@@ -140,38 +140,35 @@ function displayColumnsTable(data, dataSetTypeId) {
             const rowspan = items.length;
 
             items.forEach((col, index) => {
-                const fileExtension = col.FileType || '';
+                const fileExtension = col.FileType || col.FileExtensions ||'';
                 const fileDescription = col.FileDescription || '';
-                const isRedacted = col.Redact || false;
-                const isTokenised = col.Tokenise || false;
+                const isRedacted = col.Redact ? 1 : 0;  // Convert to 1/0
+                const isTokenised = col.Tokenise ? 1 : 0;  // Convert to 1/0
 
-                // Check if this is the first row in the group
                 if (index === 0) {
-                    // --- First Row of the Group ---
                     rowsHtml += `
-                        <tr data-id="${col.DataSetFolderFileID}-${col.FileType}" data-folder-name="${folderName}">
+                        <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
                             <td rowspan="${rowspan}">${folderName}</td>
                             <td data-field="FileType">${fileExtension}</td>
                             <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised === 1 ? 'checked' : ''}>
                             </td>
                         </tr>
                     `;
                 } else {
-                    // --- Subsequent Rows of the Group ---
                     rowsHtml += `
-                        <tr data-id="${col.DataSetFolderFileID}-${col.FileType}" data-folder-name="${folderName}">
+                        <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
                             <td data-field="FileType">${fileExtension}</td>
                             <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised === 1 ? 'checked' : ''}>
                             </td>
                         </tr>
                     `;
@@ -315,7 +312,7 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
 
         let rowHtml = '';
         if (dataSetID === "new" || !folderName) {
-            const optionsHtml = folders.map(folder => `<option value="${folder.folderId}">${folder.FolderName}</option>`).join('');
+            const optionsHtml = folders.map(folder => `<option value="${folder.FolderName}">${folder.FolderName}</option>`).join('');
             rowHtml = `
             <tr>
                 <td>Folder Name <input type="text" hidden="true"></td>
@@ -328,9 +325,9 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
                 </td>
             </tr>`;
         } else {
-            const filteredFolders = folders.filter(folder => folder.Id != folderId);
+            const filteredFolders = folders.filter(folder => folder.FolderName != folderName);
             const optionsHtml = filteredFolders
-                .map(folder => `<option value="${folder.Id}" title="${folder.FolderName}">${folder.FolderName}</option>`)
+                .map(folder => `<option value="${folder.FolderName}" title="${folder.FolderName}">${folder.FolderName}</option>`)
                 .join('');
 
             rowHtml = `
@@ -406,6 +403,7 @@ async function fetchLoomeDataSourceTablesByTableId(tableId) {
 
 
 async function fetchDataSetFieldValue(data_set_id) {
+
     if (data_set_id === "new") {
         return {
             id: null,
@@ -413,7 +411,8 @@ async function fetchDataSetFieldValue(data_set_id) {
         };
     }
 
-    const initialParams = { "data_set_id": data_set_id };
+    const initialParams = { "data_set_id": data_set_id }; 
+   
     const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
     console.log("Fetched DataSet Field Value (as array):", resultsArray);
     if (!resultsArray || resultsArray.length === 0) {
@@ -421,25 +420,33 @@ async function fetchDataSetFieldValue(data_set_id) {
         return { id: null, name: null }; // Return a default value
     }
 
+    // --- KEY CHANGE: Get the first object from the array ---
     const result = resultsArray[0];
     console.log("Fetched DataSet Field Value 1:", result);
     console.log("Result FieldID:", result.FieldID);
-
+    // If Field Value is a Table Name, the result is the ID of the table
+    // Get the actual table name from another endpoint
     // Case 1: The value is a table ID, so we need to fetch the name
-    if (result.FieldID == 3) {
+    if (result.FieldID == 3) { 
         console.log("FieldID indicates a table reference. Fetching table name...");
         const tableIdAsString = result.Value; // The value is a string, e.g., "9"
+
+        // --- CONVERT TO INTEGER HERE ---
         const tableId = parseInt(tableIdAsString, 10);
+        
         const tableInfo = await fetchLoomeDataSourceTablesByTableId(tableId);
         console.log("Fetched Table Info:", tableId, tableInfo[0]);
-        
+        // Return an object with BOTH the ID and the fetched name
         return {
             id: tableId,
             name: tableInfo[0].TableName
         };
 
+    // Case 2: The value is just a simple value, not a reference to another table
     } else {
         console.log("FieldID indicates a direct value. Using value as-is.");
+        // Return an object with the same shape for consistency.
+        // The ID can be null as it doesn't apply, and the 'name' is the value itself.
         return {
             id: null,
             name: result.Value
@@ -888,7 +895,8 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
 
         const mapFolderData = (item) => {
             return {
-                ...item, 
+                ...item,
+                FileType: item.FileType || item.FileExtensions || '',
                 FileDescription: item.FileDescription || '',
                 Redact: item.Redact || 0,
                 Tokenise: item.Tokenise || 0
@@ -899,9 +907,8 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
                 const subFolderName = tableNameSelector.value;
 
-                // Fetch data for NEW set
                 const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
-
+                console.log("Original NEW Folder Columns Data: ", originalData);
                 // Apply the consistent mapping
                 newColumnsData = originalData.map(mapFolderData);
 
@@ -1323,6 +1330,7 @@ async function renderManageDataSourcePage() {
                     //await updateColumnsForTable(1);
                     console.log("Table Name Selector Changed");
                     await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
+                    
                 }
             });
 
@@ -1411,30 +1419,31 @@ async function renderManageDataSourcePage() {
                     console.error("Cannot update: missing row or field information.");
                     return;
                 }
-
+                
                 const uniqueId = rowElement.dataset.id;
-                const columnName = rowElement.dataset.columnName;
-                const folderId = rowElement.dataset.id;
+                if (!uniqueId) {
+                    console.error("Cannot update: missing data-id on the row.");
+                    return;
+                }
 
                 console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
 
                 const columnToUpdate = allColumnsData.find(col => {
-                    // For NEW database datasets (no DataSetColumnID yet)
-                    if (currentDataSourceTypeID === 1 && !col.DataSetColumnID && columnName) {
-                        return col.ColumnName === columnName;
-                    }
-                    // For EXISTING database datasets
                     if (col.DataSetColumnID && col.DataSetColumnID == uniqueId) return true;
-                    // For folder type
-                    if (col.DataSetFolderFileID && col.FileType && `${col.DataSetFolderFileID}-${col.FileType}` === uniqueId) return true;
+                    if (col.FolderName && col.FileType) {
+                        const folderFileKey = `${col.FolderName}-${col.FileType}`;
+                        if (folderFileKey === uniqueId) return true;
+                    }
                     return false;
                 });
 
                 if (columnToUpdate) {
                     columnToUpdate[field] = value;
-                    console.log("Updated in-memory data:", allColumnsData);
+                    console.log("✓ Updated successfully. Object now:", columnToUpdate);
+                    console.log("✓ Full allColumnsData:", allColumnsData);
                 } else {
-                    console.error("Could not find matching object in allColumnsData for uniqueId:", uniqueId);
+                    console.error("✗ Could not find matching object for uniqueId:", uniqueId);
+                    console.error("Available objects:", allColumnsData.map(col => `${col.FolderName}-${col.FileType}`));
                 }
             }
 
