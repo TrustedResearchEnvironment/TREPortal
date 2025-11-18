@@ -109,8 +109,8 @@ function displayColumnsTable(data, dataSetTypeId) {
     let rowsHtml = '';
     if (dataSetTypeId == 1) { // Database type
 
-        rowsHtml = data.map(col => `
-            <tr data-id="${col.DataSetColumnID || ''}" data-column-name="${col.ColumnName}">
+        rowsHtml = data.map((col, index) => `
+            <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
                 <td>${col.ColumnName || ''}</td>
                 <td class="editable-cell" data-field="LogicalColumnName">${col.LogicalColumnName || ''}</td>
                 <td class="editable-cell" data-field="BusinessDescription">${col.BusinessDescription || ''}</td>
@@ -1429,7 +1429,11 @@ async function renderManageDataSourcePage() {
                 console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
 
                 const columnToUpdate = allColumnsData.find(col => {
+                    // Match by DataSetColumnID (for existing datasets)
                     if (col.DataSetColumnID && col.DataSetColumnID == uniqueId) return true;
+                    // Match by ColumnName (for new datasets)
+                    if (col.ColumnName && col.ColumnName === uniqueId) return true;
+                    // Match by FolderName-FileType (for folder type)
                     if (col.FolderName && col.FileType) {
                         const folderFileKey = `${col.FolderName}-${col.FileType}`;
                         if (folderFileKey === uniqueId) return true;
