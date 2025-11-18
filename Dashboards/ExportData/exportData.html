@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Data Export Requests</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="exportData.css">
+</head>
+<body>
+    <div id="webcrumbs">
+        <div class="bg-gray-50 min-h-screen p-6">
+            <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+                <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                    <h1 class="text-2xl font-bold text-black">My Data Export Requests</h1>
+                    
+                    <button id="request-export-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg hover:bg-[#3da59d] transition-colors">
+                        Request Data Export
+                    </button>
+                </div>
+
+                <div class="p-6">
+                    <div id="export-jobs-table-area">
+                    </div>
+
+                    <div id="pagination-controls" class="flex justify-between items-center mt-4 px-2">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="export-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">New Data Export Request</h2>
+                <button id="modal-close-btn" class="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <form id="export-form">
+                <div class="mb-4">
+                    <label for="export-type" class="block text-sm font-medium text-gray-700 mb-2">Source Assist Project</label>
+                    <select id="export-type" name="export-type" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#4ec4bc] focus:border-[#4ec4bc]">
+                        <option value="">Select source Assist Project...</option>
+                    </select>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" id="modal-submit-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#3da59d]" disabled>
+                        Submit Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="exportData.js"></script>
+</body>
+</html>
