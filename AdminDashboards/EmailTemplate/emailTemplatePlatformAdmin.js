@@ -1,6 +1,7 @@
 // Define the single container ID for the table
 const TABLE_CONTAINER_ID = 'requests-table-area';
-const API_REQUEST_ID = 14;
+const API_REQUEST_ID = 'GetEmailTemplates';
+const API_UPDATE_EMAIL_TEMPLATE = 'UpdateEmailTemplate';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -469,7 +470,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                         "email_template_subject":  updatedSubject,
                         "email_template_body":  JSON.stringify(updatedTemplateText)
                     };
-                    const updatedEmailTemplate = await window.loomeApi.runApiRequest(45, updateParams);
+                    const updatedEmailTemplate = await window.loomeApi.runApiRequest(API_UPDATE_EMAIL_TEMPLATE, updateParams);
 
                     // --- 3. Handle the Server's Response ---
                     if (!updatedEmailTemplate) {

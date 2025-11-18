@@ -2,7 +2,9 @@
 //                      STATE & CONFIGURATION
 // =================================================================
 const TABLE_CONTAINER_ID = 'requests-table-area';
-const API_REQUEST_ID = 16;
+const API_REQUEST_ID = 'GetAllRequests';
+const API_APPROVE_REQUEST = 'ApproveRequestID';
+const API_REJECT_REQUEST = 'RejectRequestID';
 
 // We will store all fetched data here
 let allRequests = []; 

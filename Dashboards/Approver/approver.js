@@ -2,7 +2,12 @@
 //                      STATE & CONFIGURATION
 // =================================================================
 const TABLE_CONTAINER_ID = 'requests-table-area';
-const API_REQUEST_ID = 15;
+const API_REQUEST_ID = 'GetRequestList';
+const API_APPROVE_REQUEST = 'ApproveRequestID';
+const API_REJECT_REQUEST = 'RejectRequestID';
+const API_GET_REQUEST_DETAILS = 'GetRequestID';
+const API_GET_DATASET_DETAILS = 'GetDataSetID';
+const API_GET_ALL_ASSIST_PROJECTS = 'GetAllAssistProjects';
 
 // We will store all fetched data here
 let allRequests = []; 
@@ -242,7 +247,7 @@ async function approveRequestFromAPI(requestId) {
         loadingToast = showToast('Approving request...', 'info');
         console.log('Loading toast shown:', loadingToast);
         
-        const response = await window.loomeApi.runApiRequest(23, {
+        const response = await window.loomeApi.runApiRequest(API_APPROVE_REQUEST, {
             "id": requestId,
         });
         
@@ -351,7 +356,7 @@ async function rejectRequestFromAPI(requestId) {
         // Show loading state
         loadingToast = showToast('Rejecting request...', 'info');
         
-        const response = await window.loomeApi.runApiRequest(24, {
+        const response = await window.loomeApi.runApiRequest(API_REJECT_REQUEST, {
             "id": requestId,
         });
         
@@ -500,7 +505,7 @@ async function fetchRequestDetails(requestID) {
     try {
         
         // Call the API
-        const response = await window.loomeApi.runApiRequest(8, {
+        const response = await window.loomeApi.runApiRequest(API_GET_REQUEST_DETAILS, {
             "RequestID": requestID,
         });
         
@@ -521,7 +526,7 @@ async function fetchDatasetDetails(datasetID) {
     try {
         
         // Call the API
-        const response = await window.loomeApi.runApiRequest(6, {
+        const response = await window.loomeApi.runApiRequest(API_GET_DATASET_DETAILS, {
             "DataSetID": datasetID,
         });
         
@@ -545,7 +550,7 @@ async function getProjectsMapping() {
     try {
         
         // Fetch projects data
-        const response = await window.loomeApi.runApiRequest(44);
+        const response = await window.loomeApi.runApiRequest(API_GET_ALL_ASSIST_PROJECTS);
         const data = safeParseJson(response);
         
         // Create a mapping from project ID to project name
@@ -761,7 +766,7 @@ function renderTable(containerId, data, config, selectedStatus) {
     if (selectedStatus === 'Pending Approval') headers.push('Approvers');
     else if (selectedStatus === 'Approved') { headers.push('Approved by'); headers.push('Approved on'); }
     else if (selectedStatus === 'Rejected') { headers.push('Rejected by'); headers.push('Rejected on'); }
-    else if (selectedStatus === 'Finalised') { headers.push('Approved on'); headers.push('Approved by'); headers.push('Finalised on'); }
+    else if (selectedStatus === 'Finalised') { headers.push('Approved by'); headers.push('Approved on'); headers.push('Finalised on'); }
     headers.forEach(headerText => {
         const th = document.createElement('th');
         th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';

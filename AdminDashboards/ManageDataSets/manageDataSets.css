@@ -11,3 +11,70 @@
     color: white;
     border-color: #454d55; /* Optional: Adjust border for a cleaner look */
 }
+
+/* 1. The Wrapper: This container helps us position the custom arrow. */
+.custom-dropdown-wrapper {
+  position: relative; /* Establishes a positioning context for the ::after pseudo-element. */
+  width: 100%;
+}
+
+/* 2. The Select Element Itself: This is where we do the main styling. */
+.selectpicker {
+  /* --- A. Reset and Basic Styling --- */
+  -webkit-appearance: none; /* Removes default Chrome/Safari styling */
+  -moz-appearance: none;    /* Removes default Firefox styling */
+  appearance: none;         /* Removes default styling for other browsers */
+  
+  /* --- B. Custom Appearance (to look like a clean input field) --- */
+  display: block;
+  width: 100%;
+  padding: 0.5rem 2.5rem 0.5rem 0.75rem; /* Right padding makes room for our custom arrow */
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #333; /* Darker text for readability */
+  
+  /* --- C. Background and Border --- */
+  background-color: #ffffff; /* A clean white background */
+  background-image: none;     /* Ensure no gradient or image is applied by default */
+  border: 1px solid #ced4da; /* A standard light gray border */
+  border-radius: 0.25rem;     /* Slightly rounded corners */
+  
+  /* --- D. User Experience --- */
+  cursor: pointer; /* Changes the cursor to a hand to show it's clickable */
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* 3. Hover and Focus States: Provide visual feedback to the user. */
+
+/* On hover, slightly change the border color */
+.selectpicker:hover {
+  border-color: #86b7fe; /* A light blue to indicate interactivity */
+}
+
+/* When the dropdown is clicked (focused) */
+.selectpicker:focus {
+  border-color: #86b7fe;
+  outline: 0; /* Remove the default browser outline */
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); /* Add a modern "glow" effect */
+  background-color: #ffffff; /* IMPORTANT: Explicitly keep the background white on focus */
+}
+
+/* 4. The Custom Arrow Icon */
+.custom-dropdown-wrapper::after {
+  /* You can use a character, an SVG, or a CSS triangle here */
+  content: '▼';
+  
+  /* Styling the arrow */
+  font-size: 0.75rem;
+  color: #6c757d; /* A muted gray for the arrow */
+  
+  /* Positioning the arrow inside the wrapper */
+  position: absolute;
+  top: 50%;
+  right: 1rem; /* Adjust horizontal position */
+  transform: translateY(-50%); /* Perfectly centers the arrow vertically */
+  
+  /* This is crucial: it allows the user to click "through" the arrow to the select box */
+  pointer-events: none;
+}

@@ -46,11 +46,27 @@ def GetAuthenticationHeaders(clientID, clientSecret, identityurl, scope='webApi'
     return headers
 
 
+# get all existign api requests
+# GET: https://test-app-api.loomesoftware.com/api/v1/apirequests
+def GetAllApiRequests(apiurl, headers):
+    response = requests.request("GET", apiurl + '/apirequests', headers=headers)
+    if response.status_code != 200:
+        print("Failed to get API Requests")
+        exit()
+    return json.loads(response.text)
 
 
 # main
 if __name__ == "__main__":
     headers = GetAuthenticationHeaders(clientId, clientSecret, IDENTITY_URL)
+    
+    existing_requests = GetAllApiRequests(API_URL, headers)
+    print(f"Existing Requests Count: {len(existing_requests)}")
+    # list all existing
+    for req in existing_requests:
+        print(f"Existing Request: {req['name']} with ID: {req['id']}")
+
+    
     with open('AllRequests.json') as f:
         requests_data = json.load(f)
 
@@ -70,6 +86,16 @@ if __name__ == "__main__":
         # # on url swap REMOVED with http://test-app.loomesoftware.com
         # generate a random name 
         # request['name'] =  str(int(time.time()))
+        # remove id
+        # request.pop('id', None)
+        # look in existing_requests and see if the name is there, if so use that ID
+        for existing_request in existing_requests:
+            if existing_request['name'] == request['name']:
+                request['id'] = existing_request['id']
+                print(f"Found existing request: {request['name']} with ID: {request['id']}")
+                break
+            else:
+                request['id'] = 0
 
         if 'url' in request:
             request['url'] = request['url'].replace('https://PLACEHOLDER', FASTAPI_URL)
@@ -79,16 +105,18 @@ if __name__ == "__main__":
                 if header['key'] == 'X-API-Key':
                     header['value'] = API_KEY
 
-        # show id
-        # print(request['id'])
-        response = requests.request("PUT", API_URL + '/apirequests', data=json.dumps(request), headers=headers)
+        # if id is 0 do a post
+        if request['id'] == 0:
+            response = requests.request("POST", API_URL + '/apirequests', data=json.dumps(request), headers=headers)
+        else:
+            response = requests.request("PUT", API_URL + '/apirequests', data=json.dumps(request), headers=headers)
         if response.status_code == 200:
-            print(f"Successfully submitted request:  {request['id']} {request['name']}")
+            print(f"Successfully submitted request:    {request['name']}")
             # print(response.text)
             # sleep 5
             time.sleep(4)
         else:
             print(response.text)
-            print(f"FAILED: to submit request: {request['id']} {request['name']}, Status Code: {response.status_code}")
+            print(f"FAILED: to submit request:   {request['name']}, Status Code: {response.status_code}")
             print(response.status_code)
         # exit()

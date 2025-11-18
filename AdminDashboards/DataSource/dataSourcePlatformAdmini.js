@@ -1,7 +1,13 @@
 // Define the single container ID for the table
 const TABLE_CONTAINER_ID = 'requests-table-area';
-const API_DATASOURCE_ID = 5
-const DBCONNECTION_API_ID = 33
+const API_DATASOURCE_ID = 'GetDataSource';
+const API_UPDATE_DATASOURCE_ID = 'UpdateDataSource';
+const API_DBCONNECTION_ID = 'GetDatabaseConnection';
+
+const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
+const API__DATASOURCE_FIELDVALUE_ID = 'GetDataSourceFieldValues';
+const API__DATASOURCE_FOLDER_ID = 'GetFolderConnection';
+const API_ADD_DATASOURCE_ID = 'AddDataSource';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -14,6 +20,7 @@ const searchInput = document.getElementById('searchRequests');
 
 let dataSourceTypeMap = new Map();
 let dbConnectionMap = new Map();
+let folderConnectionMap = new Map();
 
 /**
  * Displays a temporary "toast" notification on the screen.
@@ -71,7 +78,7 @@ function showToast(message, type = 'success', duration = 3000) {
  */
 async function createDbConnectionMap() {
     try {
-        const response = await window.loomeApi.runApiRequest(DBCONNECTION_API_ID, {});
+        const response = await window.loomeApi.runApiRequest(API_DBCONNECTION_ID, {});
         const connections = safeParseJson(response);
 
         if (!connections || connections.length === 0) {
@@ -90,6 +97,39 @@ async function createDbConnectionMap() {
 
     } catch (error) {
         console.error("Failed to create DB connection map:", error);
+        return new Map(); // Return empty map on failure
+    }
+}
+
+
+
+// Miguel
+/**
+ * Fetches all Folder connections and creates a lookup map.
+ * @returns {Promise<Map<number, string>>} A promise that resolves to a Map where the
+ * key is the ConnectionId and the value is the ConnectionName.
+ */
+async function createFolderConnectionMap() {
+    try {
+        const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID, {});
+        const connections = safeParseJson(response);
+
+        if (!connections || connections.length === 0) {
+            return new Map(); // Return an empty map if no data
+        }
+
+        // Use reduce() to transform the array into a Map
+        const connectionMap = connections.reduce((map, item) => {
+            if (item.ConnectionID && item.ConnectionName) {
+                map.set(item.ConnectionID, item.ConnectionName);
+            }
+            return map;
+        }, new Map());
+
+        return connectionMap;
+
+    } catch (error) {
+        console.error("Failed to create Folder connection map:", error);
         return new Map(); // Return empty map on failure
     }
 }
@@ -214,7 +254,7 @@ function AddDataSource(typeNamesList, allFields) {
         if (selectedTypeId === 1) {
             try {
                 // MIGUEL TO BE UPDATED
-                const response = await window.loomeApi.runApiRequest(DBCONNECTION_API_ID);
+                const response = await window.loomeApi.runApiRequest(API_DBCONNECTION_ID);
                 const connections = safeParseJson(response);
                 
                 // Store ConnectionId in a data attribute that we can access later
@@ -268,7 +308,50 @@ function AddDataSource(typeNamesList, allFields) {
             }
             return;
         }
+        // Special handling for Folder type (ID = 3)
+        else if (selectedTypeId === 3) {
+            try {
+                const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID);
+                const folders = safeParseJson(response);
 
+                // MIGUEL: Change ConnectionID and ConnectionName to FolderID and FolderName later
+                const dropdownHtml = `
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40%;">Name</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Folder Connection</td>
+                                <td class="relative">
+                                    <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
+                                            name="Folder Connection">
+                                        <option value="" class="text-gray-500">Select a connection...</option>
+                                        ${folders.map(folder => `
+                                            <option value="${folder.ConnectionID}">${folder.ConnectionName}</option>
+                                        `).join('')}
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+
+                fieldsContainer.innerHTML = dropdownHtml;
+            } catch (error) {
+                console.error('Failed to fetch folders:', error);
+                fieldsContainer.innerHTML = '<p class="text-danger">Error loading folders.</p>';
+            }
+            return;
+        }
         // Original code for other types
         const requiredFieldIds = typeIdToFieldIdMap[selectedTypeId] || [];
 
@@ -324,13 +407,13 @@ function AddDataSource(typeNamesList, allFields) {
  * @returns {Promise<Array>} A promise that resolves to an array of all data source types.
  */
 async function getAllDataSourceTypes(pageSize = 100) {
-    const DATASOURCETYPE_API_ID = 13;
+    
     let allResults = []; // Use a local variable to store results
 
     try {
         // --- 1. Initial request ---
         const initialParams = { "page": 1, "pageSize": pageSize, "search": '' };
-        const initialResponse = await window.loomeApi.runApiRequest(DATASOURCETYPE_API_ID, initialParams);
+        const initialResponse = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, initialParams);
         const parsedInitial = safeParseJson(initialResponse);
 
         if (!parsedInitial || parsedInitial.RowCount === 0) {
@@ -351,7 +434,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
             console.log(`Fetching page ${page} of ${totalPages}...`);
             const params = { "page": page, "pageSize": pageSize, "search": '' };
             // FIXED BUG: Use the correct API ID in the loop
-            const response = await window.loomeApi.runApiRequest(DATASOURCETYPE_API_ID, params);
+            const response = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, params);
             const parsed = safeParseJson(response);
             if (parsed && parsed.Results) {
                 allResults = allResults.concat(parsed.Results);
@@ -426,10 +509,8 @@ async function fetchApiData(apiId, params = {}, context = 'data') {
  * @returns {Promise<object|null>} A promise resolving to a single field value object, or null on failure.
  */
 async function getAllFields(fieldID) {
-    const DATASOURCEFIELDVALUE_API_ID = 19;
-
     // Call the generic helper
-    return fetchApiData(DATASOURCEFIELDVALUE_API_ID, {});
+    return fetchApiData(API__DATASOURCE_FIELDVALUE_ID, {});
 }
 
 /**
@@ -584,25 +665,39 @@ const renderAccordionDetails = (item) => {
 
     // --- NEW: Logic to build the fields table HTML ---
     let fieldsTableHtml = '';
+
+    
+    
     // Check if item.Fields exists and is not an empty object
     if (item.Fields && Object.keys(item.Fields).length > 0) {
         // Use Object.entries to iterate over key-value pairs
         const fieldRows = Object.entries(item.Fields).map(([key, value]) => {
             displayValue = value; // Default display value
 
+            // For overriding key display names
+            let displayKey = key;
+
             // Check if the current field is Database Connection
             if (key === 'Database Connection') {
                 // Look up the name from our map. Use parseInt because the ID might be a string.
                 // If not found, fall back to showing the original value (the ID).
                 displayValue = dbConnectionMap.get(parseInt(value)) || value;
-            }
+            } else if (key === 'Folder Connection') {
+                // Look up the name from our map. Use parseInt because the ID might be a string.
+                // If not found, fall back to showing the original value (the ID).
+                
+                displayValue = folderConnectionMap.get(parseInt(value)) || value;
 
+                // instead of Folder Name in the Name column, use 'Folder Connection'
+                displayKey = 'Folder Connection';
+            }
+            
 
             return `
                 <tr>
-                    <td class="p-2 border-t">${key}</td>
+                    <td class="p-2 border-t">${displayKey}</td>
                     <td class="p-2 border-t">
-                        <span id="dbConnValue" data-field-name="${key}">${displayValue || ''}</span>
+                        <span id="dbConnValue" data-field-name="${displayKey}">${displayValue || ''}</span>
                         
                     </td>
                 </tr>
@@ -735,7 +830,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             if (isAccordion) {
                 triggerRow.className = 'accordion-trigger hover:bg-gray-50 cursor-pointer';
                 // Use a more robust unique ID
-                const accordionId = `accordion-content-${item.DataSourceID || index}`;
+                const accordionId = `accordion-content-${item.DataSourceId || index}`;
                 triggerRow.dataset.target = `#${accordionId}`;
             }
             
@@ -768,7 +863,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
             if (isAccordion) {
                 const contentRow = document.createElement('tr');
-                const accordionId = `accordion-content-${item.DataSourceID || index}`;
+                const accordionId = `accordion-content-${item.DataSourceId || index}`;
                 contentRow.id = accordionId;
                 contentRow.className = 'accordion-content hidden';
                 
@@ -861,15 +956,33 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     // }
 
                     // --- 2. Send Request to the Endpoint using fetch ---
-                    const updateParams = {
-                        "data_source_id": dataSourceId ,
-                        "description":  updatedDescription,
-                        "isActive":  updatedIsActive,
-                        "name":  updatedName,
-                        "fieldName": "Database Connection",
-                        "fieldValue": displayValue
-                    };
-                    const updatedDataSource = await window.loomeApi.runApiRequest(21, updateParams);
+                    const dbConnSpan = document.getElementById('dbConnValue');
+                    const connType = dbConnSpan.dataset.fieldName;
+                    
+                    let updateParams = {}
+                    if (connType == 'Database Connection') {
+                        updateParams = {
+                            "data_source_id": dataSourceId ,
+                            "description":  updatedDescription,
+                            "isActive":  updatedIsActive,
+                            "name":  updatedName,
+                            "fieldName": "Database Connection",
+                            "fieldValue": displayValue
+                        };
+                    } else if (connType == 'Folder Connection') {
+                        updateParams = {
+                            "data_source_id": dataSourceId ,
+                            "description":  updatedDescription,
+                            "isActive":  updatedIsActive,
+                            "name":  updatedName,
+                            "fieldName": "Folder Connection",
+                            "fieldValue": displayValue
+                        };
+                    }
+                    
+
+                    
+                    const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, updateParams);
 
                     // --- 3. Handle the Server's Response ---
                     if (!updatedDataSource) {
@@ -989,6 +1102,8 @@ async function renderPlatformAdminDataSourcePage() {
     dataSourceTypeMap = await createDataSourceTypeMap(allTypesArray);
     dbConnectionMap = await createDbConnectionMap();
 
+    folderConnectionMap = await createFolderConnectionMap();
+
     const typeNamesList = allTypesArray.map(item => item.Name);
 
     const fields = await getAllFields();
@@ -1097,7 +1212,7 @@ async function renderPlatformAdminDataSourcePage() {
 
         try {
             
-            const response = await window.loomeApi.runApiRequest(22, payload);
+            const response = await window.loomeApi.runApiRequest(API_ADD_DATASOURCE_ID, payload);
             console.log("RESPONSE: ", response)
             
             showToast('Data Source added successfully!\nPlease wait while the data refreshes.', 'success');
