@@ -1,4 +1,3 @@
-
 // API Constants
 const API_GET_COLUMNS_DATA = 'GetColumnsDataByDataSetID';
 const API_GET_DATASOURCE_FOLDERS = 'GetLoomeDataSourceFolders';
@@ -13,7 +12,6 @@ const API_UPDATE_DATASET = 'UpdateDataSet';
 const API_GET_DATASOURCE_SUBFOLDERS = 'GetLoomeDataSourceFirstSubFolders';
 const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWithFiles';
 const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
-
 
 const pageSize = 10;
 let currentPage = 1;
@@ -33,7 +31,7 @@ function showToast(message, type = 'success', duration = 3000) {
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
     toast.textContent = message;
-    
+
     // Basic styling
     const style = document.createElement('style');
     document.head.appendChild(style);
@@ -54,14 +52,14 @@ function showToast(message, type = 'success', duration = 3000) {
     `);
     style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
     style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
-    
+
     // Append to body and trigger animation
     document.body.appendChild(toast);
     setTimeout(() => {
         toast.style.opacity = '1';
         toast.style.transform = 'translateY(0)';
     }, 10); // A tiny delay to allow the CSS transition to work
-    
+
     // Set a timer to remove the toast
     setTimeout(() => {
         toast.style.opacity = '0';
@@ -79,12 +77,12 @@ function showToast(message, type = 'success', duration = 3000) {
  */
 async function fetchSQLDataSetColumns(data_set_id, page = 1) {
     // Add page and pageSize to the parameters sent to the API
-    const params = { 
+    const params = {
         "data_set_id": data_set_id,
         "page": page,
         "pageSize": pageSize
-    }; 
-   
+    };
+
     // IMPORTANT: getFromAPI should return the single paginated object, not an array
     return getFromAPI(API_GET_COLUMNS_DATA, params);
 }
@@ -95,9 +93,6 @@ async function fetchSQLDataSetColumns(data_set_id, page = 1) {
  */
 function displayColumnsTable(data, dataSetTypeId) {
     const tableBody = document.getElementById('dataSetColsBody');
-    
-    // Extract the actual data array from the response object
-    //const columnsData = paginatedResponse ? paginatedResponse.Results : null;
 
     if (!data || data.length === 0) {
         const placeholderHtml = `
@@ -111,7 +106,6 @@ function displayColumnsTable(data, dataSetTypeId) {
     }
 
     // --- DATA EXISTS ---
-    // The mapping logic remains exactly the same
     let rowsHtml = '';
     if (dataSetTypeId == 1) { // Database type
 
@@ -129,10 +123,6 @@ function displayColumnsTable(data, dataSetTypeId) {
                 </td>
             </tr>
         `).join('');
-        // Excludeing isFilter for now
-    // <td class="checkbox-cell">
-    //     <input class="form-check-input editable-checkbox" type="checkbox" data-field="IsFilter" ${col.IsFilter ? 'checked' : ''}>
-    // </td>
 
     } else if (dataSetTypeId == 3) { // Folder type   
         // 1. Group the data by FolderName
@@ -150,10 +140,6 @@ function displayColumnsTable(data, dataSetTypeId) {
             const rowspan = items.length;
 
             items.forEach((col, index) => {
-                // --- THIS IS THE FIX ---
-                // Use the correct property name: `col.FileExtensions`
-                // Also, add default values for Redact and Tokenise if they don't exist.
-                // const fileExtension = col.FileExtensions || '';
                 const fileExtension = col.FileType || '';
                 const fileDescription = col.FileDescription || '';
                 const isRedacted = col.Redact || false;
@@ -192,17 +178,13 @@ function displayColumnsTable(data, dataSetTypeId) {
                 }
             });
         });
-
-
     }
-    
-    
+
     tableBody.innerHTML = rowsHtml;
 }
 
 /**
 * Renders a compact and functional set of pagination controls.
-* Includes First, Previous, Next, Last buttons and a page input field.
 */
 function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     const container = document.getElementById(containerId);
@@ -225,13 +207,11 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     const disabledClasses = "opacity-50 cursor-not-allowed";
 
     let paginationHTML = `
-            <!-- First Page Button -->
             <button data-page="1" 
                     class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
                     ${isFirstPage ? 'disabled' : ''}>
                 First
             </button>
-            <!-- Previous Page Button -->
             <button data-page="${currentPage - 1}" 
                     class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
                     style="margin-right: 10px;"
@@ -239,8 +219,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
                 Previous
             </button>
 
-        <!-- Page number input and display -->
-            <span>Page</span>
+        <span>Page</span>
             <input type="number" 
                    id="page-input" 
                    class="w-16 text-center border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" 
@@ -250,14 +229,12 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
                    aria-label="Current page">
             <span>of ${totalPages}</span>
 
-            <!-- Next Page Button -->
             <button data-page="${currentPage + 1}" 
                     class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}"
                     style="margin-left: 10px;" 
                     ${isLastPage ? 'disabled' : ''}>
                 Next
             </button>
-            <!-- Last Page Button -->
             <button data-page="${totalPages}" 
                     class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}" 
                     ${isLastPage ? 'disabled' : ''}>
@@ -269,9 +246,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
 }
 
 /**
- * A central function to handle page changes. It validates the new page number
- * and re-renders the table.
- * @param {number} newPage - The page number to navigate to.
+ * A central function to handle page changes.
  */
 function handlePageChange(newPage) {
     const totalPages = Math.ceil(allColumnsData.length / pageSize);
@@ -279,12 +254,11 @@ function handlePageChange(newPage) {
     // Validate the page number to ensure it's within bounds
     if (newPage >= 1 && newPage <= totalPages) {
         currentPage = newPage;
-        renderTablePage(currentDataSourceTypeID); // Your existing function to render the table and pagination
+        renderTablePage(currentDataSourceTypeID); 
     } else {
-        // Optional: Revert the input field if the user enters an invalid number
         const pageInput = document.getElementById('page-input');
         if (pageInput) {
-            pageInput.value = currentPage; 
+            pageInput.value = currentPage;
         }
         console.warn(`Invalid page number entered: ${newPage}`);
     }
@@ -293,8 +267,6 @@ function handlePageChange(newPage) {
 /////////////////////////
 /**
  * Fetches the simple field value for a Folder data set.
- * @param {string|number} data_set_id - The ID of the data set.
- * @returns {Promise<Object>} A promise that resolves to an object { id: null, name: 'folder_name' }.
  */
 async function fetchDataSetFolderValue(data_set_id) {
     if (data_set_id === "new") {
@@ -304,18 +276,17 @@ async function fetchDataSetFolderValue(data_set_id) {
         };
     }
 
-    const initialParams = { "data_set_id": data_set_id }; 
-   
+    const initialParams = { "data_set_id": data_set_id };
     const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
+    
     if (!resultsArray || resultsArray.length === 0) {
         console.warn("API returned no data for data_set_id:", data_set_id);
         return { id: null, name: null }; // Return a default value
     }
 
-    // Just get the first result and return its value directly.
     const result = resultsArray[0];
     console.log("Fetched Folder Value:", result.Value);
-    
+
     return {
         id: null, // Folders don't have a separate ID, just the name
         name: result.Value
@@ -323,13 +294,10 @@ async function fetchDataSetFolderValue(data_set_id) {
 }
 /////////////////////////
 
-
 // Data Set Field Table Rendering Functions
 
 /**
  * Renders the row for selecting a Folder.
- * @param {HTMLElement} tbody The table body to append the row to.
- * @param {object} dataSource The data source object.
  */
 async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
     tbody.innerHTML = `<tr><td>Folder Name</td><td>Loading folders...</td></tr>`;
@@ -344,11 +312,10 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
         console.log("Fetched DataSet Field Value 2:", fetchedData);
         let folderId = fetchedData.id;
         let folderName = fetchedData.name;
-        
-        if (dataSetID === "new" || !folderName) {
-            // Create the dropdown HTML with the fetched tables
-            const optionsHtml = folders.map(folder => `<option value="${folder.folderId}">${folder.FolderName}</option>`).join('');
 
+        let rowHtml = '';
+        if (dataSetID === "new" || !folderName) {
+            const optionsHtml = folders.map(folder => `<option value="${folder.folderId}">${folder.FolderName}</option>`).join('');
             rowHtml = `
             <tr>
                 <td>Folder Name <input type="text" hidden="true"></td>
@@ -360,12 +327,8 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
                     <div class="validation-message"></div>
                 </td>
             </tr>`;
-
         } else {
-
             const filteredFolders = folders.filter(folder => folder.Id != folderId);
-
-            // Now, create the options HTML from the *filtered* array.
             const optionsHtml = filteredFolders
                 .map(folder => `<option value="${folder.Id}" title="${folder.FolderName}">${folder.FolderName}</option>`)
                 .join('');
@@ -382,7 +345,7 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
                     </td>
                 </tr>`;
         }
-        
+
         tbody.innerHTML = rowHtml;
 
     } catch (error) {
@@ -393,22 +356,19 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
 
 
 async function fetchSubFolders(data_source_id) {
-    const initialParams = { "data_source_id": data_source_id }; 
-  
+    const initialParams = { "data_source_id": data_source_id };
     return getFromAPI(API_GET_DATASOURCE_SUBFOLDERS, initialParams);
 }
 
 
 async function fetchSubFoldersWithFiles(subFolderName, currentDataSourceID) {
-    const initialParams = { "sub_folder_name": subFolderName, "data_source_id": currentDataSourceID }; 
+    const initialParams = { "sub_folder_name": subFolderName, "data_source_id": currentDataSourceID };
     const results = await getFromAPI(API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES, initialParams);
-    
     return results;
 }
 
 /**
  * Renders the row for the REDCap API Key.
- * @param {HTMLElement} tbody The table body to append the row to.
  */
 function renderRedcapApiKeyRowDataSetFields(tbody) {
     const rowHtml = `
@@ -428,7 +388,7 @@ function renderRedcapApiKeyRowDataSetFields(tbody) {
                 </div>
             </td>
         </tr>`;
-    
+
     tbody.innerHTML = rowHtml;
 
     // Optional: Add an event listener to the new button
@@ -440,14 +400,12 @@ function renderRedcapApiKeyRowDataSetFields(tbody) {
 }
 
 async function fetchLoomeDataSourceTablesByTableId(tableId) {
-    const initialParams = { "table_id": tableId }; 
-   
+    const initialParams = { "table_id": tableId };
     return getFromAPI(API_GET_DATASOURCE_TABLE_BY_ID, initialParams)
 }
 
 
 async function fetchDataSetFieldValue(data_set_id) {
-
     if (data_set_id === "new") {
         return {
             id: null,
@@ -455,8 +413,7 @@ async function fetchDataSetFieldValue(data_set_id) {
         };
     }
 
-    const initialParams = { "data_set_id": data_set_id }; 
-   
+    const initialParams = { "data_set_id": data_set_id };
     const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
     console.log("Fetched DataSet Field Value (as array):", resultsArray);
     if (!resultsArray || resultsArray.length === 0) {
@@ -464,33 +421,25 @@ async function fetchDataSetFieldValue(data_set_id) {
         return { id: null, name: null }; // Return a default value
     }
 
-    // --- KEY CHANGE: Get the first object from the array ---
     const result = resultsArray[0];
     console.log("Fetched DataSet Field Value 1:", result);
     console.log("Result FieldID:", result.FieldID);
-    // If Field Value is a Table Name, the result is the ID of the table
-    // Get the actual table name from another endpoint
+
     // Case 1: The value is a table ID, so we need to fetch the name
-    if (result.FieldID == 3) { 
+    if (result.FieldID == 3) {
         console.log("FieldID indicates a table reference. Fetching table name...");
         const tableIdAsString = result.Value; // The value is a string, e.g., "9"
-
-        // --- CONVERT TO INTEGER HERE ---
         const tableId = parseInt(tableIdAsString, 10);
-        
         const tableInfo = await fetchLoomeDataSourceTablesByTableId(tableId);
         console.log("Fetched Table Info:", tableId, tableInfo[0]);
-        // Return an object with BOTH the ID and the fetched name
+        
         return {
             id: tableId,
             name: tableInfo[0].TableName
         };
 
-    // Case 2: The value is just a simple value, not a reference to another table
     } else {
         console.log("FieldID indicates a direct value. Using value as-is.");
-        // Return an object with the same shape for consistency.
-        // The ID can be null as it doesn't apply, and the 'name' is the value itself.
         return {
             id: null,
             name: result.Value
@@ -501,20 +450,15 @@ async function fetchDataSetFieldValue(data_set_id) {
 
 /**
  * Renders the row for selecting a SQL table.
- * @param {HTMLElement} tbody The table body to append the row to.
- * @param {object} dataSource The data source object (needed for connection details).
  */
 async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID) {
     // First, show a "Loading..." state
     tbody.innerHTML = `<tr><td>Table Name</td><td>Loading tables...</td></tr>`;
 
     try {
-
-        // This function should fetch the list of tables for the given data source connection.
-        const tables = await fetchSqlTables(dataSource.DataSourceID); 
+        const tables = await fetchSqlTables(dataSource.DataSourceID);
         console.log("Fetched tables:", tables);
-    
-        // Await the result from your function
+
         const fetchedData = await fetchDataSetFieldValue(dataSetID);
         console.log("Fetched DataSet Field Value 2:", fetchedData);
         let tableId = fetchedData.id;;
@@ -524,7 +468,7 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
 
         if (dataSetID === "new" || !tableId) {
             // Create the dropdown HTML with the fetched tables
-            const optionsHtml = tables.map(table => `<option value="${table.Id}">${table.TableName}</option>`).join('');      
+            const optionsHtml = tables.map(table => `<option value="${table.Id}">${table.TableName}</option>`).join('');
 
             rowHtml = `
             <tr>
@@ -539,10 +483,7 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
             </tr>`;
 
         } else {
-
             const filteredTables = tables.filter(table => table.Id != tableId);
-
-            // Now, create the options HTML from the *filtered* array.
             const optionsHtml = filteredTables
                 .map(table => `<option value="${table.Id}" title="${table.TableName}">${table.TableName}</option>`)
                 .join('');
@@ -560,8 +501,6 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
                 </tr>`;
         }
 
-        
-        
         tbody.innerHTML = rowHtml;
 
     } catch (error) {
@@ -572,17 +511,15 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
 
 
 async function fetchSqlTables(data_source_id) {
-    const initialParams = { "data_source_id": data_source_id }; 
-   
+    const initialParams = { "data_source_id": data_source_id };
     return getFromAPI(API_GET_DATASOURCE_TABLES, initialParams)
 }
 
 /**
  * Dynamically updates the "Data Set Fields" table based on the selected data source type.
- * @param {object} dataSource The full data source object, which includes DataSourceTypeID.
  */
 async function updateDataSetFieldsTable(dataSource, dataSetID) {
-   
+
     console.log("Updating fields for DataSource:", dataSource);
 
     const fieldsTable = document.getElementById('dataSetFieldsTable');
@@ -604,7 +541,7 @@ async function updateDataSetFieldsTable(dataSource, dataSetID) {
     fieldsTable.style.display = 'table';
 
     console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
-    
+
     // Use a switch to decide which content to render
     switch (dataSource.DataSourceTypeID) {
         case 1: // SQL Database Type
@@ -626,7 +563,7 @@ async function updateDataSetFieldsTable(dataSource, dataSetID) {
             fieldsTable.style.display = 'none';
             break;
     }
-  
+
 }
 // End Data Set Field Table Rendering Functions
 
@@ -634,9 +571,6 @@ async function updateDataSetFieldsTable(dataSource, dataSetID) {
 
 /**
  * Fetches the metadata value for a given DataSetID and renders it in an input field.
- * This is used for the SQL Database data source type.
- * @param {HTMLElement} tbody - The tbody element of the metadata table.
- * @param {number|null} dataSetID - The ID of the data set to fetch metadata for.
  */
 async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
     // Step 1: Provide immediate feedback to the user with a loading state.
@@ -664,12 +598,9 @@ async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
     try {
         // Step 2: AWAIT the data. The code will pause here until the API responds.
         const result = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": dataSetID });
-
-        // Step 3: Now 'result' is the actual data array. Use it to build the final HTML.
-        // Use a variable for clarity.
         const tagValue = (result && result.length > 0) ? result[0].Value : '';
 
-        // Let's assume the MetadataID for "Tag" is 5. It's important to have this in the hidden input.
+        // Let's assume the MetadataID for "Tag" is 5.
         const rowHtml = `
             <tr>
                 <td>Tag <input type="hidden" value="5"></td>
@@ -682,7 +613,6 @@ async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
 
     } catch (error) {
         console.error("Failed to fetch metadata value:", error);
-        // Step 4: Show an error message to the user if the API call fails.
         tbody.innerHTML = `
             <tr>
                 <td>Tag <input type="hidden" value="5"></td>
@@ -696,12 +626,8 @@ async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
 
 /**
  * Renders two static rows with input fields for REDCap API metadata.
- * @param {HTMLElement} tbody - The tbody element of the metadata table.
- * @param {object} dataSource - The data source object (not used in this function but passed for consistency).
  */
 function renderRedcapApiKeyRowMetaData(tbody, dataSource) {
-    // These rows are static, so we can just define the HTML directly.
-    // Using unique and descriptive IDs for each input is important.
     const rowHtml = `
         <tr>
             <td>Citations for related publications <input type="hidden" value="1"></td>
@@ -722,27 +648,23 @@ function renderRedcapApiKeyRowMetaData(tbody, dataSource) {
 
 /**
  * Hides the metadata table and shows the placeholder text.
- * This is used for data source types that do not have any metadata fields.
- * @param {HTMLElement} tbody - The tbody element of the metadata table.
  */
 function renderFolderSelectorMetaData(tbody) {
-    // As requested, this case has no metadata, so we hide the table
-    // and re-show the placeholder.
     const metaDataTable = document.getElementById('metaDataTable');
     const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
-    
+
     metaDataTable.style.display = 'none';
     metaDataPlaceholder.style.display = 'block';
     metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
 }
 
-function updateMetaDataTable(dataSource, dataSetID)  {
+function updateMetaDataTable(dataSource, dataSetID) {
     const metaDataTable = document.getElementById('metaDataTable');
     const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
     const tbody = metaDataTable.querySelector('tbody');
 
     // Clear any old data
-    tbody.innerHTML = ''; 
+    tbody.innerHTML = '';
 
     // If there's no data source selected, show the placeholder and exit.
     if (!dataSource || !dataSource.DataSourceTypeID) {
@@ -756,7 +678,7 @@ function updateMetaDataTable(dataSource, dataSetID)  {
     metaDataTable.style.display = 'table';
 
     console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
-    
+
     // Use a switch to decide which content to render
     switch (dataSource.DataSourceTypeID) {
         case 1: // SQL Database Type
@@ -785,8 +707,6 @@ function updateMetaDataTable(dataSource, dataSetID)  {
 
 /**
  * Safely parses a response that might be a JSON string or an object.
- * @param {string | object} response The API response.
- * @returns {object}
  */
 function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
@@ -794,7 +714,7 @@ function safeParseJson(response) {
 
 async function getFromAPI(API_ID, initialParams) {
     let allResults = [];
-    
+
     try {
         const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
         const parsedInitial = safeParseJson(initialResponse);
@@ -804,26 +724,24 @@ async function getFromAPI(API_ID, initialParams) {
             console.log("API returned no data.");
             return [];
         }
-        
+
         let allResults = []; // Initialize as an empty array for a clean state
 
         // --- DETECTION LOGIC ---
-        // Check if the response has the signature of a paginated object.
-        // Checking for PageCount is more reliable than just checking for Results.
         if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
-            
+
             // --- PAGINATED PATH ---
             console.log("Detected a paginated response.");
-            
+
             allResults = parsedInitial.Results;
             const totalPages = parsedInitial.PageCount;
 
             if (totalPages > 1) {
                 for (let page = 2; page <= totalPages; page++) {
                     console.log(`Fetching page ${page} of ${totalPages}...`);
-                    
+
                     // Construct params for the next page, preserving other initial params
-                    const params = { ...initialParams, "page": page }; 
+                    const params = { ...initialParams, "page": page };
                     console.log(params)
                     const response = await window.loomeApi.runApiRequest(API_ID, params);
                     const parsed = safeParseJson(response);
@@ -839,13 +757,9 @@ async function getFromAPI(API_ID, initialParams) {
             // --- NON-PAGINATED PATH ---
             console.log("Detected a non-paginated response.");
 
-            // The entire response is the result.
-            // We ensure it's always an array for a consistent return type.
             if (Array.isArray(parsedInitial)) {
-                // If the response is already an array, use it directly.
                 allResults = parsedInitial;
             } else {
-                // If the response is a single object, wrap it in an array.
                 allResults = [parsedInitial];
             }
         }
@@ -856,33 +770,26 @@ async function getFromAPI(API_ID, initialParams) {
     } catch (error) {
         console.error("An error occurred while fetching data source types:", error);
         return [];
-    }  
+    }
 }
 
 async function getAllDataSets() {
     const initialParams = { "page": 1, "pageSize": 100, "search": '', activeStatus: 3 }; //Get both active and inactive Data Set
-   
     return getFromAPI(API_GET_DATASETS, initialParams)
-    
 }
 
 async function getAllDataSources() {
-    const initialParams = { "page": 1, "pageSize": 100, "search": '' }; 
-   
+    const initialParams = { "page": 1, "pageSize": 100, "search": '' };
     return getFromAPI(API_GET_DATASOURCES, initialParams)
-    
 }
 
 /**
  * Populates the dropdown with the list of existing data sources.
  */
 function populateExistingDataSets(optgroup, allResults) {
-    // First, clear any existing options from the optgroup.
     optgroup.innerHTML = '';
-
-    // A good practice is to sort the data before rendering.
     allResults.sort((a, b) => a.Name.localeCompare(b.Name));
-    
+
     allResults.forEach(ds => {
         const option = document.createElement('option');
         option.value = ds.DataSetID;
@@ -906,36 +813,29 @@ function populateDataSourceOptions(selectElement, data, valueField, textField) {
 
 /**
  * Fetches the schema for a given table ID and formats it into a standard array of column objects.
- * @param {string|number} tableId The ID of the table to fetch.
- * @returns {Promise<Array<Object>>} A promise that resolves to the array of formatted column objects, or an empty array on failure.
  */
 async function formatSQLColumnsFromSchema(tableId) {
     try {
         const tableDataArray = await fetchLoomeDataSourceTablesByTableId(tableId);
 
-        // Safety check: ensure we got a valid response
         if (!tableDataArray || tableDataArray.length === 0) {
             console.warn(`No schema data found for Table ID: ${tableId}`);
             return [];
         }
 
         const tableSchema = tableDataArray[0];
-
-        // IMPROVEMENT (Robustness): Use `|| ''` to prevent .split() from crashing on null/undefined.
         const columnNames = (tableSchema.ColumnList || '').split(",").map(name => name.trim());
         const columnTypes = (tableSchema.ColumnTypes || '').split(",").map(type => type.trim());
 
-        // Safety check for mismatched lengths
         if (columnNames.length !== columnTypes.length) {
             console.error("Mismatch between the number of column names and column types.");
             return [];
         }
 
-        // Map the names and types into the final object structure
         const formattedColumns = columnNames.map((name, index) => ({
             "ColumnName": name,
             "ColumnType": columnTypes[index],
-            "LogicalColumnName": '', // Use empty string instead of null for consistency
+            "LogicalColumnName": '', 
             "BusinessDescription": '',
             "ExampleValue": '',
             "Tokenise": false,
@@ -949,10 +849,9 @@ async function formatSQLColumnsFromSchema(tableId) {
 
     } catch (error) {
         console.error(`Error fetching or formatting schema for Table ID ${tableId}:`, error);
-        return []; // Always return an array to prevent downstream errors
+        return [];
     }
 }
-
 
 
 /**
@@ -981,7 +880,6 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
                 const tableId = tableNameSelector.value;
                 console.log(`FETCHING schema for new Data Set from Table ID: ${tableId}...`);
-                // This now calls your dedicated helper function
                 newColumnsData = await formatSQLColumnsFromSchema(tableId);
             }
         }
@@ -990,1088 +888,41 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
 
         const mapFolderData = (item) => {
             return {
-                ...item, // Copy all original properties
-
-                // Explicitly provide defaults for properties that might be null
-                // or missing. This ensures the structure is consistent.
+                ...item, 
                 FileDescription: item.FileDescription || '',
                 Redact: item.Redact || 0,
                 Tokenise: item.Tokenise || 0
             };
         };
         if (dataSetId === 'new') {
-                const tableNameSelector = document.getElementById('tableNameSelector');
-                if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
-                    const subFolderName = tableNameSelector.value;
-                    
-                    // Fetch data for NEW set
-                    const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
-                    
-                    // Apply the consistent mapping
-                    newColumnsData = originalData.map(mapFolderData);
-                    
-                    console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
-                }
-            } else if (dataSetId && dataSetId !== 'new') {
-                try {
-                    
-                    // 1. Fetch data for EXISTING set (SAVED data from DB)
-                    const fetchedData = await getFromAPI(API_GET_DATASET_FOLDERFILE, { "data_set_id": dataSetId });
+            const tableNameSelector = document.getElementById('tableNameSelector');
+            if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
+                const subFolderName = tableNameSelector.value;
 
-                    // 2. Apply the SAME consistent mapping
-                    newColumnsData = fetchedData.map(mapFolderData);
+                // Fetch data for NEW set
+                const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
 
-                    console.log("Fetched and Mapped EXISTING (saved) folder columns:", newColumnsData);
+                // Apply the consistent mapping
+                newColumnsData = originalData.map(mapFolderData);
 
-                } catch (error) {
-                    console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
-                }
+                console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
             }
-    }
-    
-
-    // --- CRITICAL: Update the master state ---
-    allColumnsData = newColumnsData || [];
-    currentPage = 1; // Always reset to the first page when data is reloaded
-
-    // Finally, render the first page of the NEW data
-    renderTablePage(dataSourceTypeId);
-}
-
-/**
- * Renders the UI based on the current state of `allColumnsData` and `currentPage`.
- * This function DOES NOT fetch data.
- */
-function renderTablePage(dataSetTypeId) {
-    // Calculate the slice of data for the current page
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    console.log(startIndex, endIndex)
-    const pageData = allColumnsData.slice(startIndex, endIndex);
-    console.log("pageData: ", pageData, allColumnsData)
-    // Render the table with only the data for the current page
-    displayColumnsTable(pageData, dataSetTypeId);
-    
-    console.log(allColumnsData.length, pageSize, currentPage)
-    // Render the pagination controls based on the FULL dataset length
-    renderPagination('pagination-controls', allColumnsData.length, pageSize, currentPage);
-}
-
-/**
- * Gathers all data from the form fields and tables into a structured object.
- * @returns {object} An object containing mainDetails and columns arrays.
- */
-function gatherFormData(allColumnsData) {
-    // --- Part A: Gather Main Form Details ---
-    const mainDetails = {
-        Name: document.getElementById('dataSetName').value,
-        Description: document.getElementById('dataSetDescription').value,
-        DataSourceID: parseInt(document.getElementById('dataSource').value, 10),
-        Owner: document.getElementById('dataSetOwner').value,
-        Approvers: document.getElementById('dataSetApprover').value,
-        IsActive: document.getElementById('dataSetActive').checked
-    };
-
-    // --- Part B: Gather Dynamic Metadata (from dataSetFieldsTable and metaDataTable) ---
-    // This is a generic way to scrape key-value metadata.
-    const metaData= [];
-    const dataSetFieldValues = [];
-    const fieldsTableBody = document.getElementById('dataSetFieldsTable').querySelector('tbody');
-    const metaTableBody = document.getElementById('metaDataTable').querySelector('tbody');
-
-    // Helper to scrape a metadata and data set fields table
-    const scrapeMetaTable = (tbody) => {
-        tbody.querySelectorAll('tr').forEach(row => {
-            const keyInput = row.querySelector('td:first-child input[type="hidden"]');
-            const valueInput = row.querySelector('td:last-child input, td:last-child select');
-            if (keyInput && valueInput) {
-                metaData.push({ //MetaDataID being 1 is only for those with "Tag" as the Metadata
-                    MetaDataID: 1, //parseInt(keyInput.value, 10),
-                    Value: valueInput.value
-                });
-            }
-        });
-    };
-
-    const scrapeFieldsTable = (tbody) => {
-        // --- PATH 1: Check for the specific SQL Table Name selector first ---
-        const tableNameSelector = tbody.querySelector('#tableNameSelector');
-        if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== "-1") {
-            // The FieldID for "Table Name" is 3. THIS ONLY APPLIES FOR SQL DATA SOURCES.
-            dataSetFieldValues.push({
-                FieldID: 3, // Hardcode the ID since we know what we found
-                Value: tableNameSelector.value
-            });
-            return; // We're done with this table, so we can exit.
-        }
-
-// API Constants
-const API_GET_COLUMNS_DATA = 'GetColumnsDataByDataSetID';
-const API_GET_DATASOURCE_FOLDERS = 'GetLoomeDataSourceFolders';
-const API_GET_DATASOURCE_TABLES = 'GetLoomeDataSourceTablesByDataSourceID';
-const API_GET_DATASOURCE_TABLE_BY_ID = 'GetLoomeDataSourceTablesByTableId';
-const API_GET_DATASET_FIELD_VALUE = 'GetDataSetFieldValuesByDataSetID';
-const API_GET_DATASET_METADATA_VALUE = 'GetDataSetMetaDataValue';
-const API_GET_DATASETS = 'GetDataSet';
-const API_GET_DATASOURCES = 'GetDataSource';
-const API_CREATE_DATASET = 'CreateDataSet';
-const API_UPDATE_DATASET = 'UpdateDataSet';
-const API_GET_DATASOURCE_SUBFOLDERS = 'GetLoomeDataSourceFirstSubFolders';
-const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWithFiles';
-const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
-
-
-const pageSize = 10;
-let currentPage = 1;
-let dataSourceTypeMap = new Map();
-let allColumnsData = [];
-let currentDataSourceTypeID = 0;
-let currentDataSourceID = 0;
-
-/**
- * Displays a temporary "toast" notification on the screen.
- * @param {string} message - The message to display.
- * @param {string} [type='success'] - The type of toast ('success', 'error', 'info').
- * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
- */
-function showToast(message, type = 'success', duration = 3000) {
-    // Create the toast element
-    const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.textContent = message;
-    
-    // Basic styling
-    const style = document.createElement('style');
-    document.head.appendChild(style);
-    style.sheet.insertRule(`
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: #fff;
-            font-family: sans-serif;
-            z-index: 9999;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(-20px);
-        }
-    `);
-    style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
-    style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
-    
-    // Append to body and trigger animation
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-    }, 10); // A tiny delay to allow the CSS transition to work
-    
-    // Set a timer to remove the toast
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
-        // Remove the element from the DOM after the fade-out animation
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, duration);
-}
-
-/**
- * Fetches a specific page of columns for a given data set ID.
- * @param {string|number} data_set_id - The ID of the data set.
- * @param {number} [page=1] - The page number to fetch.
- * @returns {Promise<Object>} A promise that resolves with the paginated response object.
- */
-async function fetchSQLDataSetColumns(data_set_id, page = 1) {
-    // Add page and pageSize to the parameters sent to the API
-    const params = { 
-        "data_set_id": data_set_id,
-        "page": page,
-        "pageSize": pageSize
-    }; 
-   
-    // IMPORTANT: getFromAPI should return the single paginated object, not an array
-    return getFromAPI(API_GET_COLUMNS_DATA, params);
-}
-
-/**
- * Populates the column table's tbody with data from a paginated response.
- * @param {Object|null} paginatedResponse - The full response object from the API.
- */
-function displayColumnsTable(data, dataSetTypeId) {
-    const tableBody = document.getElementById('dataSetColsBody');
-    
-    // Extract the actual data array from the response object
-    //const columnsData = paginatedResponse ? paginatedResponse.Results : null;
-
-    if (!data || data.length === 0) {
-        const placeholderHtml = `
-            <tr>
-                <td colspan="7" class="text-center text-muted">
-                    No columns to display. Select a Data Source and Table.
-                </td>
-            </tr>`;
-        tableBody.innerHTML = placeholderHtml;
-        return;
-    }
-
-    // --- DATA EXISTS ---
-    // The mapping logic remains exactly the same
-    let rowsHtml = '';
-    if (dataSetTypeId == 1) { // Database type
-
-        rowsHtml = data.map(col => `
-            <tr data-id="${col.DataSetColumnID || ''}" data-column-name="${col.ColumnName}">
-                <td>${col.ColumnName || ''}</td>
-                <td class="editable-cell" data-field="LogicalColumnName">${col.LogicalColumnName || ''}</td>
-                <td class="editable-cell" data-field="BusinessDescription">${col.BusinessDescription || ''}</td>
-                <td class="editable-cell" data-field="ExampleValue">${col.ExampleValue || ''}</td>
-                <td class="checkbox-cell">
-                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
-                </td>
-                <td class="checkbox-cell">
-                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${col.Tokenise ? 'checked' : ''}>
-                </td>
-            </tr>
-        `).join('');
-        // Excludeing isFilter for now
-    // <td class="checkbox-cell">
-    //     <input class="form-check-input editable-checkbox" type="checkbox" data-field="IsFilter" ${col.IsFilter ? 'checked' : ''}>
-    // </td>
-
-    } else if (dataSetTypeId == 3) { // Folder type   
-        // 1. Group the data by FolderName
-        const groupedByFolderName = new Map();
-
-        data.forEach(item => {
-            const folderName = item.FolderName || 'Unnamed Folder';
-            if (!groupedByFolderName.has(folderName)) {
-                groupedByFolderName.set(folderName, []);
-            }
-            groupedByFolderName.get(folderName).push(item);
-        });
-
-        groupedByFolderName.forEach((items, folderName) => {
-            const rowspan = items.length;
-
-            items.forEach((col, index) => {
-                // --- THIS IS THE FIX ---
-                // Use the correct property name: `col.FileExtensions`
-                // Also, add default values for Redact and Tokenise if they don't exist.
-                // const fileExtension = col.FileExtensions || '';
-                const fileExtension = col.FileType || '';
-                const fileDescription = col.FileDescription || '';
-                const isRedacted = col.Redact || false;
-                const isTokenised = col.Tokenise || false;
-
-                // Check if this is the first row in the group
-                if (index === 0) {
-                    // --- First Row of the Group ---
-                    rowsHtml += `
-                        <tr data-id="${col.DataSetFolderFileID}-${col.FileType}" data-folder-name="${folderName}">
-                            <td rowspan="${rowspan}">${folderName}</td>
-                            <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted ? 'checked' : ''}>
-                            </td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised ? 'checked' : ''}>
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    // --- Subsequent Rows of the Group ---
-                    rowsHtml += `
-                        <tr data-id="${col.DataSetFolderFileID}-${col.FileType}" data-folder-name="${folderName}">
-                            <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted ? 'checked' : ''}>
-                            </td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised ? 'checked' : ''}>
-                            </td>
-                        </tr>
-                    `;
-                }
-            });
-        });
-
-
-    }
-    
-    
-    tableBody.innerHTML = rowsHtml;
-}
-
-/**
-* Renders a compact and functional set of pagination controls.
-* Includes First, Previous, Next, Last buttons and a page input field.
-*/
-function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Pagination container with ID "${containerId}" not found.`);
-        return;
-    }
-
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    container.innerHTML = ''; // Clear old controls
-
-    if (totalPages <= 1) {
-        return; // No need for pagination.
-    }
-
-    // --- Determine button states ---
-    const isFirstPage = currentPage === 1;
-    const isLastPage = currentPage === totalPages;
-    const commonButtonClasses = "px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100";
-    const disabledClasses = "opacity-50 cursor-not-allowed";
-
-    let paginationHTML = `
-            <!-- First Page Button -->
-            <button data-page="1" 
-                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
-                    ${isFirstPage ? 'disabled' : ''}>
-                First
-            </button>
-            <!-- Previous Page Button -->
-            <button data-page="${currentPage - 1}" 
-                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
-                    style="margin-right: 10px;"
-                    ${isFirstPage ? 'disabled' : ''}>
-                Previous
-            </button>
-
-        <!-- Page number input and display -->
-            <span>Page</span>
-            <input type="number" 
-                   id="page-input" 
-                   class="w-16 text-center border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" 
-                   value="${currentPage}" 
-                   min="1" 
-                   max="${totalPages}" 
-                   aria-label="Current page">
-            <span>of ${totalPages}</span>
-
-            <!-- Next Page Button -->
-            <button data-page="${currentPage + 1}" 
-                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}"
-                    style="margin-left: 10px;" 
-                    ${isLastPage ? 'disabled' : ''}>
-                Next
-            </button>
-            <!-- Last Page Button -->
-            <button data-page="${totalPages}" 
-                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}" 
-                    ${isLastPage ? 'disabled' : ''}>
-                Last
-            </button>
-    `;
-
-    container.innerHTML = paginationHTML;
-}
-
-/**
- * A central function to handle page changes. It validates the new page number
- * and re-renders the table.
- * @param {number} newPage - The page number to navigate to.
- */
-function handlePageChange(newPage) {
-    const totalPages = Math.ceil(allColumnsData.length / pageSize);
-
-    // Validate the page number to ensure it's within bounds
-    if (newPage >= 1 && newPage <= totalPages) {
-        currentPage = newPage;
-        renderTablePage(currentDataSourceTypeID); // Your existing function to render the table and pagination
-    } else {
-        // Optional: Revert the input field if the user enters an invalid number
-        const pageInput = document.getElementById('page-input');
-        if (pageInput) {
-            pageInput.value = currentPage; 
-        }
-        console.warn(`Invalid page number entered: ${newPage}`);
-    }
-}
-
-/////////////////////////
-/**
- * Fetches the simple field value for a Folder data set.
- * @param {string|number} data_set_id - The ID of the data set.
- * @returns {Promise<Object>} A promise that resolves to an object { id: null, name: 'folder_name' }.
- */
-async function fetchDataSetFolderValue(data_set_id) {
-    if (data_set_id === "new") {
-        return {
-            id: null,
-            name: null
-        };
-    }
-
-    const initialParams = { "data_set_id": data_set_id }; 
-   
-    const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
-    if (!resultsArray || resultsArray.length === 0) {
-        console.warn("API returned no data for data_set_id:", data_set_id);
-        return { id: null, name: null }; // Return a default value
-    }
-
-    // Just get the first result and return its value directly.
-    const result = resultsArray[0];
-    console.log("Fetched Folder Value:", result.Value);
-    
-    return {
-        id: null, // Folders don't have a separate ID, just the name
-        name: result.Value
-    };
-}
-/////////////////////////
-
-
-// Data Set Field Table Rendering Functions
-
-
-
-
-async function fetchSubFolders(data_source_id) {
-    const initialParams = { "data_source_id": data_source_id }; 
-  
-    return getFromAPI(API_GET_DATASOURCE_SUBFOLDERS, initialParams);
-}
-
-
-async function fetchSubFoldersWithFiles(subFolderName, currentDataSourceID) {
-    const initialParams = { "sub_folder_name": subFolderName, "data_source_id": currentDataSourceID }; 
-    const results = await getFromAPI(API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES, initialParams);
-    
-    return results;
-}
-
-/**
- * Renders the row for the REDCap API Key.
- * @param {HTMLElement} tbody The table body to append the row to.
- */
-function renderRedcapApiKeyRowDataSetFields(tbody) {
-    const rowHtml = `
-        <tr>
-            <td>REDCap API Key <input type="text" hidden="true"></td>
-            <td width="70%">
-                <div class="container">
-                    <div class="row">
-                        <div class="col">
-                            <input id="redcapapi" type="password" class="form-control valid">
-                            <div class="validation-message"></div>
-                        </div>
-                        <div class="col col-lg-3">
-                            <button id="redcapRefreshBtn" class="btn btn-accent float-right" title="RedCap">Refresh</button>
-                        </div>
-                    </div>
-                </div>
-            </td>
-        </tr>`;
-    
-    tbody.innerHTML = rowHtml;
-
-    // Optional: Add an event listener to the new button
-    tbody.querySelector('#redcapRefreshBtn').addEventListener('click', () => {
-        const apiKey = tbody.querySelector('#redcapapi').value;
-        console.log(`Refresh button clicked! API Key: ${apiKey}`);
-        showToast('Refresh clicked!');
-    });
-}
-
-async function fetchLoomeDataSourceTablesByTableId(tableId) {
-    const initialParams = { "table_id": tableId }; 
-   
-    return getFromAPI(API_GET_DATASOURCE_TABLE_BY_ID, initialParams)
-}
-
-
-async function fetchDataSetFieldValue(data_set_id) {
-
-    if (data_set_id === "new") {
-        return {
-            id: null,
-            name: null
-        };
-    }
-
-    const initialParams = { "data_set_id": data_set_id }; 
-   
-    const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
-    console.log("Fetched DataSet Field Value (as array):", resultsArray);
-    if (!resultsArray || resultsArray.length === 0) {
-        console.warn("API returned no data for data_set_id:", data_set_id);
-        return { id: null, name: null }; // Return a default value
-    }
-
-    // --- KEY CHANGE: Get the first object from the array ---
-    const result = resultsArray[0];
-    console.log("Fetched DataSet Field Value 1:", result);
-    console.log("Result FieldID:", result.FieldID);
-    // If Field Value is a Table Name, the result is the ID of the table
-    // Get the actual table name from another endpoint
-    // Case 1: The value is a table ID, so we need to fetch the name
-    if (result.FieldID == 3) { 
-        console.log("FieldID indicates a table reference. Fetching table name...");
-        const tableIdAsString = result.Value; // The value is a string, e.g., "9"
-
-        // --- CONVERT TO INTEGER HERE ---
-        const tableId = parseInt(tableIdAsString, 10);
-        
-        const tableInfo = await fetchLoomeDataSourceTablesByTableId(tableId);
-        console.log("Fetched Table Info:", tableId, tableInfo[0]);
-        // Return an object with BOTH the ID and the fetched name
-        return {
-            id: tableId,
-            name: tableInfo[0].TableName
-        };
-
-    // Case 2: The value is just a simple value, not a reference to another table
-    } else {
-        console.log("FieldID indicates a direct value. Using value as-is.");
-        // Return an object with the same shape for consistency.
-        // The ID can be null as it doesn't apply, and the 'name' is the value itself.
-        return {
-            id: null,
-            name: result.Value
-        };
-    }
-}
-
-
-/**
- * Renders the row for selecting a SQL table.
- * @param {HTMLElement} tbody The table body to append the row to.
- * @param {object} dataSource The data source object (needed for connection details).
- */
-async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID) {
-    // First, show a "Loading..." state
-    tbody.innerHTML = `<tr><td>Table Name</td><td>Loading tables...</td></tr>`;
-
-    try {
-
-        // This function should fetch the list of tables for the given data source connection.
-        const tables = await fetchSqlTables(dataSource.DataSourceID); 
-        console.log("Fetched tables:", tables);
-    
-        // Await the result from your function
-        const fetchedData = await fetchDataSetFieldValue(dataSetID);
-        console.log("Fetched DataSet Field Value 2:", fetchedData);
-        let tableId = fetchedData.id;;
-        let tableName = fetchedData.name;;
-
-        let rowHtml = '';
-
-        if (dataSetID === "new" || !tableId) {
-            // Create the dropdown HTML with the fetched tables
-            const optionsHtml = tables.map(table => `<option value="${table.Id}">${table.TableName}</option>`).join('');      
-
-            rowHtml = `
-            <tr>
-                <td>Table Name <input type="text" hidden="true"></td>
-                <td width="70%">
-                    <select id="tableNameSelector" class="form-control selectpicker bg-white">
-                        <option value="-1">Select a Table</option>
-                        ${optionsHtml}
-                    </select>
-                    <div class="validation-message"></div>
-                </td>
-            </tr>`;
-
-        } else {
-
-            const filteredTables = tables.filter(table => table.Id != tableId);
-
-            // Now, create the options HTML from the *filtered* array.
-            const optionsHtml = filteredTables
-                .map(table => `<option value="${table.Id}" title="${table.TableName}">${table.TableName}</option>`)
-                .join('');
-
-            rowHtml = `
-                <tr>
-                    <td>Table Name <input type="text" hidden="true"></td>
-                    <td width="70%">
-                        <select id="tableNameSelector" class="form-control selectpicker" style="background-color: #E9ECEF" disabled>
-                            <option value="${tableId}" title="${tableName}" selected>${tableName}</option>
-                            ${optionsHtml}
-                        </select>
-                        <div class="validation-message"></div>
-                    </td>
-                </tr>`;
-        }
-
-        
-        
-        tbody.innerHTML = rowHtml;
-
-    } catch (error) {
-        console.error("Failed to fetch SQL tables:", error);
-        tbody.innerHTML = `<tr><td>Table Name</td><td class="text-danger">Error loading tables.</td></tr>`;
-    }
-}
-
-
-async function fetchSqlTables(data_source_id) {
-    const initialParams = { "data_source_id": data_source_id }; 
-   
-    return getFromAPI(API_GET_DATASOURCE_TABLES, initialParams)
-}
-
-/**
- * Dynamically updates the "Data Set Fields" table based on the selected data source type.
- * @param {object} dataSource The full data source object, which includes DataSourceTypeID.
- */
-async function updateDataSetFieldsTable(dataSource, dataSetID) {
-   
-    console.log("Updating fields for DataSource:", dataSource);
-
-    const fieldsTable = document.getElementById('dataSetFieldsTable');
-    const fieldsPlaceholder = document.getElementById('fieldsPlaceholder');
-    const tbody = fieldsTable.querySelector('tbody');
-
-    // Always start by clearing the current content
-    tbody.innerHTML = '';
-
-    // If there's no data source selected, show the placeholder and exit.
-    if (!dataSource || !dataSource.DataSourceTypeID) {
-        fieldsPlaceholder.style.display = 'block';
-        fieldsTable.style.display = 'none';
-        return;
-    }
-
-    // A valid data source is selected, so ensure the table is visible.
-    fieldsPlaceholder.style.display = 'none';
-    fieldsTable.style.display = 'table';
-
-    console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
-    
-    // Use a switch to decide which content to render
-    switch (dataSource.DataSourceTypeID) {
-        case 1: // SQL Database Type
-            await renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID);
-            break;
-
-        case 2: // REDCap API Type
-            renderRedcapApiKeyRowDataSetFields(tbody, dataSource);
-            break;
-
-        case 3: // Folder Type
-            await renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID);
-            break;
-
-        default:
-            // If the type is unknown, revert to the placeholder state.
-            console.warn(`Unknown DataSourceTypeID: ${dataSource.DataSourceTypeID}`);
-            fieldsPlaceholder.style.display = 'block';
-            fieldsTable.style.display = 'none';
-            break;
-    }
-  
-}
-// End Data Set Field Table Rendering Functions
-
-// MetaData Table Rendering Functions
-
-/**
- * Fetches the metadata value for a given DataSetID and renders it in an input field.
- * This is used for the SQL Database data source type.
- * @param {HTMLElement} tbody - The tbody element of the metadata table.
- * @param {number|null} dataSetID - The ID of the data set to fetch metadata for.
- */
-async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
-    // Step 1: Provide immediate feedback to the user with a loading state.
-    tbody.innerHTML = `
-        <tr>
-            <td>Tag <input type="hidden"></td>
-            <td width="70%">
-                <input class="form-control" value="Loading..." disabled>
-            </td>
-        </tr>
-    `;
-
-    // A guard clause to handle cases where there's no ID to fetch.
-    if (!dataSetID || dataSetID === "new") {
-        tbody.innerHTML = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input id="metaDataTag" class="form-control valid" value="">
-                </td>
-            </tr>`;
-        return;
-    }
-
-    try {
-        // Step 2: AWAIT the data. The code will pause here until the API responds.
-        const result = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": dataSetID });
-
-        // Step 3: Now 'result' is the actual data array. Use it to build the final HTML.
-        // Use a variable for clarity.
-        const tagValue = (result && result.length > 0) ? result[0].Value : '';
-
-        // Let's assume the MetadataID for "Tag" is 5. It's important to have this in the hidden input.
-        const rowHtml = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input id="metaDataTag" class="form-control valid" value="${tagValue}">
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML = rowHtml;
-
-    } catch (error) {
-        console.error("Failed to fetch metadata value:", error);
-        // Step 4: Show an error message to the user if the API call fails.
-        tbody.innerHTML = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input class="form-control is-invalid" value="Error loading data" disabled>
-                </td>
-            </tr>
-        `;
-    }
-}
-
-/**
- * Renders two static rows with input fields for REDCap API metadata.
- * @param {HTMLElement} tbody - The tbody element of the metadata table.
- * @param {object} dataSource - The data source object (not used in this function but passed for consistency).
- */
-function renderRedcapApiKeyRowMetaData(tbody, dataSource) {
-    // These rows are static, so we can just define the HTML directly.
-    // Using unique and descriptive IDs for each input is important.
-    const rowHtml = `
-        <tr>
-            <td>Citations for related publications <input type="hidden" value="1"></td>
-            <td width="70%">
-                <input id="redcapCitations" class="form-control">
-            </td>
-        </tr>
-        <tr>
-            <td>ANZCTR URL <input type="hidden" value="2"></td>
-            <td width="70%">
-                <input id="redcapAnzctrUrl" class="form-control">
-            </td>
-        </tr>
-    `;
-    tbody.innerHTML = rowHtml;
-}
-
-
-/**
- * Hides the metadata table and shows the placeholder text.
- * This is used for data source types that do not have any metadata fields.
- * @param {HTMLElement} tbody - The tbody element of the metadata table.
- */
-function renderFolderSelectorMetaData(tbody) {
-    // As requested, this case has no metadata, so we hide the table
-    // and re-show the placeholder.
-    const metaDataTable = document.getElementById('metaDataTable');
-    const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
-    
-    metaDataTable.style.display = 'none';
-    metaDataPlaceholder.style.display = 'block';
-    metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
-}
-
-function updateMetaDataTable(dataSource, dataSetID)  {
-    const metaDataTable = document.getElementById('metaDataTable');
-    const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
-    const tbody = metaDataTable.querySelector('tbody');
-
-    // Clear any old data
-    tbody.innerHTML = ''; 
-
-    // If there's no data source selected, show the placeholder and exit.
-    if (!dataSource || !dataSource.DataSourceTypeID) {
-        metaDataPlaceholder.style.display = 'block';
-        metaDataTable.style.display = 'none';
-        return;
-    }
-
-    // A valid data source is selected, so ensure the table is visible.
-    metaDataPlaceholder.style.display = 'none';
-    metaDataTable.style.display = 'table';
-
-    console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
-    
-    // Use a switch to decide which content to render
-    switch (dataSource.DataSourceTypeID) {
-        case 1: // SQL Database Type
-            console.log("In Render SQL Metadata: ", dataSetID)
-            renderSqlTableSelectorMetaData(tbody, dataSetID);
-            break;
-
-        case 2: // REDCap API Type
-            renderRedcapApiKeyRowMetaData(tbody, dataSource);
-            break;
-
-        case 3: // Folder Type
-            renderFolderSelectorMetaData(tbody, dataSource);
-            break;
-
-        default:
-            // If the type is unknown, revert to the placeholder state.
-            console.warn(`Unknown DataSourceTypeID: ${dataSource.DataSourceTypeID}`);
-            metaDataPlaceholder.style.display = 'block';
-            metaDataTable.style.display = 'none';
-            break;
-    }
-}
-
-// End MetaData Table Rendering Functions
-
-/**
- * Safely parses a response that might be a JSON string or an object.
- * @param {string | object} response The API response.
- * @returns {object}
- */
-function safeParseJson(response) {
-    return typeof response === 'string' ? JSON.parse(response) : response;
-}
-
-async function getFromAPI(API_ID, initialParams) {
-    let allResults = [];
-    
-    try {
-        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
-        const parsedInitial = safeParseJson(initialResponse);
-
-        // Early exit if the response is null, undefined, etc.
-        if (!parsedInitial) {
-            console.log("API returned no data.");
-            return [];
-        }
-        
-        let allResults = []; // Initialize as an empty array for a clean state
-
-        // --- DETECTION LOGIC ---
-        // Check if the response has the signature of a paginated object.
-        // Checking for PageCount is more reliable than just checking for Results.
-        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
-            
-            // --- PAGINATED PATH ---
-            console.log("Detected a paginated response.");
-            
-            allResults = parsedInitial.Results;
-            const totalPages = parsedInitial.PageCount;
-
-            if (totalPages > 1) {
-                for (let page = 2; page <= totalPages; page++) {
-                    console.log(`Fetching page ${page} of ${totalPages}...`);
-                    
-                    // Construct params for the next page, preserving other initial params
-                    const params = { ...initialParams, "page": page }; 
-                    console.log(params)
-                    const response = await window.loomeApi.runApiRequest(API_ID, params);
-                    const parsed = safeParseJson(response);
-
-                    if (parsed && parsed.Results) {
-                        allResults = allResults.concat(parsed.Results);
-                    }
-
-                } // end for loop
-            }
-
-        } else {
-            // --- NON-PAGINATED PATH ---
-            console.log("Detected a non-paginated response.");
-
-            // The entire response is the result.
-            // We ensure it's always an array for a consistent return type.
-            if (Array.isArray(parsedInitial)) {
-                // If the response is already an array, use it directly.
-                allResults = parsedInitial;
-            } else {
-                // If the response is a single object, wrap it in an array.
-                allResults = [parsedInitial];
-            }
-        }
-
-        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
-        return allResults;
-
-    } catch (error) {
-        console.error("An error occurred while fetching data source types:", error);
-        return [];
-    }  
-}
-
-async function getAllDataSets() {
-    const initialParams = { "page": 1, "pageSize": 100, "search": '', activeStatus: 3 }; //Get both active and inactive Data Set
-   
-    return getFromAPI(API_GET_DATASETS, initialParams)
-    
-}
-
-async function getAllDataSources() {
-    const initialParams = { "page": 1, "pageSize": 100, "search": '' }; 
-   
-    return getFromAPI(API_GET_DATASOURCES, initialParams)
-    
-}
-
-/**
- * Populates the dropdown with the list of existing data sources.
- */
-function populateExistingDataSets(optgroup, allResults) {
-    // First, clear any existing options from the optgroup.
-    optgroup.innerHTML = '';
-
-    // A good practice is to sort the data before rendering.
-    allResults.sort((a, b) => a.Name.localeCompare(b.Name));
-    
-    allResults.forEach(ds => {
-        const option = document.createElement('option');
-        option.value = ds.DataSetID;
-        option.textContent = ds.Name;
-        optgroup.appendChild(option);
-    });
-}
-
-function populateDataSourceOptions(selectElement, data, valueField, textField) {
-    if (!selectElement || !Array.isArray(data)) return;
-    while (selectElement.options.length > 1) {
-        selectElement.remove(1);
-    }
-    data.forEach(item => {
-        const option = document.createElement('option');
-        option.value = item[valueField];
-        option.textContent = item[textField];
-        selectElement.appendChild(option);
-    });
-}
-
-/**
- * Fetches the schema for a given table ID and formats it into a standard array of column objects.
- * @param {string|number} tableId The ID of the table to fetch.
- * @returns {Promise<Array<Object>>} A promise that resolves to the array of formatted column objects, or an empty array on failure.
- */
-async function formatSQLColumnsFromSchema(tableId) {
-    try {
-        const tableDataArray = await fetchLoomeDataSourceTablesByTableId(tableId);
-
-        // Safety check: ensure we got a valid response
-        if (!tableDataArray || tableDataArray.length === 0) {
-            console.warn(`No schema data found for Table ID: ${tableId}`);
-            return [];
-        }
-
-        const tableSchema = tableDataArray[0];
-
-        // IMPROVEMENT (Robustness): Use `|| ''` to prevent .split() from crashing on null/undefined.
-        const columnNames = (tableSchema.ColumnList || '').split(",").map(name => name.trim());
-        const columnTypes = (tableSchema.ColumnTypes || '').split(",").map(type => type.trim());
-
-        // Safety check for mismatched lengths
-        if (columnNames.length !== columnTypes.length) {
-            console.error("Mismatch between the number of column names and column types.");
-            return [];
-        }
-
-        // Map the names and types into the final object structure
-        const formattedColumns = columnNames.map((name, index) => ({
-            "ColumnName": name,
-            "ColumnType": columnTypes[index],
-            "LogicalColumnName": '', // Use empty string instead of null for consistency
-            "BusinessDescription": '',
-            "ExampleValue": '',
-            "Tokenise": false,
-            "TokenIdentifierType": 0,
-            "Redact": false,
-            "DisplayOrder": index + 1,
-            "IsFilter": false,
-        }));
-
-        return formattedColumns;
-
-    } catch (error) {
-        console.error(`Error fetching or formatting schema for Table ID ${tableId}:`, error);
-        return []; // Always return an array to prevent downstream errors
-    }
-}
-
-
-
-/**
- * The single function responsible for FETCHING data and populating the master `allColumnsData` array.
- * This is a "reset" action.
- */
-async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
-    const dataSetId = document.getElementById('dataSetSelection').value;
-    let newColumnsData = []; // Default to an empty array
-
-    if (dataSourceTypeId === 1) { // SQL Database Type
-        // --- SCENARIO 1: Editing an EXISTING Data Set ---
-        if (dataSetId && dataSetId !== 'new') {
+        } else if (dataSetId && dataSetId !== 'new') {
             try {
-                console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
-                newColumnsData = await fetchSQLDataSetColumns(dataSetId);
+                // 1. Fetch data for EXISTING set (SAVED data from DB)
+                const fetchedData = await getFromAPI(API_GET_DATASET_FOLDERFILE, { "data_set_id": dataSetId });
 
-                console.log("newColumnsData:", newColumnsData)
+                // 2. Apply the SAME consistent mapping
+                newColumnsData = fetchedData.map(mapFolderData);
+
+                console.log("Fetched and Mapped EXISTING (saved) folder columns:", newColumnsData);
+
             } catch (error) {
                 console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
             }
         }
-        // --- SCENARIO 2: Creating a NEW Data Set ---
-        else if (dataSetId === 'new') {
-            const tableNameSelector = document.getElementById('tableNameSelector');
-            if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
-                const tableId = tableNameSelector.value;
-                console.log(`FETCHING schema for new Data Set from Table ID: ${tableId}...`);
-                // This now calls your dedicated helper function
-                newColumnsData = await formatSQLColumnsFromSchema(tableId);
-            }
-        }
-    } else if (dataSourceTypeId === 3) { // Folder Type
-        newColumnsData = [];
-
-        const mapFolderData = (item) => {
-            return {
-                ...item, // Copy all original properties
-
-                // Explicitly provide defaults for properties that might be null
-                // or missing. This ensures the structure is consistent.
-                FileDescription: item.FileDescription || '',
-                Redact: item.Redact || 0,
-                Tokenise: item.Tokenise || 0
-            };
-        };
-        if (dataSetId === 'new') {
-                const tableNameSelector = document.getElementById('tableNameSelector');
-                if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
-                    const subFolderName = tableNameSelector.value;
-                    
-                    // Fetch data for NEW set
-                    const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
-                    
-                    // Apply the consistent mapping
-                    newColumnsData = originalData.map(mapFolderData);
-                    
-                    console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
-                }
-            } else if (dataSetId && dataSetId !== 'new') {
-                try {
-                    
-                    // 1. Fetch data for EXISTING set (SAVED data from DB)
-                    const fetchedData = await getFromAPI(API_GET_DATASET_FOLDERFILE, { "data_set_id": dataSetId });
-
-                    // 2. Apply the SAME consistent mapping
-                    newColumnsData = fetchedData.map(mapFolderData);
-
-                    console.log("Fetched and Mapped EXISTING (saved) folder columns:", newColumnsData);
-
-                } catch (error) {
-                    console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
-                }
-            }
     }
-    
+
 
     // --- CRITICAL: Update the master state ---
     allColumnsData = newColumnsData || [];
@@ -2094,7 +945,7 @@ function renderTablePage(dataSetTypeId) {
     console.log("pageData: ", pageData, allColumnsData)
     // Render the table with only the data for the current page
     displayColumnsTable(pageData, dataSetTypeId);
-    
+
     console.log(allColumnsData.length, pageSize, currentPage)
     // Render the pagination controls based on the FULL dataset length
     renderPagination('pagination-controls', allColumnsData.length, pageSize, currentPage);
@@ -2117,7 +968,7 @@ function gatherFormData(allColumnsData) {
 
     // --- Part B: Gather Dynamic Metadata (from dataSetFieldsTable and metaDataTable) ---
     // This is a generic way to scrape key-value metadata.
-    const metaData= [];
+    const metaData = [];
     const dataSetFieldValues = [];
     const fieldsTableBody = document.getElementById('dataSetFieldsTable').querySelector('tbody');
     const metaTableBody = document.getElementById('metaDataTable').querySelector('tbody');
@@ -2143,7 +994,7 @@ function gatherFormData(allColumnsData) {
             if (currentDataSourceTypeID === 1) { // SQL Database
                 // The FieldID for "Table Name" is 3.
                 dataSetFieldValues.push({
-                    FieldID: 3, 
+                    FieldID: 3,
                     Value: tableNameSelector.value
                 });
             } else if (currentDataSourceTypeID === 3) { // Folder
@@ -2154,38 +1005,8 @@ function gatherFormData(allColumnsData) {
             }
             return; // We're done with this table, so we can exit.
         }
-
-        // // --- PATH 2: Check for other known fields, like the REDCap API Key ---
-        // const redcapInput = tbody.querySelector('#redcapapi');
-        // if (redcapInput && redcapInput.value) {
-        //     // The FieldID for "REDCap API Key" is 1 (or whatever it is in your DB).
-        //     dataSetFieldValues.push({
-        //         FieldID: 1, // Hardcode the ID
-        //         Value: redcapInput.value
-        //     });
-        //     return;
-        // }
-        
-        // // --- PATH 3 (FALLBACK): A generic scraper for any other rows ---
-        // // This can handle other simple key/value pairs if needed.
-        // tbody.querySelectorAll('tr').forEach(row => {
-        //     // Skip rows we've already handled
-        //     if (row.querySelector('#tableNameSelector') || row.querySelector('#redcapapi')) {
-        //         return;
-        //     }
-
-        //     const keyInput = row.querySelector('td:first-child input[type="hidden"]');
-        //     const valueInput = row.querySelector('td:last-child input, td:last-child select');
-
-        //     if (keyInput && valueInput && valueInput.value) {
-        //         dataSetFieldValues.push({
-        //             FieldID: parseInt(keyInput.value, 10),
-        //             Value: valueInput.value
-        //         });
-        //     }
-        // });
     };
-    
+
     // Scrape both tables if they exist
     if (fieldsTableBody) scrapeFieldsTable(fieldsTableBody);
     if (metaTableBody) scrapeMetaTable(metaTableBody);
@@ -2195,8 +1016,8 @@ function gatherFormData(allColumnsData) {
     if (currentDataSourceTypeID === 1) {
         return {
             ...mainDetails,
-            DataSetMetaDataValues: metaData, 
-            DataSetFieldValues: dataSetFieldValues, 
+            DataSetMetaDataValues: metaData,
+            DataSetFieldValues: dataSetFieldValues,
             DataSetColumns: columns,
             DataSetFolderFiles: []
         };
@@ -2207,13 +1028,13 @@ function gatherFormData(allColumnsData) {
 
         return {
             ...mainDetails,
-            DataSetMetaDataValues: metaData, 
-            DataSetFieldValues: dataSetFieldValues, 
+            DataSetMetaDataValues: metaData,
+            DataSetFieldValues: dataSetFieldValues,
             DataSetColumns: [],
             DataSetFolderFiles: columnsWithoutId
         };
     }
-    
+
 }
 
 // --- API FUNCTIONS ---
@@ -2231,7 +1052,7 @@ async function createDataSet(data) {
 
     try {
         // Send the new 'payload' object to the API instead of the original 'data'
-        const response = await window.loomeApi.runApiRequest(API_CREATE_DATASET, {"payload":payload});
+        const response = await window.loomeApi.runApiRequest(API_CREATE_DATASET, { "payload": payload });
         if (!response) throw new Error("Failed to add dataset - no response from server");
         showToast('Dataset added successfully!');
         return response;
@@ -2255,7 +1076,7 @@ async function updateDataSet(data_set_id, data) {
         // 1. Copy FileExtensions from FileType
         payload.DataSetFolderFiles = payload.DataSetFolderFiles.map(file => ({
             ...file,
-            FileExtensions: file.FileType || "" 
+            FileExtensions: file.FileType || ""
         }));
 
         // 2. Group by FolderName to build DataSetFolders
@@ -2270,7 +1091,7 @@ async function updateDataSet(data_set_id, data) {
                 };
             }
             foldersMap[folderName].DataSetFolderFiles.push({
-                FolderName: folderName, 
+                FolderName: folderName,
                 FileType: file.FileType,
                 FileDescription: file.FileDescription,
                 FileExtensions: file.FileExtensions,
@@ -2302,16 +1123,16 @@ async function updateDataSet(data_set_id, data) {
         payload.DataSetMetaDataValues = payload.DataSetMetaDataValues || [];
     }
 
-    
+
     console.log("Sending this payload to the API:", payload);
 
-    
+
     try {
         // Send the new 'payload' object to the API
         const response = await window.loomeApi.runApiRequest(
             API_UPDATE_DATASET,
             { id: data_set_id, payload }
-            );
+        );
 
         if (!response) throw new Error("Failed to update dataset - no response from server");
 
@@ -2331,185 +1152,7 @@ async function updateDataSet(data_set_id, data) {
 function updateTableHeader(dataSourceType) {
     const headersConfig = {
         1: ['Column Name', 'Logical Name', 'Business Description', 'Example Value', 'Redact', 'Deidentify'],
-        3: ['Folder Name', 'File Type', 'File Description','Redact', 'Deidentify']
-    };
-
-    const tableHeaderRow = document.getElementById('dataSetColsHeader');
-    if (!tableHeaderRow) {
-        console.error("Error: Table header row with id 'data-table-header' not found.");
-        return;
-    }
-
-    const headers = headersConfig[dataSourceType];
-    if (!headers) {
-        tableHeaderRow.innerHTML = '<th>Please select a data source type first.</th>';
-        return;
-    }
-
-    const headerHtml = headers.map(headerText => `<th>${headerText}</th>`).join('');
-    tableHeaderRow.innerHTML = headerHtml;
-}
-
-
-
-renderManageDataSourcePage()
-        // // --- PATH 2: Check for other known fields, like the REDCap API Key ---
-        // const redcapInput = tbody.querySelector('#redcapapi');
-        // if (redcapInput && redcapInput.value) {
-        //     // The FieldID for "REDCap API Key" is 1 (or whatever it is in your DB).
-        //     dataSetFieldValues.push({
-        //         FieldID: 1, // Hardcode the ID
-        //         Value: redcapInput.value
-        //     });
-        //     return;
-        // }
-        
-        // // --- PATH 3 (FALLBACK): A generic scraper for any other rows ---
-        // // This can handle other simple key/value pairs if needed.
-        // tbody.querySelectorAll('tr').forEach(row => {
-        //     // Skip rows we've already handled
-        //     if (row.querySelector('#tableNameSelector') || row.querySelector('#redcapapi')) {
-        //         return;
-        //     }
-
-        //     const keyInput = row.querySelector('td:first-child input[type="hidden"]');
-        //     const valueInput = row.querySelector('td:last-child input, td:last-child select');
-
-        //     if (keyInput && valueInput && valueInput.value) {
-        //         dataSetFieldValues.push({
-        //             FieldID: parseInt(keyInput.value, 10),
-        //             Value: valueInput.value
-        //         });
-        //     }
-        // });
-    };
-    
-    // Scrape both tables if they exist
-    if (fieldsTableBody) scrapeFieldsTable(fieldsTableBody);
-    if (metaTableBody) scrapeMetaTable(metaTableBody);
-
-    const columns = allColumnsData;
-
-    if (currentDataSourceTypeID === 1) {
-        return {
-            ...mainDetails,
-            DataSetMetaDataValues: metaData, 
-            DataSetFieldValues: dataSetFieldValues, 
-            DataSetColumns: columns,
-            DataSetFolderFiles: []
-        };
-    } else if (currentDataSourceTypeID === 3) {
-        console.log("Gathering form data for Folder type with columns:", columns);
-        // Remove 'Id' since that ID is from LoomeDataSourceFolders 
-        const columnsWithoutId = columns.map(({ Id, ...rest }) => rest);
-
-        return {
-            ...mainDetails,
-            DataSetMetaDataValues: metaData, 
-            DataSetFieldValues: dataSetFieldValues, 
-            DataSetColumns: [],
-            DataSetFolderFiles: columnsWithoutId
-        };
-    }
-    
-}
-
-// --- API FUNCTIONS ---
-// This calls a API that does the create for DataSet, DataSetColumns, DataSetMetaDataValues, and DataSetFieldValues
-async function createDataSet(data) {
-    const payload = {
-        ...data, // Spread all properties from the original object
-        OptOutMessage: "string",
-        OptOutList: "string",
-        OptOutColumn: "-1",
-        DataSourceTypeID: currentDataSourceTypeID
-    };
-
-    console.log("Sending this payload to the API:", payload);
-
-    try {
-        // Send the new 'payload' object to the API instead of the original 'data'
-        const response = await window.loomeApi.runApiRequest(API_CREATE_DATASET, {"payload":payload});
-        if (!response) throw new Error("Failed to add dataset - no response from server");
-        showToast('Dataset added successfully!');
-        return response;
-    } catch (error) {
-        console.error("Error creating dataset:", error);
-        throw error;
-    }
-}
-
-async function updateDataSet(data_set_id, data) {
-    const payload = {
-        ...data,
-        id: parseInt(data_set_id, 10),
-        OptOutMessage: "string",
-        OptOutList: "string",
-        OptOutColumn: "-1",
-        DataSourceTypeID: currentDataSourceTypeID
-    };
-
-    if (payload.DataSetFolderFiles && Array.isArray(payload.DataSetFolderFiles)) {
-        // 1. Copy FileExtensions from FileType
-        payload.DataSetFolderFiles = payload.DataSetFolderFiles.map(file => ({
-            ...file,
-            FileExtensions: file.FileType || "" 
-        }));
-
-        // 2. Group by FolderName to build DataSetFolders
-        const foldersMap = {};
-        payload.DataSetFolderFiles.forEach(file => {
-            const folderName = file.FolderName || "root";
-            if (!foldersMap[folderName]) {
-                foldersMap[folderName] = {
-                    FolderName: folderName,
-                    Description: "",
-                    DataSetFolderFiles: []
-                };
-            }
-            foldersMap[folderName].DataSetFolderFiles.push({
-                FolderName: folderName, 
-                FileType: file.FileType,
-                FileDescription: file.FileDescription,
-                FileExtensions: file.FileExtensions,
-                // TokeniseRule: "",
-                Redact: file.Redact ? 1 : 0,
-                Tokenise: file.Tokenise ? 1 : 0,
-            });
-        });
-
-        payload.DataSetFolders = Object.values(foldersMap);
-        delete payload.DataSetFolderFiles; // remove flat list
-    }
-
-    console.log("Sending this payload to the API:", payload);
-
-    try {
-        // Send the new 'payload' object to the API instead of the original 'data'
-        const response = await window.loomeApi.runApiRequest(
-            API_UPDATE_DATASET,
-            { id: data_set_id, payload }
-            );
-
-        if (!response) throw new Error("Failed to update dataset - no response from server");
-
-        showToast('Dataset updated successfully!');
-        return response;
-
-    } catch (error) {
-        console.error("Error updating dataset:", error);
-        throw error;
-    }
-}
-
-/**
- * Updates the header of a data table based on the specified data source type.
- * @param {number | string} dataSourceType - The ID of the data source type (e.g., 1 for Database, 3 for Folder).
- */
-function updateTableHeader(dataSourceType) {
-    const headersConfig = {
-        1: ['Column Name', 'Logical Name', 'Business Description', 'Example Value', 'Redact', 'Deidentify'],
-        3: ['Folder Name', 'File Type', 'File Description','Redact', 'Deidentify']
+        3: ['Folder Name', 'File Type', 'File Description', 'Redact', 'Deidentify']
     };
 
     const tableHeaderRow = document.getElementById('dataSetColsHeader');
@@ -2529,12 +1172,12 @@ function updateTableHeader(dataSourceType) {
 }
 
 async function renderManageDataSourcePage() {
-    
+
     const selectionDropdown = document.getElementById('dataSetSelection');
     const detailsContainer = document.getElementById('dataSetDetailsContainer');
     const optgroup = selectionDropdown.querySelector('optgroup');
     let dataSource = {};
-    
+
     // Form input elements
     const nameInput = document.getElementById('dataSetName');
     const descriptionInput = document.getElementById('dataSetDescription');
@@ -2543,7 +1186,7 @@ async function renderManageDataSourcePage() {
     const owner = document.getElementById('dataSetOwner');
     const approver = document.getElementById('dataSetApprover');
     const dataSetFieldsTable = document.getElementById('dataSetFieldsTable');
-    
+
     /**
      * Clears the form fields to their default state for creating a new entry.
      */
@@ -2557,7 +1200,7 @@ async function renderManageDataSourcePage() {
         approver.value = '';
         console.log("Form cleared for new data source.");
     }
-    
+
     /**
      * Fills the form fields with data from a given data source object.
      * @param {object} dataSet The data set object with details.
@@ -2573,7 +1216,7 @@ async function renderManageDataSourcePage() {
 
         console.log("Form populated with:", dataSet, dataSource);
     }
-    
+
 
     async function updateFormForSelection(allDataSets, allDataSources) {
         const selectedId = selectionDropdown.value;
@@ -2584,13 +1227,13 @@ async function renderManageDataSourcePage() {
             nameInput.readOnly = false;
             descriptionInput.disabled = false;
             dataSourceDrpDwn.disabled = false;
-            
+
 
             clearForm();
-            updateDataSetFieldsTable(null, null); 
+            updateDataSetFieldsTable(null, null);
             updateMetaDataTable(null, null);
             // When creating a new set, there are no columns to show. Clear the table.
-            displayColumnsTable(null); 
+            displayColumnsTable(null);
         } else {
             // Don't let name and description be edited for existing sets
             // nameInput.disabled = true;
@@ -2609,35 +1252,35 @@ async function renderManageDataSourcePage() {
 
             // set GLOBALS so loadColumnsData() knows the type/id
             currentDataSourceTypeID = dataSource.DataSourceTypeID;
-            currentDataSourceID    = dataSource.DataSourceID;
+            currentDataSourceID = dataSource.DataSourceID;
 
             // 2. Update the dynamic metadata tables on the left
-            updateDataSetFieldsTable(dataSource, selectedId); 
+            updateDataSetFieldsTable(dataSource, selectedId);
             updateMetaDataTable(dataSource, selectedId);
-            
+
             // refresh header immediately
             updateTableHeader(currentDataSourceTypeID);
         }
     }
-   
-    
+
+
     // Add the 'async' keyword to the function that wraps this logic.
     // For example, if it's inside a DOMContentLoaded listener:
-    document.addEventListener('DOMContentLoaded', async () => { 
-    
+    document.addEventListener('DOMContentLoaded', async () => {
+
         try {
             // 1. Use 'await' to wait for the data to arrive.
             // The code will pause here until getAllDataSources() resolves.
             let allDataSets = await getAllDataSets();
             let allDataSources = await getAllDataSources();
-            
+
             // 2. Now, allResults is the actual array of data.
             console.log('Data has arrived:', allDataSets);
-            
+
             // 3. The rest of your code can now run in the correct order.
             populateExistingDataSets(optgroup, allDataSets);
             populateDataSourceOptions(dataSourceDrpDwn, allDataSources, 'DataSourceID', 'Name');
-            
+
             // Create the Empty Columns Table
             updateFormForSelection(allDataSets, allDataSources);
 
@@ -2654,7 +1297,7 @@ async function renderManageDataSourcePage() {
                     // First, update the metadata sections in the left column.
                     await updateDataSetFieldsTable(selectedDataSource, selectedDataSetID);
                     await updateMetaDataTable(selectedDataSource, selectedDataSetID);
-                    
+
                 } else {
                     // If no source is selected, clear everything.
                     displayColumnsTable(null);
@@ -2663,8 +1306,8 @@ async function renderManageDataSourcePage() {
 
                 await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
                 updateTableHeader(selectedDataSource.DataSourceTypeID)
-              
-            
+
+
             });
 
             // Listener for TOP-LEVEL data set selection
@@ -2715,124 +1358,10 @@ async function renderManageDataSourcePage() {
             // =================================================================
 
             const dataSetColsTable = document.getElementById('dataSetColsTable');
-            
+
 
             // Get a reference to the body of the columns table.
             const dataSetColsBody = document.getElementById('dataSetColsBody');
-
-            // --- Listener 1: For TEXT cell editing (on double-click) ---
-            // dataSetColsBody.addEventListener('dblclick', (event) => {
-            //     const cell = event.target;
-            //     // Only allow editing on cells with the 'editable-cell' class
-            //     if (!cell.classList.contains('editable-cell')) {
-            //         return;
-            //     }
-            //     // Prevent creating an input if one already exists
-            //     if (cell.querySelector('input')) {
-            //         return;
-            //     }
-            //     const originalText = cell.textContent.trim();
-                
-            //     // Create an input element (this part is the same)
-            //     cell.innerHTML = '';
-            //     const input = document.createElement('input');
-            //     input.type = 'text';
-            //     input.className = 'form-control form-control-sm';
-            //     input.value = originalText;
-            //     cell.appendChild(input);
-            //     input.focus();
-            //     // Handler for when the input loses focus (blur) or Enter is pressed
-            //     const saveChanges = () => {
-            //         const newValue = input.value.trim();
-            //         cell.innerHTML = newValue;
-            //         const row = cell.closest('tr');
-            //         if (!row) return;
-            //         // Get the ID from the row
-            //         const uniqueId = row.dataset.id;
-            //         const field = cell.dataset.field;
-            //         if (!uniqueId || !field) return;
-            //         // Find the object in the master array using the appropriate logic for each type.
-            //         const columnToUpdate = allColumnsData.find(col => {
-            //             // Check for Database type (which has DataSetColumnID)
-            //             if (col.DataSetColumnID && col.DataSetColumnID == uniqueId) {
-            //                 return true;
-            //             }
-            //             // Check for Folder type (which has Id and FileExtensions)
-            //             if (col.Id && col.FileExtensions && `${col.Id}-${col.FileExtensions}` === uniqueId) {
-            //                 return true;
-            //             }
-            //             return false;
-            //         });
-            //         if (columnToUpdate) {
-            //             // Update the property on the object in the in-memory array
-            //             columnToUpdate[field] = newValue;
-            //             console.log("Updated in-memory data:", allColumnsData);
-            //         } else {
-            //             console.error("Could not find matching object in allColumnsData for uniqueId:", uniqueId);
-            //         }
-            //     };
-            //     input.addEventListener('blur', saveChanges);
-            //     input.addEventListener('keydown', (e) => {
-            //         if (e.key === 'Enter') {
-            //             input.blur(); // Trigger the blur event to save
-            //         } else if (e.key === 'Escape') {
-            //             cell.innerHTML = originalText; // Cancel the edit
-            //         }
-            //     });
-            // });
-
-
-            // // --- Listener 2: For CHECKBOX and TEXT cell editing (on change) ---
-            // // Add this unified listener to your DOMContentLoaded block
-            // dataSetColsBody.addEventListener('change', (event) => {
-            //     const target = event.target;
-            //     const row = target.closest('tr');
-            //     if (!row) return; // Exit if the event didn't originate from within a row
-
-            //     // Use the unique ID as the primary key to find the object
-            //     const uniqueId = row.dataset.id;
-            //     const field = target.dataset.field;
-            //     console.log("Change detected... ID:", uniqueId, "Field:", field);
-            //     if (!uniqueId || !field) return; // Exit if we don't have the info we need
-
-            //     // Find the object in the master array. We need to check both possible ID structures.
-            //     const columnToUpdate = allColumnsData.find(col => {
-            //         // Check for Database type
-            //         if (col.DataSetColumnID && col.DataSetColumnID == uniqueId) {
-            //             return true;
-            //         }
-            //         // Check for Folder type
-            //         if (col.Id && col.FileExtensions && `${col.Id}-${col.FileExtensions}` === uniqueId) {
-            //             return true;
-            //         }
-            //         return false;
-            //     });
-
-            //     if (!columnToUpdate) {
-            //         console.error("Could not find matching object in allColumnsData for uniqueId:", uniqueId);
-            //         return;
-            //     }
-                
-            //     // Now that we have the correct object, proceed with the update logic
-            //     if (target.classList.contains('editable-checkbox')) {
-            //         const isChecked = target.checked;
-            //         console.log(`Saving Checkbox... ID: ${uniqueId}, Field: ${field}, New Value: ${isChecked}`);
-                    
-            //         // This works for both because 'field' will be "Redact" or "Tokenise"
-            //         columnToUpdate[field] = isChecked;
-
-            //     } else if (target.tagName === 'INPUT' && target.type === 'text') {
-            //         const newValue = target.value.trim();
-            //         const cell = target.parentElement;
-            //         cell.innerHTML = newValue;
-            //         console.log(`Saving Text... ID: ${uniqueId}, Field: ${field}, New Value: '${newValue}'`);
-
-            //         // This works for both because 'field' will be "LogicalColumnName", etc.
-            //         columnToUpdate[field] = newValue;
-            //     }
-
-            //     console.log("Updated in-memory data:", allColumnsData);
-            // });
 
             // --- 1. The dblclick listener is now ONLY for creating the input ---
             dataSetColsBody.addEventListener('dblclick', (event) => {
@@ -2882,25 +1411,26 @@ async function renderManageDataSourcePage() {
                     console.error("Cannot update: missing row or field information.");
                     return;
                 }
-                
+
                 const uniqueId = rowElement.dataset.id;
-                if (!uniqueId) {
-                    console.error("Cannot update: missing data-id on the row.");
-                    return;
-                }
+                const columnName = rowElement.dataset.columnName;
+                const folderId = rowElement.dataset.id;
 
                 console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
 
                 const columnToUpdate = allColumnsData.find(col => {
-                    // Check for Database type
+                    // For NEW database datasets (no DataSetColumnID yet)
+                    if (currentDataSourceTypeID === 1 && !col.DataSetColumnID && columnName) {
+                        return col.ColumnName === columnName;
+                    }
+                    // For EXISTING database datasets
                     if (col.DataSetColumnID && col.DataSetColumnID == uniqueId) return true;
-                    // Check for Folder type
+                    // For folder type
                     if (col.DataSetFolderFileID && col.FileType && `${col.DataSetFolderFileID}-${col.FileType}` === uniqueId) return true;
                     return false;
                 });
 
                 if (columnToUpdate) {
-                    // Update the property on the object in the in-memory array
                     columnToUpdate[field] = value;
                     console.log("Updated in-memory data:", allColumnsData);
                 } else {
@@ -2908,7 +1438,7 @@ async function renderManageDataSourcePage() {
                 }
             }
 
- 
+
 
             // =================================================================
             //  SUBMIT DATASET DETAILS LOGIC
@@ -2944,18 +1474,18 @@ async function renderManageDataSourcePage() {
 
                     if (dataSetId === 'new') {
                         // --- CREATE (POST) LOGIC ---
-                        
+
                         // Create the main data set record first
                         console.log("Creating new Data Set with payload:", formData);
                         const newDataSet = await createDataSet(formData); // Assume this returns the new object with its ID
                         const newDataSetId = newDataSet.DataSetID;
-                        
+
                         showToast('Data Set created successfully!');
 
                     } else {
                         // --- UPDATE (PUT/PATCH) LOGIC ---
                         console.log(`Updating Data Set ID ${dataSetId} with payload:`, formData);
-                        
+
                         // Update the main data set record;
                         await updateDataSet(dataSetId, formData);
 
@@ -2964,9 +1494,9 @@ async function renderManageDataSourcePage() {
 
                     // Clear the forms
                     clearForm();
-                    updateDataSetFieldsTable(null, null); 
+                    updateDataSetFieldsTable(null, null);
                     updateMetaDataTable(null, null);
-                    displayColumnsTable(null); 
+                    displayColumnsTable(null);
                     populateExistingDataSets(optgroup, await getAllDataSets());
 
 
@@ -2980,14 +1510,13 @@ async function renderManageDataSourcePage() {
                 }
             });
 
-    
+
         } catch (error) {
             console.error("Failed to fetch data sets:", error);
             // You could display an error message to the user here.
         }
     });
 
-
 }
 
-renderManageDataSourcePage()
+renderManageDataSourcePage();
