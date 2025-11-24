@@ -3,9 +3,9 @@
 // =================================================================
 
 const TABLE_CONTAINER_ID = 'export-jobs-table-area';
-const API_REQUEST_ID = 41;
-const EXPORT_REQUEST_API_ID = 9; 
-const SUBMIT_EXPORT_API_ID = 42;
+const API_REQUEST_ID = 'GetDataExport';
+const EXPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
+const SUBMIT_EXPORT_API_ID = 'RequestDataExportByAssistProjectID';
 
 // Modal Element IDs
 const MODAL_ID = 'export-modal';
@@ -168,25 +168,57 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
 
     if (totalPages <= 1) return;
 
-    const prevDisabled = currentPage === 1;
+    // --- Determine button states ---
+    const isFirstPage = currentPage === 1;
+    const isLastPage = currentPage === totalPages;
+    const commonButtonClasses = "px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100";
+    const disabledClasses = "opacity-50 cursor-not-allowed";
+
+    // --- Build the HTML string ---
     let paginationHTML = `
-        <button data-page="${currentPage - 1}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 ${prevDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${prevDisabled ? 'disabled' : ''}>
-            Previous
-        </button>`;
+        <div class="flex items-center gap-2">
+            <!-- First Page Button -->
+            <button data-page="1" 
+                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
+                    ${isFirstPage ? 'disabled' : ''}>
+                First
+            </button>
+            <!-- Previous Page Button -->
+            <button data-page="${currentPage - 1}" 
+                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
+                    ${isFirstPage ? 'disabled' : ''}>
+                Previous
+            </button>
+        </div>
 
-    paginationHTML += '<div class="flex items-center gap-2">';
-    for (let i = 1; i <= totalPages; i++) {
-        const isActive = i === currentPage;
-        paginationHTML += `
-            <button data-page="${i}" class="px-4 py-2 text-sm font-medium ${isActive ? 'text-white bg-blue-600' : 'text-gray-700 bg-white'} border border-gray-300 rounded-lg hover:bg-gray-100">${i}</button>`;
-    }
-    paginationHTML += '</div>';
+        <!-- Page number input and display -->
+        <div class="flex items-center gap-2 text-sm text-gray-700">
+            <span>Page</span>
+            <input type="number" 
+                   id="page-input" 
+                   class="w-16 text-center border border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" 
+                   value="${currentPage}" 
+                   min="1" 
+                   max="${totalPages}" 
+                   aria-label="Current page">
+            <span>of ${totalPages}</span>
+        </div>
 
-    const nextDisabled = currentPage === totalPages;
-    paginationHTML += `
-        <button data-page="${currentPage + 1}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 ${nextDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${nextDisabled ? 'disabled' : ''}>
-            Next
-        </button>`;
+        <div class="flex items-center gap-2">
+            <!-- Next Page Button -->
+            <button data-page="${currentPage + 1}" 
+                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}" 
+                    ${isLastPage ? 'disabled' : ''}>
+                Next
+            </button>
+            <!-- Last Page Button -->
+            <button data-page="${totalPages}" 
+                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}" 
+                    ${isLastPage ? 'disabled' : ''}>
+                Last
+            </button>
+        </div>
+    `;
 
     container.innerHTML = paginationHTML;
 }
@@ -241,6 +273,23 @@ function setupEventListeners() {
         
         currentPage = parseInt(button.dataset.page, 10);
         renderUI();
+    });
+
+    // NEW: Add listener for page input field
+    document.getElementById('pagination-controls').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && event.target.id === 'page-input') {
+            const inputElement = event.target;
+            const totalPages = Math.ceil(allJobs.length / rowsPerPage);
+            const newPage = parseInt(inputElement.value, 10);
+
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderUI();
+            } else {
+                alert(`Please enter a page number between 1 and ${totalPages}.`);
+                inputElement.value = currentPage;
+            }
+        }
     });
 
     const openBtn = document.getElementById(OPEN_MODAL_BTN_ID);
