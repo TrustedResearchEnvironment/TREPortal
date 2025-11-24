@@ -3,9 +3,9 @@
 // =================================================================
 
 const TABLE_CONTAINER_ID = 'export-jobs-table-area';
-const API_REQUEST_ID = 41;
-const EXPORT_REQUEST_API_ID = 9; 
-const SUBMIT_EXPORT_API_ID = 42;
+const API_REQUEST_ID = 'GetDataExport';
+const EXPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
+const SUBMIT_EXPORT_API_ID = 'RequestDataExportByAssistProjectID';
 
 // Modal Element IDs
 const MODAL_ID = 'export-modal';
