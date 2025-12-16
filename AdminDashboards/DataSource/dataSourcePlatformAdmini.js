@@ -256,51 +256,55 @@ function AddDataSource(typeNamesList, allFields) {
                 // MIGUEL TO BE UPDATED
                 const response = await window.loomeApi.runApiRequest(API_DBCONNECTION_ID);
                 const connections = safeParseJson(response);
-                
-                // Store ConnectionId in a data attribute that we can access later
-                const dropdownHtml = `
-                    <table class="table table-sm table-bordered">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 40%;">Name</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Database Connection</td>
-                                <td class="relative">
-                                    <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
-                                            name="Database Connection">
-                                        <option value="" class="text-gray-500">Select a connection...</option>
-                                        ${connections.map(conn => `
-                                            <option value="${conn.ConnectionID}" 
-                                                    data-connection-id="${conn.ConnectionID}">
-                                                ${conn.ConnectionName}
-                                            </option>
-                                        `).join('')}
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        </svg>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-                
-                fieldsContainer.innerHTML = dropdownHtml;
-                
-                // Add change event listener to store the ConnectionId
-                const select = fieldsContainer.querySelector('select');
-                select.addEventListener('change', (e) => {
-                    const selectedOption = e.target.options[e.target.selectedIndex];
-                    const connectionId = selectedOption.dataset.connectionId;
-                    // Store the ConnectionId for later use
-                    window.selectedConnectionId = connectionId; // You can access this globally
-                });
+
+                if (!connections || connections.length === 0) {
+                    fieldsContainer.innerHTML = '<p class="text-muted">No database connections are available.</p>';
+                } else {
+                    // Store ConnectionId in a data attribute that we can access later
+                    const dropdownHtml = `
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40%;">Name</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Database Connection</td>
+                                    <td class="relative">
+                                        <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
+                                                name="Database Connection">
+                                            <option value="" class="text-gray-500">Select a connection...</option>
+                                            ${connections.map(conn => `
+                                                <option value="${conn.ConnectionID}" 
+                                                        data-connection-id="${conn.ConnectionID}">
+                                                    ${conn.ConnectionName}
+                                                </option>
+                                            `).join('')}
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    fieldsContainer.innerHTML = dropdownHtml;
+                    
+                    // Add change event listener to store the ConnectionId
+                    const select = fieldsContainer.querySelector('select');
+                    select.addEventListener('change', (e) => {
+                        const selectedOption = e.target.options[e.target.selectedIndex];
+                        const connectionId = selectedOption.dataset.connectionId;
+                        // Store the ConnectionId for later use
+                        window.selectedConnectionId = connectionId; // You can access this globally
+                    });
+                }
 
             } catch (error) {
                 console.error('Failed to fetch database connections:', error);
@@ -313,39 +317,43 @@ function AddDataSource(typeNamesList, allFields) {
             try {
                 const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID);
                 const folders = safeParseJson(response);
+                
+                if (!folders || folders.length === 0) {
+                    fieldsContainer.innerHTML = '<p class="text-muted">No folder connections are available.</p>';
+                } else {
+                    // MIGUEL: Change ConnectionID and ConnectionName to FolderID and FolderName later
+                    const dropdownHtml = `
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40%;">Name</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Folder Connection</td>
+                                    <td class="relative">
+                                        <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
+                                                name="Folder Connection">
+                                            <option value="" class="text-gray-500">Select a connection...</option>
+                                            ${folders.map(folder => `
+                                                <option value="${folder.ConnectionID}">${folder.ConnectionName}</option>
+                                            `).join('')}
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    `;
 
-                // MIGUEL: Change ConnectionID and ConnectionName to FolderID and FolderName later
-                const dropdownHtml = `
-                    <table class="table table-sm table-bordered">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 40%;">Name</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Folder Connection</td>
-                                <td class="relative">
-                                    <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
-                                            name="Folder Connection">
-                                        <option value="" class="text-gray-500">Select a connection...</option>
-                                        ${folders.map(folder => `
-                                            <option value="${folder.ConnectionID}">${folder.ConnectionName}</option>
-                                        `).join('')}
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        </svg>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-
-                fieldsContainer.innerHTML = dropdownHtml;
+                    fieldsContainer.innerHTML = dropdownHtml;
+                }
             } catch (error) {
                 console.error('Failed to fetch folders:', error);
                 fieldsContainer.innerHTML = '<p class="text-danger">Error loading folders.</p>';
