@@ -256,12 +256,15 @@ function safeParseJson(response) {
 }
 
 /**
- * Renders pagination controls.
- * (This function NO LONGER adds event listeners).
- */
+* Renders a compact and functional set of pagination controls.
+* Includes First, Previous, Next, Last buttons and a page input field.
+*/
 function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container) {
+        console.error(`Pagination container with ID "${containerId}" not found.`);
+        return;
+    }
 
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     container.innerHTML = ''; // Clear old controls
@@ -270,32 +273,56 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
         return; // No need for pagination.
     }
 
-    // --- Previous Button ---
-    const prevDisabled = currentPage === 1;
+    // --- Determine button states ---
+    const isFirstPage = currentPage === 1;
+    const isLastPage = currentPage === totalPages;
+    const commonButtonClasses = "px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100";
+    const disabledClasses = "opacity-50 cursor-not-allowed";
+
+    // --- Build the HTML string ---
     let paginationHTML = `
-        <button data-page="${currentPage - 1}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 ${prevDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${prevDisabled ? 'disabled' : ''}>
-            Previous
-        </button>
-    `;
-
-    // --- Page Number Buttons ---
-    paginationHTML += '<div class="flex items-center gap-2">';
-    for (let i = 1; i <= totalPages; i++) {
-        const isActive = i === currentPage;
-        paginationHTML += `
-            <button data-page="${i}" class="px-4 py-2 text-sm font-medium ${isActive ? 'text-white bg-blue-600' : 'text-gray-700 bg-white'} border border-gray-300 rounded-lg hover:bg-gray-100">
-                ${i}
+        <div class="flex items-center gap-2">
+            <!-- First Page Button -->
+            <button data-page="1" 
+                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
+                    ${isFirstPage ? 'disabled' : ''}>
+                First
             </button>
-        `;
-    }
-    paginationHTML += '</div>';
+            <!-- Previous Page Button -->
+            <button data-page="${currentPage - 1}" 
+                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
+                    ${isFirstPage ? 'disabled' : ''}>
+                Previous
+            </button>
+        </div>
 
-    // --- Next Button ---
-    const nextDisabled = currentPage === totalPages;
-    paginationHTML += `
-        <button data-page="${currentPage + 1}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 ${nextDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${nextDisabled ? 'disabled' : ''}>
-            Next
-        </button>
+        <!-- Page number input and display -->
+        <div class="flex items-center gap-2 text-sm text-gray-700">
+            <span>Page</span>
+            <input type="number" 
+                   id="page-input" 
+                   class="w-16 text-center border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" 
+                   value="${currentPage}" 
+                   min="1" 
+                   max="${totalPages}" 
+                   aria-label="Current page">
+            <span>of ${totalPages}</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Next Page Button -->
+            <button data-page="${currentPage + 1}" 
+                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}" 
+                    ${isLastPage ? 'disabled' : ''}>
+                Next
+            </button>
+            <!-- Last Page Button -->
+            <button data-page="${totalPages}" 
+                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}" 
+                    ${isLastPage ? 'disabled' : ''}>
+                Last
+            </button>
+        </div>
     `;
 
     container.innerHTML = paginationHTML;
@@ -488,6 +515,7 @@ async function renderMyRequestsPage() {
 
         // --- 3. UPDATE ALL CHIP COUNTS ONCE ---
         // This is the logic you wanted. It calculates counts from the unfiltered master array.
+        let totalRequests = 0;
         const chipsContainer = document.getElementById('status-chips-container');
         for (const chip of chipsContainer.querySelectorAll('.chip')) {
             const status = chip.dataset.status;
@@ -495,6 +523,13 @@ async function renderMyRequestsPage() {
             // Await the asynchronous getCounts function for each chip
             const count = await getCounts(status);
             chip.querySelector('.chip-count').textContent = count;
+            totalRequests += Number(count);
+        }
+
+        // Update the total count in the header
+        const requestsCountEl = document.getElementById('requestsCount');
+        if (requestsCountEl) {
+            requestsCountEl.textContent = totalRequests;
         }
 
         // --- 4. SETUP EVENT LISTENERS ---
@@ -518,12 +553,25 @@ async function renderMyRequestsPage() {
         });
 
         // Listener for pagination buttons
-        document.getElementById('pagination-controls').addEventListener('click', (event) => {
+        const paginationContainer = document.getElementById('pagination-controls');
+        paginationContainer.addEventListener('click', (event) => {
             const button = event.target.closest('button[data-page]');
             if (!button || button.disabled) return;
             
             currentPage = parseInt(button.dataset.page, 10);
             renderUI(); // Re-render everything
+        });
+
+        // --- ADD THIS NEW LISTENER for the page input box ---
+        paginationContainer.addEventListener('keydown', (event) => {
+            // Only act if the user pressed Enter and the target is our input
+            if (event.key === 'Enter' && event.target.id === 'page-input') {
+                const newPage = parseInt(event.target.value, 10);
+                if (!isNaN(newPage) && newPage > 0) {
+                    currentPage = newPage;
+                    renderUI();
+                }
+            }
         });
 
         // --- 5. INITIAL PAGE RENDER ---
