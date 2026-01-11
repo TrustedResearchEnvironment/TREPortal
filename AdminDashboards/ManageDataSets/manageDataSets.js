@@ -903,9 +903,24 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             };
         };
         if (dataSetId === 'new') {
-            const tableNameSelector = document.getElementById('tableNameSelector');
-            if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
-                const subFolderName = tableNameSelector.value;
+                const tableNameSelector = document.getElementById('tableNameSelector');
+                if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
+                    const subFolderName = tableNameSelector.value;
+                    
+                    // Fetch data for NEW set
+                    const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
+                    
+                    // Apply the consistent mapping
+                    newColumnsData = originalData.map(mapFolderData);
+                    
+                    console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
+                }
+            } else if (dataSetId && dataSetId !== 'new') {
+                try {
+                    console.log(`FETCHING SAVED columns for existing Data Set ID: ${dataSetId}...`);
+                    
+                    // 1. Fetch data for EXISTING set (SAVED data from DB)
+                    const fetchedData = await (dataSetId); //NEED TO CHANGE THIS
 
                 const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
                 console.log("Original NEW Folder Columns Data: ", originalData);
