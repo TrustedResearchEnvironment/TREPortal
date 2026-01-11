@@ -256,55 +256,51 @@ function AddDataSource(typeNamesList, allFields) {
                 // MIGUEL TO BE UPDATED
                 const response = await window.loomeApi.runApiRequest(API_DBCONNECTION_ID);
                 const connections = safeParseJson(response);
-
-                if (!connections || connections.length === 0) {
-                    fieldsContainer.innerHTML = '<p class="text-muted">No database connections are available.</p>';
-                } else {
-                    // Store ConnectionId in a data attribute that we can access later
-                    const dropdownHtml = `
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 40%;">Name</th>
-                                    <th>Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Database Connection</td>
-                                    <td class="relative">
-                                        <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
-                                                name="Database Connection">
-                                            <option value="" class="text-gray-500">Select a connection...</option>
-                                            ${connections.map(conn => `
-                                                <option value="${conn.ConnectionID}" 
-                                                        data-connection-id="${conn.ConnectionID}">
-                                                    ${conn.ConnectionName}
-                                                </option>
-                                            `).join('')}
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                            </svg>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    `;
-                    
-                    fieldsContainer.innerHTML = dropdownHtml;
-                    
-                    // Add change event listener to store the ConnectionId
-                    const select = fieldsContainer.querySelector('select');
-                    select.addEventListener('change', (e) => {
-                        const selectedOption = e.target.options[e.target.selectedIndex];
-                        const connectionId = selectedOption.dataset.connectionId;
-                        // Store the ConnectionId for later use
-                        window.selectedConnectionId = connectionId; // You can access this globally
-                    });
-                }
+                
+                // Store ConnectionId in a data attribute that we can access later
+                const dropdownHtml = `
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40%;">Name</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Database Connection</td>
+                                <td class="relative">
+                                    <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
+                                            name="Database Connection">
+                                        <option value="" class="text-gray-500">Select a connection...</option>
+                                        ${connections.map(conn => `
+                                            <option value="${conn.ConnectionID}" 
+                                                    data-connection-id="${conn.ConnectionID}">
+                                                ${conn.ConnectionName}
+                                            </option>
+                                        `).join('')}
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+                
+                fieldsContainer.innerHTML = dropdownHtml;
+                
+                // Add change event listener to store the ConnectionId
+                const select = fieldsContainer.querySelector('select');
+                select.addEventListener('change', (e) => {
+                    const selectedOption = e.target.options[e.target.selectedIndex];
+                    const connectionId = selectedOption.dataset.connectionId;
+                    // Store the ConnectionId for later use
+                    window.selectedConnectionId = connectionId; // You can access this globally
+                });
 
             } catch (error) {
                 console.error('Failed to fetch database connections:', error);
@@ -317,43 +313,39 @@ function AddDataSource(typeNamesList, allFields) {
             try {
                 const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID);
                 const folders = safeParseJson(response);
-                
-                if (!folders || folders.length === 0) {
-                    fieldsContainer.innerHTML = '<p class="text-muted">No folder connections are available.</p>';
-                } else {
-                    // MIGUEL: Change ConnectionID and ConnectionName to FolderID and FolderName later
-                    const dropdownHtml = `
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 40%;">Name</th>
-                                    <th>Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Folder Connection</td>
-                                    <td class="relative">
-                                        <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
-                                                name="Folder Connection">
-                                            <option value="" class="text-gray-500">Select a connection...</option>
-                                            ${folders.map(folder => `
-                                                <option value="${folder.ConnectionID}">${folder.ConnectionName}</option>
-                                            `).join('')}
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                            </svg>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    `;
 
-                    fieldsContainer.innerHTML = dropdownHtml;
-                }
+                // MIGUEL: Change ConnectionID and ConnectionName to FolderID and FolderName later
+                const dropdownHtml = `
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40%;">Name</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Folder Connection</td>
+                                <td class="relative">
+                                    <select class="form-control form-control-sm dynamic-field appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-full" 
+                                            name="Folder Connection">
+                                        <option value="" class="text-gray-500">Select a connection...</option>
+                                        ${folders.map(folder => `
+                                            <option value="${folder.ConnectionID}">${folder.ConnectionName}</option>
+                                        `).join('')}
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+
+                fieldsContainer.innerHTML = dropdownHtml;
             } catch (error) {
                 console.error('Failed to fetch folders:', error);
                 fieldsContainer.innerHTML = '<p class="text-danger">Error loading folders.</p>';
@@ -1251,5 +1243,510 @@ async function renderPlatformAdminDataSourcePage() {
     await fetchAndRenderPage(tableConfig, 1, '');
 }
 
+// --- EXPORT FOR TESTING (Node.js environment only) ---
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        safeParseJson,
+        showToast,
+        createDbConnectionMap,
+        createFolderConnectionMap,
+        getDataSourceFormData,
+        AddDataSource,
+        getAllDataSourceTypes,
+        createDataSourceTypeMap,
+        fetchApiData,
+        getAllFields,
+        renderPagination,
+        fetchAndRenderPage,
+        renderAccordionDetails,
+        renderTable,
+        formatDate,
+        renderPlatformAdminDataSourcePage
+    };
+}
 
-renderPlatformAdminDataSourcePage()
+// --- AUTO-EXECUTE ONLY IN BROWSER ---
+if (typeof window !== 'undefined' && typeof module === 'undefined') {
+    renderPlatformAdminDataSourcePage();
+}
+
+// =============================================================================
+// UNIT TESTS (Jest - only run in Node.js test environment)
+// =============================================================================
+if (typeof describe !== 'undefined') {
+
+    // --- Suppress console output during tests for cleaner output ---
+    let originalConsole;
+    beforeAll(() => {
+        originalConsole = {
+            log: console.log,
+            warn: console.warn,
+            error: console.error
+        };
+        console.log = jest.fn();
+        console.warn = jest.fn();
+        console.error = jest.fn();
+    });
+
+    afterAll(() => {
+        console.log = originalConsole.log;
+        console.warn = originalConsole.warn;
+        console.error = originalConsole.error;
+    });
+
+    // --- MOCK DATA based on API Response Structures ---
+    const mockGetDataSourceResponse = {
+        CurrentPage: 1,
+        PageCount: 2,
+        PageSize: 5,
+        RowCount: 10,
+        FirstRowOnPage: 1,
+        LastRowOnPage: 5,
+        Results: [
+            {
+                DataSourceTypeID: 1,
+                DataSourceID: 101,
+                Name: "Test Database Source",
+                Description: "A test database connection",
+                isRefreshed: true,
+                ModifiedDate: "2026-01-11T10:18:13.931Z",
+                IsActive: true,
+                RefreshedDate: "2026-01-10T08:00:00.000Z",
+                Fields: {
+                    "Database Connection": "5"
+                }
+            },
+            {
+                DataSourceTypeID: 3,
+                DataSourceID: 102,
+                Name: "Test Folder Source",
+                Description: "A test folder connection",
+                isRefreshed: false,
+                ModifiedDate: "2026-01-05T12:00:00.000Z",
+                IsActive: false,
+                RefreshedDate: null,
+                Fields: {
+                    "Folder Connection": "10"
+                }
+            }
+        ]
+    };
+
+    const mockGetDataSourceTypesResponse = {
+        CurrentPage: 1,
+        PageCount: 1,
+        PageSize: 100,
+        RowCount: 3,
+        FirstRowOnPage: 1,
+        LastRowOnPage: 3,
+        Results: [
+            { DataSourceTypeID: 1, Name: "Database", Description: "Database connection", IsActive: true, ModifiedDate: "2026-01-01T00:00:00Z" },
+            { DataSourceTypeID: 2, Name: "REDCap API", Description: "REDCap API connection", IsActive: true, ModifiedDate: "2026-01-01T00:00:00Z" },
+            { DataSourceTypeID: 3, Name: "Folder", Description: "Folder connection", IsActive: true, ModifiedDate: "2026-01-01T00:00:00Z" }
+        ]
+    };
+
+    const mockGetDatabaseConnectionResponse = [
+        { ConnectionID: 1, ConnectionName: "Production DB" },
+        { ConnectionID: 2, ConnectionName: "Staging DB" },
+        { ConnectionID: 5, ConnectionName: "Test DB" }
+    ];
+
+    const mockGetFolderConnectionResponse = [
+        { ConnectionID: 10, ConnectionName: "Shared Drive" },
+        { ConnectionID: 11, ConnectionName: "Archive Folder" }
+    ];
+
+    // --- TEST SUITE: safeParseJson ---
+    describe('safeParseJson', () => {
+        test('should return the same object when input is already an object', () => {
+            const input = { key: 'value', number: 42 };
+            const result = safeParseJson(input);
+            expect(result).toEqual(input);
+            expect(result).toBe(input); // Same reference
+        });
+
+        test('should parse a valid JSON string into an object', () => {
+            const input = '{"key": "value", "number": 42}';
+            const result = safeParseJson(input);
+            expect(result).toEqual({ key: 'value', number: 42 });
+        });
+
+        test('should parse a JSON array string', () => {
+            const input = '[1, 2, 3]';
+            const result = safeParseJson(input);
+            expect(result).toEqual([1, 2, 3]);
+        });
+
+        test('should throw an error for invalid JSON string', () => {
+            const input = 'not valid json';
+            expect(() => safeParseJson(input)).toThrow(SyntaxError);
+        });
+
+        test('should handle empty object string', () => {
+            const result = safeParseJson('{}');
+            expect(result).toEqual({});
+        });
+
+        test('should handle API response structure (GetDataSource)', () => {
+            const jsonString = JSON.stringify(mockGetDataSourceResponse);
+            const result = safeParseJson(jsonString);
+            expect(result.CurrentPage).toBe(1);
+            expect(result.Results).toHaveLength(2);
+            expect(result.Results[0].Name).toBe("Test Database Source");
+        });
+    });
+
+    // --- TEST SUITE: formatDate ---
+    describe('formatDate', () => {
+        test('should format a valid ISO date string', () => {
+            const result = formatDate("2026-01-11T10:18:13.931Z");
+            expect(result).toBe("January 11, 2026");
+        });
+
+        test('should format a date without time component', () => {
+            const result = formatDate("2025-12-25");
+            expect(result).toBe("December 25, 2025");
+        });
+
+        test('should return "N/A" for null input', () => {
+            const result = formatDate(null);
+            expect(result).toBe('N/A');
+        });
+
+        test('should return "N/A" for undefined input', () => {
+            const result = formatDate(undefined);
+            expect(result).toBe('N/A');
+        });
+
+        test('should return "N/A" for empty string input', () => {
+            const result = formatDate('');
+            expect(result).toBe('N/A');
+        });
+
+        test('should return "N/A" for invalid date string', () => {
+            const result = formatDate('not a date');
+            expect(result).toBe('N/A');
+        });
+
+        test('should return "N/A" for gibberish input', () => {
+            const result = formatDate('hello world');
+            expect(result).toBe('N/A');
+        });
+
+        test('should handle RefreshedDate from API response', () => {
+            const apiItem = mockGetDataSourceResponse.Results[0];
+            const result = formatDate(apiItem.RefreshedDate);
+            expect(result).toBe("January 10, 2026");
+        });
+
+        test('should handle null RefreshedDate from API response', () => {
+            const apiItem = mockGetDataSourceResponse.Results[1];
+            const result = formatDate(apiItem.RefreshedDate);
+            expect(result).toBe('N/A');
+        });
+    });
+
+    // --- TEST SUITE: createDataSourceTypeMap ---
+    describe('createDataSourceTypeMap', () => {
+        test('should create a Map from valid data source types array', async () => {
+            const typesArray = mockGetDataSourceTypesResponse.Results;
+            const result = await createDataSourceTypeMap(typesArray);
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(3);
+            expect(result.get(1)).toBe("Database");
+            expect(result.get(2)).toBe("REDCap API");
+            expect(result.get(3)).toBe("Folder");
+        });
+
+        test('should return empty Map for null input', async () => {
+            const result = await createDataSourceTypeMap(null);
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+
+        test('should return empty Map for undefined input', async () => {
+            const result = await createDataSourceTypeMap(undefined);
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+
+        test('should return empty Map for empty array', async () => {
+            const result = await createDataSourceTypeMap([]);
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+
+        test('should skip items without DataSourceTypeID', async () => {
+            const typesArray = [
+                { DataSourceTypeID: 1, Name: "Database" },
+                { Name: "Invalid - No ID" }, // Missing DataSourceTypeID
+                { DataSourceTypeID: 3, Name: "Folder" }
+            ];
+            const result = await createDataSourceTypeMap(typesArray);
+            expect(result.size).toBe(2);
+            expect(result.has(2)).toBe(false);
+        });
+
+        test('should skip items without Name', async () => {
+            const typesArray = [
+                { DataSourceTypeID: 1, Name: "Database" },
+                { DataSourceTypeID: 2 }, // Missing Name
+            ];
+            const result = await createDataSourceTypeMap(typesArray);
+            expect(result.size).toBe(1);
+            expect(result.get(1)).toBe("Database");
+        });
+    });
+
+    // --- TEST SUITE: createDbConnectionMap ---
+    describe('createDbConnectionMap', () => {
+        beforeEach(() => {
+            // In jsdom, window is the global object itself
+            window.loomeApi = {
+                runApiRequest: jest.fn()
+            };
+        });
+
+        afterEach(() => {
+            // Clean up
+            delete window.loomeApi;
+        });
+
+        test('should create a Map from API response', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue(mockGetDatabaseConnectionResponse);
+            
+            const result = await createDbConnectionMap();
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(3);
+            expect(result.get(1)).toBe("Production DB");
+            expect(result.get(2)).toBe("Staging DB");
+            expect(result.get(5)).toBe("Test DB");
+        });
+
+        test('should create Map from JSON string response', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue(
+                JSON.stringify(mockGetDatabaseConnectionResponse)
+            );
+            
+            const result = await createDbConnectionMap();
+            
+            expect(result.size).toBe(3);
+            expect(result.get(1)).toBe("Production DB");
+        });
+
+        test('should return empty Map when API returns empty array', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue([]);
+            
+            const result = await createDbConnectionMap();
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+
+        test('should return empty Map when API returns null', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue(null);
+            
+            const result = await createDbConnectionMap();
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+
+        test('should return empty Map on API error', async () => {
+            window.loomeApi.runApiRequest.mockRejectedValue(new Error('Network error'));
+            
+            const result = await createDbConnectionMap();
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+
+        test('should skip items with missing ConnectionID', async () => {
+            const partialData = [
+                { ConnectionID: 1, ConnectionName: "DB1" },
+                { ConnectionName: "Invalid DB" }, // Missing ConnectionID
+            ];
+            window.loomeApi.runApiRequest.mockResolvedValue(partialData);
+            
+            const result = await createDbConnectionMap();
+            
+            expect(result.size).toBe(1);
+        });
+    });
+
+    // --- TEST SUITE: createFolderConnectionMap ---
+    describe('createFolderConnectionMap', () => {
+
+        beforeEach(() => {
+            window.loomeApi = {
+                runApiRequest: jest.fn()
+            };
+        });
+
+        afterEach(() => {
+            delete window.loomeApi;
+        });
+
+        test('should create a Map from API response', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue(mockGetFolderConnectionResponse);
+            
+            const result = await createFolderConnectionMap();
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(2);
+            expect(result.get(10)).toBe("Shared Drive");
+            expect(result.get(11)).toBe("Archive Folder");
+        });
+
+        test('should return empty Map when API returns empty array', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue([]);
+            
+            const result = await createFolderConnectionMap();
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+
+        test('should return empty Map on API error', async () => {
+            window.loomeApi.runApiRequest.mockRejectedValue(new Error('API failure'));
+            
+            const result = await createFolderConnectionMap();
+            
+            expect(result).toBeInstanceOf(Map);
+            expect(result.size).toBe(0);
+        });
+    });
+
+    // --- TEST SUITE: getAllDataSourceTypes ---
+    describe('getAllDataSourceTypes', () => {
+
+        beforeEach(() => {
+            window.loomeApi = {
+                runApiRequest: jest.fn()
+            };
+        });
+
+        afterEach(() => {
+            delete window.loomeApi;
+        });
+
+        test('should return all data source types from single page', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue(mockGetDataSourceTypesResponse);
+            
+            const result = await getAllDataSourceTypes();
+            
+            expect(result).toHaveLength(3);
+            expect(result[0].Name).toBe("Database");
+            expect(result[1].Name).toBe("REDCap API");
+            expect(result[2].Name).toBe("Folder");
+        });
+
+        test('should handle multi-page responses', async () => {
+            const page1Response = {
+                CurrentPage: 1,
+                PageCount: 2,
+                PageSize: 2,
+                RowCount: 3,
+                Results: [
+                    { DataSourceTypeID: 1, Name: "Database" },
+                    { DataSourceTypeID: 2, Name: "REDCap API" }
+                ]
+            };
+            const page2Response = {
+                CurrentPage: 2,
+                PageCount: 2,
+                PageSize: 2,
+                RowCount: 3,
+                Results: [
+                    { DataSourceTypeID: 3, Name: "Folder" }
+                ]
+            };
+
+            window.loomeApi.runApiRequest
+                .mockResolvedValueOnce(page1Response)
+                .mockResolvedValueOnce(page2Response);
+            
+            const result = await getAllDataSourceTypes(2);
+            
+            expect(result).toHaveLength(3);
+            expect(window.loomeApi.runApiRequest).toHaveBeenCalledTimes(2);
+        });
+
+        test('should return empty array when RowCount is 0', async () => {
+            const emptyResponse = {
+                CurrentPage: 1,
+                PageCount: 0,
+                PageSize: 100,
+                RowCount: 0,
+                Results: []
+            };
+            window.loomeApi.runApiRequest.mockResolvedValue(emptyResponse);
+            
+            const result = await getAllDataSourceTypes();
+            
+            expect(result).toEqual([]);
+        });
+
+        test('should return empty array on API error', async () => {
+            window.loomeApi.runApiRequest.mockRejectedValue(new Error('Network error'));
+            
+            const result = await getAllDataSourceTypes();
+            
+            expect(result).toEqual([]);
+        });
+    });
+
+    // --- TEST SUITE: fetchApiData ---
+    describe('fetchApiData', () => {
+
+        beforeEach(() => {
+            window.loomeApi = {
+                runApiRequest: jest.fn()
+            };
+        });
+
+        afterEach(() => {
+            delete window.loomeApi;
+        });
+
+        test('should return parsed data on successful API call', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue(mockGetDataSourceResponse);
+            
+            const result = await fetchApiData('GetDataSource', { page: 1 }, 'data sources');
+            
+            expect(result).toEqual(mockGetDataSourceResponse);
+            expect(result.Results).toHaveLength(2);
+        });
+
+        test('should parse JSON string response', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue(
+                JSON.stringify(mockGetDatabaseConnectionResponse)
+            );
+            
+            const result = await fetchApiData('GetDatabaseConnection', {}, 'connections');
+            
+            expect(result).toEqual(mockGetDatabaseConnectionResponse);
+        });
+
+        test('should return null on API error', async () => {
+            window.loomeApi.runApiRequest.mockRejectedValue(new Error('API failure'));
+            
+            const result = await fetchApiData('GetDataSource', {}, 'data sources');
+            
+            expect(result).toBeNull();
+        });
+
+        test('should pass correct parameters to API', async () => {
+            window.loomeApi.runApiRequest.mockResolvedValue({});
+            const params = { page: 2, pageSize: 10, search: 'test' };
+            
+            await fetchApiData('GetDataSource', params, 'data sources');
+            
+            expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith('GetDataSource', params);
+        });
+    });
+
+} // End of test block
