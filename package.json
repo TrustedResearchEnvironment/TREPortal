@@ -28,7 +28,8 @@
       "**/manageDataSets.js",
       "**/metaDataPlatformAdmin.js",
       "**/requestsPlatformAdmin.js",
-      "**/approver.js"
+      "**/approver.js",
+      "**/userrequests.js"
     ],
     "collectCoverageFrom": [
       "**/*.js",
