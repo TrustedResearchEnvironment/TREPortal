@@ -1532,7 +1532,10 @@ async function renderManageDataSourcePage() {
 
 }
 
-renderManageDataSourcePage();
+// Only run in browser environment, not during Jest testing
+if (typeof jest === 'undefined') {
+    renderManageDataSourcePage();
+}
 
 // ============================================================================
 // MODULE EXPORTS (for Node.js/Jest testing)
