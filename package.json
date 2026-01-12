@@ -23,7 +23,8 @@
       "**/__tests__/**/*.js",
       "**/?(*.)+(spec|test).js",
       "**/dataSourcePlatformAdmin.js",
-      "**/dataSouceTypesPlatformAdmin.js"
+      "**/dataSouceTypesPlatformAdmin.js",
+      "**/emailTemplatePlatformAdmin.js"
     ],
     "collectCoverageFrom": [
       "**/*.js",
