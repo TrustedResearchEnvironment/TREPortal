@@ -26,7 +26,8 @@
       "**/dataSouceTypesPlatformAdmin.js",
       "**/emailTemplatePlatformAdmin.js",
       "**/manageDataSets.js",
-      "**/metaDataPlatformAdmin.js"
+      "**/metaDataPlatformAdmin.js",
+      "**/requestsPlatformAdmin.js"
     ],
     "collectCoverageFrom": [
       "**/*.js",
