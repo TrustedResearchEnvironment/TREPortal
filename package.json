@@ -22,7 +22,8 @@
     "testMatch": [
       "**/__tests__/**/*.js",
       "**/?(*.)+(spec|test).js",
-      "**/dataSourcePlatformAdmin.js"
+      "**/dataSourcePlatformAdmin.js",
+      "**/dataSouceTypesPlatformAdmin.js"
     ],
     "collectCoverageFrom": [
       "**/*.js",
