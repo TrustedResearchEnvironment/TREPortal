@@ -24,7 +24,8 @@
       "**/?(*.)+(spec|test).js",
       "**/dataSourcePlatformAdmin.js",
       "**/dataSouceTypesPlatformAdmin.js",
-      "**/emailTemplatePlatformAdmin.js"
+      "**/emailTemplatePlatformAdmin.js",
+      "**/manageDataSets.js"
     ],
     "collectCoverageFrom": [
       "**/*.js",

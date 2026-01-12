@@ -903,24 +903,9 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             };
         };
         if (dataSetId === 'new') {
-                const tableNameSelector = document.getElementById('tableNameSelector');
-                if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
-                    const subFolderName = tableNameSelector.value;
-                    
-                    // Fetch data for NEW set
-                    const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
-                    
-                    // Apply the consistent mapping
-                    newColumnsData = originalData.map(mapFolderData);
-                    
-                    console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
-                }
-            } else if (dataSetId && dataSetId !== 'new') {
-                try {
-                    console.log(`FETCHING SAVED columns for existing Data Set ID: ${dataSetId}...`);
-                    
-                    // 1. Fetch data for EXISTING set (SAVED data from DB)
-                    const fetchedData = await (dataSetId); //NEED TO CHANGE THIS
+            const tableNameSelector = document.getElementById('tableNameSelector');
+            if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
+                const subFolderName = tableNameSelector.value;
 
                 const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
                 console.log("Original NEW Folder Columns Data: ", originalData);
@@ -1548,3 +1533,1301 @@ async function renderManageDataSourcePage() {
 }
 
 renderManageDataSourcePage();
+
+// ============================================================================
+// MODULE EXPORTS (for Node.js/Jest testing)
+// ============================================================================
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        // API Constants
+        API_GET_COLUMNS_DATA,
+        API_GET_DATASOURCE_FOLDERS,
+        API_GET_DATASOURCE_TABLES,
+        API_GET_DATASOURCE_TABLE_BY_ID,
+        API_GET_DATASET_FIELD_VALUE,
+        API_GET_DATASET_METADATA_VALUE,
+        API_GET_DATASETS,
+        API_GET_DATASOURCES,
+        API_CREATE_DATASET,
+        API_UPDATE_DATASET,
+        API_GET_DATASOURCE_SUBFOLDERS,
+        API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES,
+        API_GET_DATASET_FOLDERFILE,
+        // Functions
+        safeParseJson,
+        showToast,
+        renderPagination,
+        handlePageChange,
+        displayColumnsTable,
+        populateExistingDataSets,
+        populateDataSourceOptions,
+        renderRedcapApiKeyRowMetaData,
+        updateTableHeader,
+        gatherFormData,
+        createDataSet,
+        updateDataSet,
+        getFromAPI,
+        getAllDataSets,
+        getAllDataSources,
+        fetchSQLDataSetColumns,
+        fetchDataSetFieldValue,
+        fetchDataSetFolderValue,
+        fetchLoomeDataSourceTablesByTableId,
+        formatSQLColumnsFromSchema,
+        fetchSubFolders,
+        fetchSubFoldersWithFiles,
+        fetchSqlTables,
+        renderTablePage,
+        // State accessors for testing
+        get pageSize() { return pageSize; },
+        get currentPage() { return currentPage; },
+        set currentPage(val) { currentPage = val; },
+        get allColumnsData() { return allColumnsData; },
+        set allColumnsData(val) { allColumnsData = val; },
+        get currentDataSourceTypeID() { return currentDataSourceTypeID; },
+        set currentDataSourceTypeID(val) { currentDataSourceTypeID = val; },
+        get currentDataSourceID() { return currentDataSourceID; },
+        set currentDataSourceID(val) { currentDataSourceID = val; }
+    };
+}
+
+// ============================================================================
+// UNIT TESTS
+// ============================================================================
+if (typeof describe === 'function') {
+    const mod = typeof module !== 'undefined' && module.exports ? module.exports : {};
+
+    describe('manageDataSets.js', () => {
+        let mockApiResponse;
+        let originalLoomeApi;
+
+        beforeEach(() => {
+            // Reset state
+            mod.currentPage = 1;
+            mod.allColumnsData = [];
+            mod.currentDataSourceTypeID = 0;
+            mod.currentDataSourceID = 0;
+
+            // Setup DOM
+            document.body.innerHTML = `
+                <div id="pagination-controls"></div>
+                <table id="dataSetColsTable">
+                    <thead><tr id="dataSetColsHeader"></tr></thead>
+                    <tbody id="dataSetColsBody"></tbody>
+                </table>
+                <select id="dataSetSelection">
+                    <optgroup label="Existing Data Sets"></optgroup>
+                </select>
+                <input id="dataSetName" type="text" />
+                <textarea id="dataSetDescription"></textarea>
+                <select id="dataSource"><option value="">Select...</option></select>
+                <input id="dataSetActive" type="checkbox" checked />
+                <input id="dataSetOwner" type="text" />
+                <input id="dataSetApprover" type="text" />
+                <table id="dataSetFieldsTable"><tbody></tbody></table>
+                <table id="metaDataTable"><tbody></tbody></table>
+                <div id="fieldsPlaceholder"></div>
+                <div id="metaDataPlaceholder"></div>
+                <select id="tableNameSelector"><option value="-1">Select...</option></select>
+            `;
+
+            // Mock console methods
+            jest.spyOn(console, 'log').mockImplementation(() => {});
+            jest.spyOn(console, 'warn').mockImplementation(() => {});
+            jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Store original API
+            originalLoomeApi = window.loomeApi;
+            mockApiResponse = null;
+            window.loomeApi = {
+                runApiRequest: jest.fn((apiId, params) => Promise.resolve(mockApiResponse))
+            };
+        });
+
+        afterEach(() => {
+            window.loomeApi = originalLoomeApi;
+            jest.restoreAllMocks();
+        });
+
+        // =====================================================================
+        // API Constants Tests
+        // =====================================================================
+        describe('API Constants', () => {
+            test('API_GET_COLUMNS_DATA should be GetColumnsDataByDataSetID', () => {
+                expect(mod.API_GET_COLUMNS_DATA).toBe('GetColumnsDataByDataSetID');
+            });
+
+            test('API_GET_DATASOURCE_FOLDERS should be GetLoomeDataSourceFolders', () => {
+                expect(mod.API_GET_DATASOURCE_FOLDERS).toBe('GetLoomeDataSourceFolders');
+            });
+
+            test('API_GET_DATASOURCE_TABLES should be GetLoomeDataSourceTablesByDataSourceID', () => {
+                expect(mod.API_GET_DATASOURCE_TABLES).toBe('GetLoomeDataSourceTablesByDataSourceID');
+            });
+
+            test('API_GET_DATASOURCE_TABLE_BY_ID should be GetLoomeDataSourceTablesByTableId', () => {
+                expect(mod.API_GET_DATASOURCE_TABLE_BY_ID).toBe('GetLoomeDataSourceTablesByTableId');
+            });
+
+            test('API_GET_DATASET_FIELD_VALUE should be GetDataSetFieldValuesByDataSetID', () => {
+                expect(mod.API_GET_DATASET_FIELD_VALUE).toBe('GetDataSetFieldValuesByDataSetID');
+            });
+
+            test('API_GET_DATASET_METADATA_VALUE should be GetDataSetMetaDataValue', () => {
+                expect(mod.API_GET_DATASET_METADATA_VALUE).toBe('GetDataSetMetaDataValue');
+            });
+
+            test('API_GET_DATASETS should be GetDataSet', () => {
+                expect(mod.API_GET_DATASETS).toBe('GetDataSet');
+            });
+
+            test('API_GET_DATASOURCES should be GetDataSource', () => {
+                expect(mod.API_GET_DATASOURCES).toBe('GetDataSource');
+            });
+
+            test('API_CREATE_DATASET should be CreateDataSet', () => {
+                expect(mod.API_CREATE_DATASET).toBe('CreateDataSet');
+            });
+
+            test('API_UPDATE_DATASET should be UpdateDataSet', () => {
+                expect(mod.API_UPDATE_DATASET).toBe('UpdateDataSet');
+            });
+
+            test('API_GET_DATASOURCE_SUBFOLDERS should be GetLoomeDataSourceFirstSubFolders', () => {
+                expect(mod.API_GET_DATASOURCE_SUBFOLDERS).toBe('GetLoomeDataSourceFirstSubFolders');
+            });
+
+            test('API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES should be GetLoomeDataSourceSubFoldersWithFiles', () => {
+                expect(mod.API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES).toBe('GetLoomeDataSourceSubFoldersWithFiles');
+            });
+
+            test('API_GET_DATASET_FOLDERFILE should be GetDataSetFolderFileByDataSetID', () => {
+                expect(mod.API_GET_DATASET_FOLDERFILE).toBe('GetDataSetFolderFileByDataSetID');
+            });
+
+            test('pageSize should be 10', () => {
+                expect(mod.pageSize).toBe(10);
+            });
+        });
+
+        // =====================================================================
+        // safeParseJson Tests
+        // =====================================================================
+        describe('safeParseJson', () => {
+            test('should parse JSON string to object', () => {
+                const jsonString = '{"name":"test","value":123}';
+                const result = mod.safeParseJson(jsonString);
+                expect(result).toEqual({ name: 'test', value: 123 });
+            });
+
+            test('should return object as-is if already an object', () => {
+                const obj = { name: 'test', value: 123 };
+                const result = mod.safeParseJson(obj);
+                expect(result).toBe(obj);
+            });
+
+            test('should parse JSON array string', () => {
+                const jsonString = '[{"id":1},{"id":2}]';
+                const result = mod.safeParseJson(jsonString);
+                expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+            });
+
+            test('should return array as-is if already an array', () => {
+                const arr = [{ id: 1 }, { id: 2 }];
+                const result = mod.safeParseJson(arr);
+                expect(result).toBe(arr);
+            });
+
+            test('should handle empty object string', () => {
+                const result = mod.safeParseJson('{}');
+                expect(result).toEqual({});
+            });
+
+            test('should handle paginated response string', () => {
+                const paginatedStr = '{"Results":[{"id":1}],"PageCount":3,"TotalCount":25}';
+                const result = mod.safeParseJson(paginatedStr);
+                expect(result.Results).toEqual([{ id: 1 }]);
+                expect(result.PageCount).toBe(3);
+            });
+        });
+
+        // =====================================================================
+        // showToast Tests
+        // =====================================================================
+        describe('showToast', () => {
+            beforeEach(() => {
+                jest.useFakeTimers();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            test('should create a toast element with success class by default', () => {
+                mod.showToast('Test message');
+                const toast = document.querySelector('.toast-notification');
+                expect(toast).toBeTruthy();
+                expect(toast.classList.contains('toast-success')).toBe(true);
+                expect(toast.textContent).toBe('Test message');
+            });
+
+            test('should create a toast element with error class when type is error', () => {
+                mod.showToast('Error message', 'error');
+                const toast = document.querySelector('.toast-notification');
+                expect(toast).toBeTruthy();
+                expect(toast.classList.contains('toast-error')).toBe(true);
+            });
+
+            test('should create a toast element with info class when type is info', () => {
+                mod.showToast('Info message', 'info');
+                const toast = document.querySelector('.toast-notification');
+                expect(toast.classList.contains('toast-info')).toBe(true);
+            });
+
+            test('should apply fade-in animation after short delay', () => {
+                mod.showToast('Animated message');
+                jest.advanceTimersByTime(15);
+                const toast = document.querySelector('.toast-notification');
+                expect(toast.style.opacity).toBe('1');
+                expect(toast.style.transform).toBe('translateY(0)');
+            });
+
+            test('should start fade-out after duration', () => {
+                mod.showToast('Timed message', 'success', 3000);
+                jest.advanceTimersByTime(3015);
+                const toast = document.querySelector('.toast-notification');
+                expect(toast.style.opacity).toBe('0');
+            });
+        });
+
+        // =====================================================================
+        // renderPagination Tests
+        // =====================================================================
+        describe('renderPagination', () => {
+            test('should render pagination controls correctly', () => {
+                mod.renderPagination('pagination-controls', 50, 10, 1);
+                const container = document.getElementById('pagination-controls');
+                expect(container.innerHTML).toContain('First');
+                expect(container.innerHTML).toContain('Previous');
+                expect(container.innerHTML).toContain('Next');
+                expect(container.innerHTML).toContain('Last');
+            });
+
+            test('should show correct total pages', () => {
+                mod.renderPagination('pagination-controls', 50, 10, 1);
+                const container = document.getElementById('pagination-controls');
+                expect(container.innerHTML).toContain('of 5');
+            });
+
+            test('should disable First and Previous buttons on first page', () => {
+                mod.renderPagination('pagination-controls', 50, 10, 1);
+                const buttons = document.querySelectorAll('button[data-page]');
+                const firstBtn = buttons[0];
+                const prevBtn = buttons[1];
+                expect(firstBtn.disabled).toBe(true);
+                expect(prevBtn.disabled).toBe(true);
+            });
+
+            test('should disable Next and Last buttons on last page', () => {
+                mod.renderPagination('pagination-controls', 50, 10, 5);
+                const buttons = document.querySelectorAll('button[data-page]');
+                const nextBtn = buttons[2];
+                const lastBtn = buttons[3];
+                expect(nextBtn.disabled).toBe(true);
+                expect(lastBtn.disabled).toBe(true);
+            });
+
+            test('should not render pagination for single page', () => {
+                mod.renderPagination('pagination-controls', 5, 10, 1);
+                const container = document.getElementById('pagination-controls');
+                expect(container.innerHTML).toBe('');
+            });
+
+            test('should set correct value in page input', () => {
+                mod.renderPagination('pagination-controls', 50, 10, 3);
+                const input = document.getElementById('page-input');
+                expect(input.value).toBe('3');
+            });
+
+            test('should set correct min and max on page input', () => {
+                mod.renderPagination('pagination-controls', 50, 10, 3);
+                const input = document.getElementById('page-input');
+                expect(input.min).toBe('1');
+                expect(input.max).toBe('5');
+            });
+
+            test('should handle empty container gracefully', () => {
+                expect(() => mod.renderPagination('nonexistent', 50, 10, 1)).not.toThrow();
+            });
+
+            test('should enable all buttons on middle page', () => {
+                mod.renderPagination('pagination-controls', 50, 10, 3);
+                const buttons = document.querySelectorAll('button[data-page]');
+                buttons.forEach(btn => {
+                    expect(btn.disabled).toBe(false);
+                });
+            });
+        });
+
+        // =====================================================================
+        // handlePageChange Tests
+        // =====================================================================
+        describe('handlePageChange', () => {
+            beforeEach(() => {
+                mod.allColumnsData = Array(50).fill({}).map((_, i) => ({ id: i + 1 }));
+                mod.currentDataSourceTypeID = 1;
+            });
+
+            test('should update currentPage for valid page number', () => {
+                mod.handlePageChange(3);
+                expect(mod.currentPage).toBe(3);
+            });
+
+            test('should not update currentPage for page less than 1', () => {
+                mod.currentPage = 2;
+                mod.handlePageChange(0);
+                expect(mod.currentPage).toBe(2);
+            });
+
+            test('should not update currentPage for page greater than total pages', () => {
+                mod.currentPage = 2;
+                mod.handlePageChange(10);
+                expect(mod.currentPage).toBe(2);
+            });
+
+            test('should accept page 1', () => {
+                mod.currentPage = 3;
+                mod.handlePageChange(1);
+                expect(mod.currentPage).toBe(1);
+            });
+
+            test('should accept last page', () => {
+                mod.handlePageChange(5);
+                expect(mod.currentPage).toBe(5);
+            });
+
+            test('should reset page input to current page on invalid input', () => {
+                mod.currentPage = 2;
+                mod.renderPagination('pagination-controls', 50, 10, 2);
+                mod.handlePageChange(100);
+                const input = document.getElementById('page-input');
+                expect(input.value).toBe('2');
+            });
+        });
+
+        // =====================================================================
+        // displayColumnsTable Tests
+        // =====================================================================
+        describe('displayColumnsTable', () => {
+            test('should show placeholder when data is null', () => {
+                mod.displayColumnsTable(null, 1);
+                const tbody = document.getElementById('dataSetColsBody');
+                expect(tbody.innerHTML).toContain('No columns to display');
+            });
+
+            test('should show placeholder when data is empty array', () => {
+                mod.displayColumnsTable([], 1);
+                const tbody = document.getElementById('dataSetColsBody');
+                expect(tbody.innerHTML).toContain('No columns to display');
+            });
+
+            test('should render SQL database columns correctly (type 1)', () => {
+                const sqlData = [
+                    { DataSetColumnID: 1, ColumnName: 'id', LogicalColumnName: 'ID', BusinessDescription: 'Primary key', ExampleValue: '1', Redact: false, Tokenise: true },
+                    { DataSetColumnID: 2, ColumnName: 'name', LogicalColumnName: 'Name', BusinessDescription: 'User name', ExampleValue: 'John', Redact: true, Tokenise: false }
+                ];
+                mod.displayColumnsTable(sqlData, 1);
+                const tbody = document.getElementById('dataSetColsBody');
+                expect(tbody.querySelectorAll('tr').length).toBe(2);
+                expect(tbody.innerHTML).toContain('id');
+                expect(tbody.innerHTML).toContain('name');
+                expect(tbody.innerHTML).toContain('Primary key');
+            });
+
+            test('should render folder columns correctly (type 3)', () => {
+                const folderData = [
+                    { FolderName: 'Documents', FileType: 'pdf', FileDescription: 'PDF files', Redact: 1, Tokenise: 0 },
+                    { FolderName: 'Documents', FileType: 'docx', FileDescription: 'Word files', Redact: 0, Tokenise: 1 }
+                ];
+                mod.displayColumnsTable(folderData, 3);
+                const tbody = document.getElementById('dataSetColsBody');
+                expect(tbody.innerHTML).toContain('Documents');
+                expect(tbody.innerHTML).toContain('pdf');
+                expect(tbody.innerHTML).toContain('docx');
+            });
+
+            test('should use rowspan for grouped folder items', () => {
+                const folderData = [
+                    { FolderName: 'Reports', FileType: 'pdf', FileDescription: 'PDF', Redact: 0, Tokenise: 0 },
+                    { FolderName: 'Reports', FileType: 'xlsx', FileDescription: 'Excel', Redact: 0, Tokenise: 0 }
+                ];
+                mod.displayColumnsTable(folderData, 3);
+                const tbody = document.getElementById('dataSetColsBody');
+                expect(tbody.innerHTML).toContain('rowspan="2"');
+            });
+
+            test('should check Redact checkbox when Redact is true for SQL type', () => {
+                const sqlData = [{ DataSetColumnID: 1, ColumnName: 'ssn', Redact: true, Tokenise: false }];
+                mod.displayColumnsTable(sqlData, 1);
+                const checkbox = document.querySelector('input[data-field="Redact"]');
+                expect(checkbox.checked).toBe(true);
+            });
+
+            test('should check Tokenise checkbox when Tokenise is true for SQL type', () => {
+                const sqlData = [{ DataSetColumnID: 1, ColumnName: 'email', Redact: false, Tokenise: true }];
+                mod.displayColumnsTable(sqlData, 1);
+                const checkbox = document.querySelector('input[data-field="Tokenise"]');
+                expect(checkbox.checked).toBe(true);
+            });
+
+            test('should set data-id attribute on rows', () => {
+                const sqlData = [{ DataSetColumnID: 123, ColumnName: 'test' }];
+                mod.displayColumnsTable(sqlData, 1);
+                const row = document.querySelector('tr[data-id="123"]');
+                expect(row).toBeTruthy();
+            });
+        });
+
+        // =====================================================================
+        // populateExistingDataSets Tests
+        // =====================================================================
+        describe('populateExistingDataSets', () => {
+            test('should populate optgroup with sorted data sets', () => {
+                const optgroup = document.querySelector('#dataSetSelection optgroup');
+                const dataSets = [
+                    { DataSetID: 2, Name: 'Zebra Data' },
+                    { DataSetID: 1, Name: 'Apple Data' },
+                    { DataSetID: 3, Name: 'Mango Data' }
+                ];
+                mod.populateExistingDataSets(optgroup, dataSets);
+                const options = optgroup.querySelectorAll('option');
+                expect(options.length).toBe(3);
+                expect(options[0].textContent).toBe('Apple Data');
+                expect(options[1].textContent).toBe('Mango Data');
+                expect(options[2].textContent).toBe('Zebra Data');
+            });
+
+            test('should set correct value attribute on options', () => {
+                const optgroup = document.querySelector('#dataSetSelection optgroup');
+                const dataSets = [{ DataSetID: 42, Name: 'Test Set' }];
+                mod.populateExistingDataSets(optgroup, dataSets);
+                const option = optgroup.querySelector('option');
+                expect(option.value).toBe('42');
+            });
+
+            test('should clear existing options before populating', () => {
+                const optgroup = document.querySelector('#dataSetSelection optgroup');
+                optgroup.innerHTML = '<option value="old">Old Option</option>';
+                mod.populateExistingDataSets(optgroup, [{ DataSetID: 1, Name: 'New' }]);
+                expect(optgroup.querySelectorAll('option').length).toBe(1);
+                expect(optgroup.innerHTML).not.toContain('Old Option');
+            });
+
+            test('should handle empty array', () => {
+                const optgroup = document.querySelector('#dataSetSelection optgroup');
+                mod.populateExistingDataSets(optgroup, []);
+                expect(optgroup.querySelectorAll('option').length).toBe(0);
+            });
+        });
+
+        // =====================================================================
+        // populateDataSourceOptions Tests
+        // =====================================================================
+        describe('populateDataSourceOptions', () => {
+            test('should populate select with data source options', () => {
+                const select = document.getElementById('dataSource');
+                const data = [
+                    { DataSourceID: 1, Name: 'Source A' },
+                    { DataSourceID: 2, Name: 'Source B' }
+                ];
+                mod.populateDataSourceOptions(select, data, 'DataSourceID', 'Name');
+                expect(select.options.length).toBe(3); // 1 default + 2 data
+                expect(select.options[1].value).toBe('1');
+                expect(select.options[1].textContent).toBe('Source A');
+            });
+
+            test('should preserve first option (placeholder)', () => {
+                const select = document.getElementById('dataSource');
+                select.options[0].textContent = 'Select a source...';
+                mod.populateDataSourceOptions(select, [{ id: 1, label: 'Test' }], 'id', 'label');
+                expect(select.options[0].textContent).toBe('Select a source...');
+            });
+
+            test('should clear previous options except first', () => {
+                const select = document.getElementById('dataSource');
+                select.add(new Option('Old', 'old'));
+                mod.populateDataSourceOptions(select, [{ id: 1, name: 'New' }], 'id', 'name');
+                expect(select.options.length).toBe(2);
+            });
+
+            test('should handle null select element gracefully', () => {
+                expect(() => mod.populateDataSourceOptions(null, [], 'id', 'name')).not.toThrow();
+            });
+
+            test('should handle non-array data gracefully', () => {
+                const select = document.getElementById('dataSource');
+                expect(() => mod.populateDataSourceOptions(select, null, 'id', 'name')).not.toThrow();
+            });
+        });
+
+        // =====================================================================
+        // renderRedcapApiKeyRowMetaData Tests
+        // =====================================================================
+        describe('renderRedcapApiKeyRowMetaData', () => {
+            test('should render two input rows for REDCap metadata', () => {
+                const tbody = document.querySelector('#metaDataTable tbody');
+                mod.renderRedcapApiKeyRowMetaData(tbody, {});
+                const rows = tbody.querySelectorAll('tr');
+                expect(rows.length).toBe(2);
+            });
+
+            test('should include Citations input field', () => {
+                const tbody = document.querySelector('#metaDataTable tbody');
+                mod.renderRedcapApiKeyRowMetaData(tbody, {});
+                expect(tbody.innerHTML).toContain('Citations for related publications');
+                expect(tbody.querySelector('#redcapCitations')).toBeTruthy();
+            });
+
+            test('should include ANZCTR URL input field', () => {
+                const tbody = document.querySelector('#metaDataTable tbody');
+                mod.renderRedcapApiKeyRowMetaData(tbody, {});
+                expect(tbody.innerHTML).toContain('ANZCTR URL');
+                expect(tbody.querySelector('#redcapAnzctrUrl')).toBeTruthy();
+            });
+
+            test('should include hidden input with MetaDataID 1 for citations', () => {
+                const tbody = document.querySelector('#metaDataTable tbody');
+                mod.renderRedcapApiKeyRowMetaData(tbody, {});
+                const hiddenInputs = tbody.querySelectorAll('input[type="hidden"]');
+                expect(hiddenInputs[0].value).toBe('1');
+            });
+
+            test('should include hidden input with MetaDataID 2 for ANZCTR', () => {
+                const tbody = document.querySelector('#metaDataTable tbody');
+                mod.renderRedcapApiKeyRowMetaData(tbody, {});
+                const hiddenInputs = tbody.querySelectorAll('input[type="hidden"]');
+                expect(hiddenInputs[1].value).toBe('2');
+            });
+        });
+
+        // =====================================================================
+        // updateTableHeader Tests
+        // =====================================================================
+        describe('updateTableHeader', () => {
+            test('should render SQL database headers for type 1', () => {
+                mod.updateTableHeader(1);
+                const header = document.getElementById('dataSetColsHeader');
+                expect(header.innerHTML).toContain('Column Name');
+                expect(header.innerHTML).toContain('Logical Name');
+                expect(header.innerHTML).toContain('Business Description');
+                expect(header.innerHTML).toContain('Example Value');
+                expect(header.innerHTML).toContain('Redact');
+                expect(header.innerHTML).toContain('Deidentify');
+            });
+
+            test('should render folder headers for type 3', () => {
+                mod.updateTableHeader(3);
+                const header = document.getElementById('dataSetColsHeader');
+                expect(header.innerHTML).toContain('Folder Name');
+                expect(header.innerHTML).toContain('File Type');
+                expect(header.innerHTML).toContain('File Description');
+                expect(header.innerHTML).toContain('Redact');
+                expect(header.innerHTML).toContain('Deidentify');
+            });
+
+            test('should show message for unknown type', () => {
+                mod.updateTableHeader(99);
+                const header = document.getElementById('dataSetColsHeader');
+                expect(header.innerHTML).toContain('Please select a data source type first');
+            });
+
+            test('should create correct number of th elements for SQL type', () => {
+                mod.updateTableHeader(1);
+                const ths = document.querySelectorAll('#dataSetColsHeader th');
+                expect(ths.length).toBe(6);
+            });
+
+            test('should create correct number of th elements for folder type', () => {
+                mod.updateTableHeader(3);
+                const ths = document.querySelectorAll('#dataSetColsHeader th');
+                expect(ths.length).toBe(5);
+            });
+        });
+
+        // =====================================================================
+        // gatherFormData Tests
+        // =====================================================================
+        describe('gatherFormData', () => {
+            beforeEach(() => {
+                document.getElementById('dataSetName').value = 'Test Dataset';
+                document.getElementById('dataSetDescription').value = 'Test Description';
+                document.getElementById('dataSource').innerHTML = '<option value="5">Source</option>';
+                document.getElementById('dataSource').value = '5';
+                document.getElementById('dataSetOwner').value = 'owner@test.com';
+                document.getElementById('dataSetApprover').value = 'approver@test.com';
+                document.getElementById('dataSetActive').checked = true;
+            });
+
+            test('should gather main form details correctly', () => {
+                mod.currentDataSourceTypeID = 1;
+                const result = mod.gatherFormData([]);
+                expect(result.Name).toBe('Test Dataset');
+                expect(result.Description).toBe('Test Description');
+                expect(result.DataSourceID).toBe(5);
+                expect(result.Owner).toBe('owner@test.com');
+                expect(result.Approvers).toBe('approver@test.com');
+                expect(result.IsActive).toBe(true);
+            });
+
+            test('should return DataSetColumns for SQL type (type 1)', () => {
+                mod.currentDataSourceTypeID = 1;
+                const columns = [{ ColumnName: 'id', ColumnType: 'int' }];
+                const result = mod.gatherFormData(columns);
+                expect(result.DataSetColumns).toEqual(columns);
+                expect(result.DataSetFolderFiles).toEqual([]);
+            });
+
+            test('should return DataSetFolderFiles for folder type (type 3)', () => {
+                mod.currentDataSourceTypeID = 3;
+                const folderFiles = [{ Id: 1, FolderName: 'Docs', FileType: 'pdf' }];
+                const result = mod.gatherFormData(folderFiles);
+                expect(result.DataSetFolderFiles).toEqual([{ FolderName: 'Docs', FileType: 'pdf' }]);
+                expect(result.DataSetColumns).toEqual([]);
+            });
+
+            test('should remove Id field from folder files', () => {
+                mod.currentDataSourceTypeID = 3;
+                const folderFiles = [{ Id: 999, FolderName: 'Test', FileType: 'txt' }];
+                const result = mod.gatherFormData(folderFiles);
+                expect(result.DataSetFolderFiles[0].Id).toBeUndefined();
+            });
+
+            test('should scrape metadata from metaDataTable', () => {
+                mod.currentDataSourceTypeID = 1;
+                const tbody = document.querySelector('#metaDataTable tbody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td>Tag <input type="hidden" value="5"></td>
+                        <td><input id="metaDataTag" value="important"></td>
+                    </tr>
+                `;
+                const result = mod.gatherFormData([]);
+                expect(result.DataSetMetaDataValues).toContainEqual({ MetaDataID: 1, Value: 'important' });
+            });
+
+            test('should scrape SQL table field value', () => {
+                mod.currentDataSourceTypeID = 1;
+                const tbody = document.querySelector('#dataSetFieldsTable tbody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td>Table Name <input type="hidden"></td>
+                        <td><select id="tableNameSelector"><option value="42" selected>Users</option></select></td>
+                    </tr>
+                `;
+                const result = mod.gatherFormData([]);
+                expect(result.DataSetFieldValues).toContainEqual({ FieldID: 3, Value: '42' });
+            });
+
+            test('should scrape folder field value', () => {
+                mod.currentDataSourceTypeID = 3;
+                const tbody = document.querySelector('#dataSetFieldsTable tbody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td>Folder Name <input type="hidden"></td>
+                        <td><select id="tableNameSelector"><option value="MyFolder" selected>MyFolder</option></select></td>
+                    </tr>
+                `;
+                const result = mod.gatherFormData([]);
+                expect(result.DataSetFieldValues).toContainEqual({ FieldID: 6, Value: 'MyFolder' });
+            });
+
+            test('should handle unchecked IsActive', () => {
+                document.getElementById('dataSetActive').checked = false;
+                mod.currentDataSourceTypeID = 1;
+                const result = mod.gatherFormData([]);
+                expect(result.IsActive).toBe(false);
+            });
+        });
+
+        // =====================================================================
+        // getFromAPI Tests
+        // =====================================================================
+        describe('getFromAPI', () => {
+            test('should return empty array when API returns null', async () => {
+                mockApiResponse = null;
+                const result = await mod.getFromAPI('TestAPI', {});
+                expect(result).toEqual([]);
+            });
+
+            test('should handle paginated response', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [{ id: 1 }, { id: 2 }],
+                    PageCount: 1,
+                    TotalCount: 2
+                });
+                const result = await mod.getFromAPI('TestAPI', {});
+                expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+            });
+
+            test('should fetch all pages for multi-page response', async () => {
+                let callCount = 0;
+                window.loomeApi.runApiRequest = jest.fn(() => {
+                    callCount++;
+                    if (callCount === 1) {
+                        return Promise.resolve(JSON.stringify({
+                            Results: [{ id: 1 }],
+                            PageCount: 2
+                        }));
+                    } else {
+                        return Promise.resolve(JSON.stringify({
+                            Results: [{ id: 2 }],
+                            PageCount: 2
+                        }));
+                    }
+                });
+                const result = await mod.getFromAPI('TestAPI', { page: 1 });
+                expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledTimes(2);
+            });
+
+            test('should handle non-paginated array response', async () => {
+                mockApiResponse = [{ id: 1 }, { id: 2 }];
+                const result = await mod.getFromAPI('TestAPI', {});
+                expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+            });
+
+            test('should wrap single object in array', async () => {
+                mockApiResponse = { id: 1, name: 'Single Item' };
+                const result = await mod.getFromAPI('TestAPI', {});
+                expect(result).toEqual([{ id: 1, name: 'Single Item' }]);
+            });
+
+            test('should return empty array on error', async () => {
+                window.loomeApi.runApiRequest = jest.fn(() => Promise.reject(new Error('API Error')));
+                const result = await mod.getFromAPI('TestAPI', {});
+                expect(result).toEqual([]);
+            });
+
+            test('should pass parameters to API', async () => {
+                mockApiResponse = [];
+                await mod.getFromAPI('TestAPI', { data_set_id: 123 });
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith('TestAPI', { data_set_id: 123 });
+            });
+        });
+
+        // =====================================================================
+        // getAllDataSets Tests
+        // =====================================================================
+        describe('getAllDataSets', () => {
+            test('should call getFromAPI with correct parameters', async () => {
+                mockApiResponse = JSON.stringify({ Results: [], PageCount: 1 });
+                await mod.getAllDataSets();
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetDataSet',
+                    expect.objectContaining({
+                        page: 1,
+                        pageSize: 100,
+                        search: '',
+                        activeStatus: 3
+                    })
+                );
+            });
+
+            test('should return data sets from API', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [{ DataSetID: 1, Name: 'Test' }],
+                    PageCount: 1
+                });
+                const result = await mod.getAllDataSets();
+                expect(result).toEqual([{ DataSetID: 1, Name: 'Test' }]);
+            });
+        });
+
+        // =====================================================================
+        // getAllDataSources Tests
+        // =====================================================================
+        describe('getAllDataSources', () => {
+            test('should call getFromAPI with correct parameters', async () => {
+                mockApiResponse = JSON.stringify({ Results: [], PageCount: 1 });
+                await mod.getAllDataSources();
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetDataSource',
+                    expect.objectContaining({
+                        page: 1,
+                        pageSize: 100,
+                        search: ''
+                    })
+                );
+            });
+
+            test('should return data sources from API', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [{ DataSourceID: 1, Name: 'SQL Server' }],
+                    PageCount: 1
+                });
+                const result = await mod.getAllDataSources();
+                expect(result).toEqual([{ DataSourceID: 1, Name: 'SQL Server' }]);
+            });
+        });
+
+        // =====================================================================
+        // fetchSQLDataSetColumns Tests
+        // =====================================================================
+        describe('fetchSQLDataSetColumns', () => {
+            test('should call API with data_set_id and pagination params', async () => {
+                mockApiResponse = JSON.stringify({ Results: [], PageCount: 1 });
+                await mod.fetchSQLDataSetColumns(123, 2);
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetColumnsDataByDataSetID',
+                    expect.objectContaining({
+                        data_set_id: 123,
+                        page: 2,
+                        pageSize: 10
+                    })
+                );
+            });
+
+            test('should default to page 1', async () => {
+                mockApiResponse = JSON.stringify({ Results: [], PageCount: 1 });
+                await mod.fetchSQLDataSetColumns(123);
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetColumnsDataByDataSetID',
+                    expect.objectContaining({ page: 1 })
+                );
+            });
+
+            test('should return columns data', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [{ ColumnName: 'id', ColumnType: 'int' }],
+                    PageCount: 1
+                });
+                const result = await mod.fetchSQLDataSetColumns(123);
+                expect(result).toEqual([{ ColumnName: 'id', ColumnType: 'int' }]);
+            });
+        });
+
+        // =====================================================================
+        // fetchDataSetFieldValue Tests
+        // =====================================================================
+        describe('fetchDataSetFieldValue', () => {
+            test('should return null values for new data set', async () => {
+                const result = await mod.fetchDataSetFieldValue('new');
+                expect(result).toEqual({ id: null, name: null });
+            });
+
+            test('should return null values when API returns empty', async () => {
+                mockApiResponse = [];
+                const result = await mod.fetchDataSetFieldValue(123);
+                expect(result).toEqual({ id: null, name: null });
+            });
+
+            test('should fetch table name for FieldID 3', async () => {
+                // First call returns field value
+                window.loomeApi.runApiRequest = jest.fn()
+                    .mockResolvedValueOnce([{ FieldID: 3, Value: '42' }])
+                    .mockResolvedValueOnce([{ Id: 42, TableName: 'Users' }]);
+                
+                const result = await mod.fetchDataSetFieldValue(123);
+                expect(result).toEqual({ id: 42, name: 'Users' });
+            });
+
+            test('should return direct value for other FieldIDs', async () => {
+                mockApiResponse = [{ FieldID: 6, Value: 'MyFolder' }];
+                const result = await mod.fetchDataSetFieldValue(123);
+                expect(result).toEqual({ id: null, name: 'MyFolder' });
+            });
+        });
+
+        // =====================================================================
+        // fetchDataSetFolderValue Tests
+        // =====================================================================
+        describe('fetchDataSetFolderValue', () => {
+            test('should return null values for new data set', async () => {
+                const result = await mod.fetchDataSetFolderValue('new');
+                expect(result).toEqual({ id: null, name: null });
+            });
+
+            test('should return folder name from API', async () => {
+                mockApiResponse = [{ FieldID: 6, Value: 'Documents' }];
+                const result = await mod.fetchDataSetFolderValue(123);
+                expect(result).toEqual({ id: null, name: 'Documents' });
+            });
+
+            test('should return null when API returns empty', async () => {
+                mockApiResponse = [];
+                const result = await mod.fetchDataSetFolderValue(123);
+                expect(result).toEqual({ id: null, name: null });
+            });
+        });
+
+        // =====================================================================
+        // fetchLoomeDataSourceTablesByTableId Tests
+        // =====================================================================
+        describe('fetchLoomeDataSourceTablesByTableId', () => {
+            test('should call API with table_id parameter', async () => {
+                mockApiResponse = [];
+                await mod.fetchLoomeDataSourceTablesByTableId(42);
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetLoomeDataSourceTablesByTableId',
+                    { table_id: 42 }
+                );
+            });
+
+            test('should return table data', async () => {
+                mockApiResponse = [{ Id: 42, TableName: 'Users', ColumnList: 'id,name' }];
+                const result = await mod.fetchLoomeDataSourceTablesByTableId(42);
+                expect(result).toEqual([{ Id: 42, TableName: 'Users', ColumnList: 'id,name' }]);
+            });
+        });
+
+        // =====================================================================
+        // formatSQLColumnsFromSchema Tests
+        // =====================================================================
+        describe('formatSQLColumnsFromSchema', () => {
+            test('should format columns from schema correctly', async () => {
+                mockApiResponse = [{
+                    Id: 1,
+                    TableName: 'Users',
+                    ColumnList: 'id, name, email',
+                    ColumnTypes: 'int, varchar, varchar'
+                }];
+                const result = await mod.formatSQLColumnsFromSchema(1);
+                expect(result.length).toBe(3);
+                expect(result[0]).toEqual(expect.objectContaining({
+                    ColumnName: 'id',
+                    ColumnType: 'int',
+                    DisplayOrder: 1
+                }));
+            });
+
+            test('should return empty array when no schema data', async () => {
+                mockApiResponse = [];
+                const result = await mod.formatSQLColumnsFromSchema(999);
+                expect(result).toEqual([]);
+            });
+
+            test('should return empty array on column count mismatch', async () => {
+                mockApiResponse = [{
+                    ColumnList: 'id, name',
+                    ColumnTypes: 'int'
+                }];
+                const result = await mod.formatSQLColumnsFromSchema(1);
+                expect(result).toEqual([]);
+            });
+
+            test('should set default values for optional fields', async () => {
+                mockApiResponse = [{
+                    ColumnList: 'id',
+                    ColumnTypes: 'int'
+                }];
+                const result = await mod.formatSQLColumnsFromSchema(1);
+                expect(result[0].LogicalColumnName).toBe('');
+                expect(result[0].BusinessDescription).toBe('');
+                expect(result[0].Tokenise).toBe(false);
+                expect(result[0].Redact).toBe(false);
+            });
+
+            test('should handle API error gracefully', async () => {
+                window.loomeApi.runApiRequest = jest.fn(() => Promise.reject(new Error('API Error')));
+                const result = await mod.formatSQLColumnsFromSchema(1);
+                expect(result).toEqual([]);
+            });
+        });
+
+        // =====================================================================
+        // fetchSubFolders Tests
+        // =====================================================================
+        describe('fetchSubFolders', () => {
+            test('should call API with data_source_id parameter', async () => {
+                mockApiResponse = [];
+                await mod.fetchSubFolders(5);
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetLoomeDataSourceFirstSubFolders',
+                    { data_source_id: 5 }
+                );
+            });
+
+            test('should return subfolder list', async () => {
+                mockApiResponse = [
+                    { FolderName: 'Documents' },
+                    { FolderName: 'Images' }
+                ];
+                const result = await mod.fetchSubFolders(5);
+                expect(result).toEqual([
+                    { FolderName: 'Documents' },
+                    { FolderName: 'Images' }
+                ]);
+            });
+        });
+
+        // =====================================================================
+        // fetchSubFoldersWithFiles Tests
+        // =====================================================================
+        describe('fetchSubFoldersWithFiles', () => {
+            test('should call API with subfolder name and data source ID', async () => {
+                mockApiResponse = [];
+                await mod.fetchSubFoldersWithFiles('Documents', 5);
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetLoomeDataSourceSubFoldersWithFiles',
+                    { sub_folder_name: 'Documents', data_source_id: 5 }
+                );
+            });
+
+            test('should return files in subfolder', async () => {
+                mockApiResponse = [
+                    { FolderName: 'Documents', FileExtensions: 'pdf' },
+                    { FolderName: 'Documents', FileExtensions: 'docx' }
+                ];
+                const result = await mod.fetchSubFoldersWithFiles('Documents', 5);
+                expect(result.length).toBe(2);
+            });
+        });
+
+        // =====================================================================
+        // fetchSqlTables Tests
+        // =====================================================================
+        describe('fetchSqlTables', () => {
+            test('should call API with data_source_id parameter', async () => {
+                mockApiResponse = [];
+                await mod.fetchSqlTables(3);
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetLoomeDataSourceTablesByDataSourceID',
+                    { data_source_id: 3 }
+                );
+            });
+
+            test('should return SQL tables list', async () => {
+                mockApiResponse = [
+                    { Id: 1, TableName: 'Users' },
+                    { Id: 2, TableName: 'Orders' }
+                ];
+                const result = await mod.fetchSqlTables(3);
+                expect(result).toEqual([
+                    { Id: 1, TableName: 'Users' },
+                    { Id: 2, TableName: 'Orders' }
+                ]);
+            });
+        });
+
+        // =====================================================================
+        // renderTablePage Tests
+        // =====================================================================
+        describe('renderTablePage', () => {
+            beforeEach(() => {
+                mod.allColumnsData = Array(25).fill({}).map((_, i) => ({
+                    DataSetColumnID: i + 1,
+                    ColumnName: `col_${i + 1}`,
+                    ColumnType: 'varchar'
+                }));
+                mod.currentPage = 1;
+            });
+
+            test('should render first page of data', () => {
+                mod.renderTablePage(1);
+                const rows = document.querySelectorAll('#dataSetColsBody tr');
+                expect(rows.length).toBe(10);
+            });
+
+            test('should render correct page data', () => {
+                mod.currentPage = 2;
+                mod.renderTablePage(1);
+                const firstRow = document.querySelector('#dataSetColsBody tr');
+                expect(firstRow.innerHTML).toContain('col_11');
+            });
+
+            test('should render partial last page', () => {
+                mod.currentPage = 3;
+                mod.renderTablePage(1);
+                const rows = document.querySelectorAll('#dataSetColsBody tr');
+                expect(rows.length).toBe(5);
+            });
+
+            test('should render pagination controls', () => {
+                mod.renderTablePage(1);
+                const container = document.getElementById('pagination-controls');
+                expect(container.innerHTML).toContain('of 3');
+            });
+        });
+
+        // =====================================================================
+        // createDataSet Tests
+        // =====================================================================
+        describe('createDataSet', () => {
+            beforeEach(() => {
+                mod.currentDataSourceTypeID = 1;
+                jest.useFakeTimers();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            test('should call API with correct payload structure', async () => {
+                mockApiResponse = { DataSetID: 123 };
+                const data = { Name: 'Test', DataSourceID: 1 };
+                await mod.createDataSet(data);
+                
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'CreateDataSet',
+                    expect.objectContaining({
+                        payload: expect.objectContaining({
+                            Name: 'Test',
+                            DataSourceID: 1,
+                            OptOutMessage: 'string',
+                            OptOutList: 'string',
+                            OptOutColumn: '-1',
+                            DataSourceTypeID: 1
+                        })
+                    })
+                );
+            });
+
+            test('should return API response on success', async () => {
+                mockApiResponse = { DataSetID: 456 };
+                const result = await mod.createDataSet({ Name: 'Test' });
+                expect(result).toEqual({ DataSetID: 456 });
+            });
+
+            test('should throw error when API returns no response', async () => {
+                mockApiResponse = null;
+                await expect(mod.createDataSet({ Name: 'Test' })).rejects.toThrow('Failed to add dataset');
+            });
+
+            test('should show success toast on creation', async () => {
+                mockApiResponse = { DataSetID: 1 };
+                await mod.createDataSet({ Name: 'Test' });
+                jest.advanceTimersByTime(100);
+                const toast = document.querySelector('.toast-success');
+                expect(toast).toBeTruthy();
+            });
+        });
+
+        // =====================================================================
+        // updateDataSet Tests
+        // =====================================================================
+        describe('updateDataSet', () => {
+            beforeEach(() => {
+                mod.currentDataSourceTypeID = 1;
+                jest.useFakeTimers();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            test('should call API with data set ID and payload', async () => {
+                window.loomeApi.runApiRequest = jest.fn()
+                    .mockResolvedValueOnce([]) // field values
+                    .mockResolvedValueOnce([]) // meta values
+                    .mockResolvedValueOnce({ success: true }); // update
+
+                await mod.updateDataSet(123, { Name: 'Updated' });
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenLastCalledWith(
+                    'UpdateDataSet',
+                    expect.objectContaining({
+                        id: 123,
+                        payload: expect.objectContaining({
+                            Name: 'Updated',
+                            id: 123
+                        })
+                    })
+                );
+            });
+
+            test('should preserve existing field values on update', async () => {
+                window.loomeApi.runApiRequest = jest.fn()
+                    .mockResolvedValueOnce([{ FieldID: 3, Value: '42' }])
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce({ success: true });
+
+                await mod.updateDataSet(123, { Name: 'Test' });
+
+                const lastCall = window.loomeApi.runApiRequest.mock.calls[2];
+                expect(lastCall[1].payload.DataSetFieldValues).toContainEqual({ FieldID: 3, Value: '42' });
+            });
+
+            test('should preserve existing metadata values on update', async () => {
+                window.loomeApi.runApiRequest = jest.fn()
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce([{ MetaDataID: 1, Value: 'tag123' }])
+                    .mockResolvedValueOnce({ success: true });
+
+                await mod.updateDataSet(123, { Name: 'Test' });
+
+                const lastCall = window.loomeApi.runApiRequest.mock.calls[2];
+                expect(lastCall[1].payload.DataSetMetaDataValues).toContainEqual({ MetaDataID: 1, Value: 'tag123' });
+            });
+
+            test('should throw error when API returns no response', async () => {
+                window.loomeApi.runApiRequest = jest.fn()
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce(null);
+
+                await expect(mod.updateDataSet(123, {})).rejects.toThrow('Failed to update dataset');
+            });
+
+            test('should group folder files by FolderName for folder type', async () => {
+                mod.currentDataSourceTypeID = 3;
+                const data = {
+                    Name: 'Folder Test',
+                    DataSetFolderFiles: [
+                        { FolderName: 'Docs', FileType: 'pdf', FileDescription: 'PDFs' },
+                        { FolderName: 'Docs', FileType: 'docx', FileDescription: 'Word' }
+                    ]
+                };
+
+                window.loomeApi.runApiRequest = jest.fn()
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce({ success: true });
+
+                await mod.updateDataSet(123, data);
+
+                const lastCall = window.loomeApi.runApiRequest.mock.calls[2];
+                expect(lastCall[1].payload.DataSetFolders).toBeDefined();
+                expect(lastCall[1].payload.DataSetFolders[0].FolderName).toBe('Docs');
+                expect(lastCall[1].payload.DataSetFolders[0].DataSetFolderFiles.length).toBe(2);
+            });
+
+            test('should show success toast on update', async () => {
+                window.loomeApi.runApiRequest = jest.fn()
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce({ success: true });
+
+                await mod.updateDataSet(123, { Name: 'Test' });
+                jest.advanceTimersByTime(100);
+                const toast = document.querySelector('.toast-success');
+                expect(toast).toBeTruthy();
+            });
+        });
+
+        // =====================================================================
+        // State Management Tests
+        // =====================================================================
+        describe('State Management', () => {
+            test('should allow setting and getting currentPage', () => {
+                mod.currentPage = 5;
+                expect(mod.currentPage).toBe(5);
+            });
+
+            test('should allow setting and getting allColumnsData', () => {
+                mod.allColumnsData = [{ id: 1 }, { id: 2 }];
+                expect(mod.allColumnsData).toEqual([{ id: 1 }, { id: 2 }]);
+            });
+
+            test('should allow setting and getting currentDataSourceTypeID', () => {
+                mod.currentDataSourceTypeID = 3;
+                expect(mod.currentDataSourceTypeID).toBe(3);
+            });
+
+            test('should allow setting and getting currentDataSourceID', () => {
+                mod.currentDataSourceID = 42;
+                expect(mod.currentDataSourceID).toBe(42);
+            });
+        });
+
+    }); // End describe('manageDataSets.js')
+} // End if (typeof describe === 'function')
