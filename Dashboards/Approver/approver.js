@@ -2,7 +2,7 @@
 //                      STATE & CONFIGURATION
 // =================================================================
 const TABLE_CONTAINER_ID = 'requests-table-area';
-const API_REQUEST_ID = 'GetRequestList';
+const API_ALL_REQUESTLISTS = 'GetRequestList';
 const API_APPROVE_REQUEST = 'ApproveRequestID';
 const API_REJECT_REQUEST = 'RejectRequestID';
 const API_GET_REQUEST_DETAILS = 'GetRequestID';
@@ -13,7 +13,11 @@ const API_GET_ALL_ASSIST_PROJECTS = 'GetAllAssistProjects';
 let allRequests = []; 
 let currentPage = 1;
 const rowsPerPage = 5; // You can control page size here
-const searchInput = document.getElementById('searchRequests');
+
+// Helper function to get search input (handles lazy DOM lookup for testing)
+function getSearchInput() {
+    return document.getElementById('searchRequests');
+}
 
 // Mapping from Status ID to Status Name
 const statusIdToNameMap = { 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
@@ -1010,7 +1014,7 @@ async function getCounts(status) {
     }
     
     console.log(apiParams)
-    const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
+    const response = await window.loomeApi.runApiRequest(API_ALL_REQUESTLISTS, apiParams);
     const parsedResponse = safeParseJson(response);
     const rawData = parsedResponse.Results;
 
@@ -1027,7 +1031,8 @@ async function renderUI() {
     if (!activeChip) return; // Don't render if no chip is active
     
     const selectedStatus = activeChip.dataset.status;
-    const searchTerm = searchInput.value.toLowerCase();
+    const searchInput = getSearchInput();
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
     // --- 1. FETCH ALL DATA ONCE ---
     // We call the API without pagination params, assuming it returns all records.
@@ -1040,7 +1045,7 @@ async function renderUI() {
     }
     
     console.log(apiParams)
-    const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
+    const response = await window.loomeApi.runApiRequest(API_ALL_REQUESTLISTS, apiParams);
     const parsedResponse = safeParseJson(response)
     const rawData = parsedResponse.Results;
     const totalItems = parsedResponse.RowCount;
@@ -1097,10 +1102,13 @@ async function renderApproversPage() {
         });
 
         // Listener for the search input
-        searchInput.addEventListener('input', () => {
-            currentPage = 1; // Reset to page 1 when searching
-            renderUI(); // Re-render everything
-        });
+        const searchInput = getSearchInput();
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                currentPage = 1; // Reset to page 1 when searching
+                renderUI(); // Re-render everything
+            });
+        }
 
         // Listener for pagination buttons
         const paginationContainer = document.getElementById('pagination-controls');
@@ -1133,5 +1141,1052 @@ async function renderApproversPage() {
     }
 }
 
-// Start the application
-renderApproversPage();
+// Only run in browser environment, not during Jest testing
+if (typeof jest === 'undefined') {
+    renderApproversPage();
+}
+
+// ============================================================================
+// MODULE EXPORTS (for Node.js/Jest testing)
+// ============================================================================
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        // Constants
+        TABLE_CONTAINER_ID,
+        API_ALL_REQUESTLISTS,
+        API_APPROVE_REQUEST,
+        API_REJECT_REQUEST,
+        API_GET_REQUEST_DETAILS,
+        API_GET_DATASET_DETAILS,
+        API_GET_ALL_ASSIST_PROJECTS,
+        statusIdToNameMap,
+        configMap,
+        rowsPerPage,
+        // Functions
+        getSearchInput,
+        safeParseJson,
+        formatDate,
+        renderPagination,
+        renderTable,
+        ViewRequest,
+        ViewDataSet,
+        ApproveRequest,
+        RejectRequest,
+        showToast,
+        hideToast,
+        createToastContainer,
+        fetchRequestDetails,
+        fetchDatasetDetails,
+        getProjectsMapping,
+        displayCombinedDetails,
+        getCounts,
+        renderUI,
+        refreshAllChipCounts,
+        approveRequestFromAPI,
+        rejectRequestFromAPI,
+        // State accessors for testing
+        get currentPage() { return currentPage; },
+        set currentPage(val) { currentPage = val; },
+        get allRequests() { return allRequests; },
+        set allRequests(val) { allRequests = val; },
+        get projectsCache() { return projectsCache; },
+        set projectsCache(val) { projectsCache = val; }
+    };
+}
+
+// ============================================================================
+// UNIT TESTS
+// ============================================================================
+if (typeof describe === 'function') {
+    const mod = typeof module !== 'undefined' && module.exports ? module.exports : {};
+
+    describe('approver.js', () => {
+        let mockApiResponse;
+        let originalLoomeApi;
+
+        beforeEach(() => {
+            // Reset state
+            mod.currentPage = 1;
+            mod.allRequests = [];
+            mod.projectsCache = null;
+
+            // Setup DOM
+            document.body.innerHTML = `
+                <div id="requests-table-area"></div>
+                <div id="pagination-controls"></div>
+                <input id="searchRequests" type="text" />
+                <div id="status-chips-container">
+                    <div class="chip active" data-status="Pending Approval">
+                        <span class="chip-count">0</span>
+                    </div>
+                    <div class="chip" data-status="Approved">
+                        <span class="chip-count">0</span>
+                    </div>
+                    <div class="chip" data-status="Rejected">
+                        <span class="chip-count">0</span>
+                    </div>
+                    <div class="chip" data-status="Finalised">
+                        <span class="chip-count">0</span>
+                    </div>
+                </div>
+                <div id="viewRequestModalBody"></div>
+                <div id="viewDatasetModalBody"></div>
+                <div id="approveRequestModalBody"></div>
+                <div id="approveRequestModalLabel"></div>
+                <div id="rejectRequestModalBody"></div>
+                <div id="rejectRequestModalLabel"></div>
+                <div id="toast-container"></div>
+            `;
+
+            // Mock console methods
+            jest.spyOn(console, 'log').mockImplementation(() => {});
+            jest.spyOn(console, 'warn').mockImplementation(() => {});
+            jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Store original API and setup mock
+            originalLoomeApi = window.loomeApi;
+            mockApiResponse = null;
+            window.loomeApi = {
+                runApiRequest: jest.fn((apiId, params) => Promise.resolve(mockApiResponse))
+            };
+
+            // Mock bootstrap
+            global.bootstrap = {
+                Modal: {
+                    getInstance: jest.fn(() => ({ hide: jest.fn() }))
+                }
+            };
+        });
+
+        afterEach(() => {
+            window.loomeApi = originalLoomeApi;
+            delete global.bootstrap;
+            jest.restoreAllMocks();
+        });
+
+        // =====================================================================
+        // Constants Tests
+        // =====================================================================
+        describe('Constants', () => {
+            test('TABLE_CONTAINER_ID should be requests-table-area', () => {
+                expect(mod.TABLE_CONTAINER_ID).toBe('requests-table-area');
+            });
+
+            test('API_ALL_REQUESTLISTS should be GetRequestList', () => {
+                expect(mod.API_ALL_REQUESTLISTS).toBe('GetRequestList');
+            });
+
+            test('API_APPROVE_REQUEST should be ApproveRequestID', () => {
+                expect(mod.API_APPROVE_REQUEST).toBe('ApproveRequestID');
+            });
+
+            test('API_REJECT_REQUEST should be RejectRequestID', () => {
+                expect(mod.API_REJECT_REQUEST).toBe('RejectRequestID');
+            });
+
+            test('API_GET_REQUEST_DETAILS should be GetRequestID', () => {
+                expect(mod.API_GET_REQUEST_DETAILS).toBe('GetRequestID');
+            });
+
+            test('API_GET_DATASET_DETAILS should be GetDataSetID', () => {
+                expect(mod.API_GET_DATASET_DETAILS).toBe('GetDataSetID');
+            });
+
+            test('API_GET_ALL_ASSIST_PROJECTS should be GetAllAssistProjects', () => {
+                expect(mod.API_GET_ALL_ASSIST_PROJECTS).toBe('GetAllAssistProjects');
+            });
+
+            test('rowsPerPage should be 5', () => {
+                expect(mod.rowsPerPage).toBe(5);
+            });
+
+            test('statusIdToNameMap should have correct mappings', () => {
+                expect(mod.statusIdToNameMap[1]).toBe('Pending Approval');
+                expect(mod.statusIdToNameMap[2]).toBe('Approved');
+                expect(mod.statusIdToNameMap[3]).toBe('Finalised');
+                expect(mod.statusIdToNameMap[4]).toBe('Rejected');
+            });
+
+            test('configMap should have correct showActions settings', () => {
+                expect(mod.configMap['Pending Approval'].showActions).toBe(true);
+                expect(mod.configMap['Approved'].showActions).toBe(false);
+                expect(mod.configMap['Rejected'].showActions).toBe(false);
+                expect(mod.configMap['Finalised'].showActions).toBe(false);
+            });
+        });
+
+        // =====================================================================
+        // getSearchInput Tests
+        // =====================================================================
+        describe('getSearchInput', () => {
+            test('should return search input element', () => {
+                const input = mod.getSearchInput();
+                expect(input).toBeTruthy();
+                expect(input.id).toBe('searchRequests');
+            });
+
+            test('should return null if element does not exist', () => {
+                document.body.innerHTML = '';
+                const input = mod.getSearchInput();
+                expect(input).toBeNull();
+            });
+        });
+
+        // =====================================================================
+        // safeParseJson Tests
+        // =====================================================================
+        describe('safeParseJson', () => {
+            test('should parse JSON string to object', () => {
+                const jsonString = '{"name":"test","value":123}';
+                const result = mod.safeParseJson(jsonString);
+                expect(result).toEqual({ name: 'test', value: 123 });
+            });
+
+            test('should return object as-is if already an object', () => {
+                const obj = { name: 'test', value: 123 };
+                const result = mod.safeParseJson(obj);
+                expect(result).toBe(obj);
+            });
+
+            test('should parse JSON array string', () => {
+                const jsonString = '[{"id":1},{"id":2}]';
+                const result = mod.safeParseJson(jsonString);
+                expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+            });
+
+            test('should handle paginated response string', () => {
+                const paginatedStr = '{"Results":[{"RequestID":1}],"CurrentPage":1,"RowCount":25}';
+                const result = mod.safeParseJson(paginatedStr);
+                expect(result.Results).toEqual([{ RequestID: 1 }]);
+                expect(result.RowCount).toBe(25);
+            });
+        });
+
+        // =====================================================================
+        // formatDate Tests
+        // =====================================================================
+        describe('formatDate', () => {
+            test('should format valid date string', () => {
+                const result = mod.formatDate('2024-06-15T10:30:00');
+                expect(result).toBe('June 15, 2024');
+            });
+
+            test('should format ISO date string', () => {
+                const result = mod.formatDate('2023-12-25');
+                expect(result).toBe('December 25, 2023');
+            });
+
+            test('should return N/A for null input', () => {
+                const result = mod.formatDate(null);
+                expect(result).toBe('N/A');
+            });
+
+            test('should return N/A for undefined input', () => {
+                const result = mod.formatDate(undefined);
+                expect(result).toBe('N/A');
+            });
+
+            test('should return N/A for empty string', () => {
+                const result = mod.formatDate('');
+                expect(result).toBe('N/A');
+            });
+
+            test('should return N/A for invalid date string', () => {
+                const result = mod.formatDate('not-a-date');
+                expect(result).toBe('N/A');
+            });
+        });
+
+        // =====================================================================
+        // renderPagination Tests
+        // =====================================================================
+        describe('renderPagination', () => {
+            test('should render pagination controls', () => {
+                mod.renderPagination('pagination-controls', 50, 5, 1);
+                const container = document.getElementById('pagination-controls');
+                expect(container.innerHTML).toContain('First');
+                expect(container.innerHTML).toContain('Previous');
+                expect(container.innerHTML).toContain('Next');
+                expect(container.innerHTML).toContain('Last');
+            });
+
+            test('should show correct total pages', () => {
+                mod.renderPagination('pagination-controls', 50, 5, 1);
+                const container = document.getElementById('pagination-controls');
+                expect(container.innerHTML).toContain('of 10');
+            });
+
+            test('should disable First and Previous buttons on first page', () => {
+                mod.renderPagination('pagination-controls', 50, 5, 1);
+                const buttons = document.querySelectorAll('button[data-page]');
+                expect(buttons[0].disabled).toBe(true);
+                expect(buttons[1].disabled).toBe(true);
+            });
+
+            test('should disable Next and Last buttons on last page', () => {
+                mod.renderPagination('pagination-controls', 50, 5, 10);
+                const buttons = document.querySelectorAll('button[data-page]');
+                expect(buttons[2].disabled).toBe(true);
+                expect(buttons[3].disabled).toBe(true);
+            });
+
+            test('should not render pagination for single page', () => {
+                mod.renderPagination('pagination-controls', 3, 5, 1);
+                const container = document.getElementById('pagination-controls');
+                expect(container.innerHTML).toBe('');
+            });
+
+            test('should handle missing container gracefully', () => {
+                expect(() => mod.renderPagination('nonexistent', 50, 5, 1)).not.toThrow();
+            });
+        });
+
+        // =====================================================================
+        // Toast Functions Tests
+        // =====================================================================
+        describe('Toast Functions', () => {
+            describe('showToast', () => {
+                test('should create toast element with message', () => {
+                    const toast = mod.showToast('Test message', 'info');
+                    expect(toast).toBeTruthy();
+                    expect(toast.innerHTML).toContain('Test message');
+                });
+
+                test('should apply info styling by default', () => {
+                    const toast = mod.showToast('Info message');
+                    expect(toast.style.backgroundColor).toBe('rgb(33, 150, 243)');
+                });
+
+                test('should apply success styling', () => {
+                    const toast = mod.showToast('Success message', 'success');
+                    expect(toast.style.backgroundColor).toBe('rgb(76, 175, 80)');
+                });
+
+                test('should apply error styling', () => {
+                    const toast = mod.showToast('Error message', 'error');
+                    expect(toast.style.backgroundColor).toBe('rgb(244, 67, 54)');
+                });
+
+                test('should append toast to container', () => {
+                    mod.showToast('Test', 'info');
+                    const container = document.getElementById('toast-container');
+                    expect(container.children.length).toBeGreaterThan(0);
+                });
+            });
+
+            describe('hideToast', () => {
+                test('should set opacity to 0', () => {
+                    const toast = mod.showToast('Test', 'info');
+                    mod.hideToast(toast);
+                    expect(toast.style.opacity).toBe('0');
+                });
+
+                test('should handle null toast gracefully', () => {
+                    expect(() => mod.hideToast(null)).not.toThrow();
+                });
+
+                test('should handle already removed toast', () => {
+                    const toast = mod.showToast('Test', 'info');
+                    toast.remove();
+                    expect(() => mod.hideToast(toast)).not.toThrow();
+                });
+            });
+
+            describe('createToastContainer', () => {
+                test('should create container with correct id', () => {
+                    document.getElementById('toast-container').remove();
+                    const container = mod.createToastContainer();
+                    expect(container.id).toBe('toast-container');
+                });
+
+                test('should apply correct positioning styles', () => {
+                    document.getElementById('toast-container').remove();
+                    const container = mod.createToastContainer();
+                    expect(container.style.position).toBe('fixed');
+                    expect(container.style.top).toBe('12px');
+                    expect(container.style.right).toBe('12px');
+                });
+
+                test('should append container to body', () => {
+                    document.getElementById('toast-container').remove();
+                    mod.createToastContainer();
+                    expect(document.getElementById('toast-container')).toBeTruthy();
+                });
+            });
+        });
+
+        // =====================================================================
+        // ViewRequest Tests
+        // =====================================================================
+        describe('ViewRequest', () => {
+            test('should populate modal body with request form', () => {
+                const request = { name: 'Test Request' };
+                mod.ViewRequest(request);
+                const modalBody = document.getElementById('viewRequestModalBody');
+                expect(modalBody.innerHTML).toContain('Request Name');
+                expect(modalBody.innerHTML).toContain('Test Request');
+            });
+
+            test('should include Assist Project dropdown', () => {
+                const request = { name: 'Test' };
+                mod.ViewRequest(request);
+                const modalBody = document.getElementById('viewRequestModalBody');
+                expect(modalBody.innerHTML).toContain('Assist Project');
+            });
+
+            test('should include Scheduled Refresh options', () => {
+                const request = { name: 'Test' };
+                mod.ViewRequest(request);
+                const modalBody = document.getElementById('viewRequestModalBody');
+                expect(modalBody.innerHTML).toContain('No Refresh');
+                expect(modalBody.innerHTML).toContain('Daily');
+                expect(modalBody.innerHTML).toContain('Weekly');
+                expect(modalBody.innerHTML).toContain('Monthly');
+            });
+        });
+
+        // =====================================================================
+        // ViewDataSet Tests
+        // =====================================================================
+        describe('ViewDataSet', () => {
+            test('should populate modal body with dataset form', () => {
+                const request = { approvers: 'approver@test.com' };
+                mod.ViewDataSet(request);
+                const modalBody = document.getElementById('viewDatasetModalBody');
+                expect(modalBody.innerHTML).toContain('Description');
+                expect(modalBody.innerHTML).toContain('approver@test.com');
+            });
+
+            test('should include Data Set Fields section', () => {
+                const request = { approvers: 'test' };
+                mod.ViewDataSet(request);
+                const modalBody = document.getElementById('viewDatasetModalBody');
+                expect(modalBody.innerHTML).toContain('Data Set Fields');
+            });
+
+            test('should include Meta Data section', () => {
+                const request = { approvers: 'test' };
+                mod.ViewDataSet(request);
+                const modalBody = document.getElementById('viewDatasetModalBody');
+                expect(modalBody.innerHTML).toContain('Meta Data');
+            });
+
+            test('should include Columns section', () => {
+                const request = { approvers: 'test' };
+                mod.ViewDataSet(request);
+                const modalBody = document.getElementById('viewDatasetModalBody');
+                expect(modalBody.innerHTML).toContain('Columns');
+                expect(modalBody.innerHTML).toContain('Redact');
+                expect(modalBody.innerHTML).toContain('Tokenise');
+            });
+        });
+
+        // =====================================================================
+        // ApproveRequest Tests
+        // =====================================================================
+        describe('ApproveRequest', () => {
+            test('should set modal title with request name', () => {
+                const request = { Name: 'Data Access Request', RequestID: 1 };
+                mod.ApproveRequest(request);
+                const title = document.getElementById('approveRequestModalLabel');
+                expect(title.textContent).toBe('Approve Request: Data Access Request');
+            });
+
+            test('should populate modal body with confirmation', () => {
+                const request = { Name: 'Test Request', RequestID: 1 };
+                mod.ApproveRequest(request);
+                const modalBody = document.getElementById('approveRequestModalBody');
+                expect(modalBody.innerHTML).toContain('Please confirm the approval');
+                expect(modalBody.innerHTML).toContain('Test Request');
+            });
+
+            test('should include Approve button', () => {
+                const request = { Name: 'Test', RequestID: 1 };
+                mod.ApproveRequest(request);
+                const modalBody = document.getElementById('approveRequestModalBody');
+                expect(modalBody.innerHTML).toContain('Approve');
+                expect(modalBody.innerHTML).toContain('confirmApprovalBtn');
+            });
+
+            test('should add click event listener to confirm button', () => {
+                const request = { Name: 'Test', RequestID: 1 };
+                mod.ApproveRequest(request);
+                const confirmBtn = document.getElementById('confirmApprovalBtn');
+                expect(confirmBtn).toBeTruthy();
+            });
+        });
+
+        // =====================================================================
+        // RejectRequest Tests
+        // =====================================================================
+        describe('RejectRequest', () => {
+            test('should set modal title with request name', () => {
+                const request = { name: 'Data Access Request', Name: 'Data Access Request', RequestID: 1 };
+                mod.RejectRequest(request);
+                const title = document.getElementById('rejectRequestModalLabel');
+                expect(title.textContent).toBe('Reject Request: Data Access Request');
+            });
+
+            test('should populate modal body with rejection confirmation', () => {
+                const request = { name: 'Test', Name: 'Test Request', RequestID: 1 };
+                mod.RejectRequest(request);
+                const modalBody = document.getElementById('rejectRequestModalBody');
+                expect(modalBody.innerHTML).toContain('Please confirm the Rejection');
+                expect(modalBody.innerHTML).toContain('Test Request');
+            });
+
+            test('should include Reject button', () => {
+                const request = { name: 'Test', Name: 'Test', RequestID: 1 };
+                mod.RejectRequest(request);
+                const modalBody = document.getElementById('rejectRequestModalBody');
+                expect(modalBody.innerHTML).toContain('Reject');
+                expect(modalBody.innerHTML).toContain('confirmRejectBtn');
+            });
+        });
+
+        // =====================================================================
+        // fetchRequestDetails Tests
+        // =====================================================================
+        describe('fetchRequestDetails', () => {
+            test('should call API with correct parameters', async () => {
+                mockApiResponse = JSON.stringify({
+                    RequestID: 1,
+                    Name: 'Test Request',
+                    StatusID: 1
+                });
+
+                await mod.fetchRequestDetails(1);
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetRequestID',
+                    { RequestID: 1 }
+                );
+            });
+
+            test('should return parsed response', async () => {
+                mockApiResponse = JSON.stringify({
+                    RequestID: 1,
+                    Name: 'Test Request',
+                    Description: 'Test description',
+                    StatusID: 1,
+                    ProjectID: 10,
+                    DataSetID: 5
+                });
+
+                const result = await mod.fetchRequestDetails(1);
+
+                expect(result.RequestID).toBe(1);
+                expect(result.Name).toBe('Test Request');
+                expect(result.ProjectID).toBe(10);
+            });
+
+            test('should throw error on API failure', async () => {
+                window.loomeApi.runApiRequest = jest.fn(() => Promise.reject(new Error('API Error')));
+
+                await expect(mod.fetchRequestDetails(1)).rejects.toThrow('API Error');
+            });
+        });
+
+        // =====================================================================
+        // fetchDatasetDetails Tests
+        // =====================================================================
+        describe('fetchDatasetDetails', () => {
+            test('should call API with correct parameters', async () => {
+                mockApiResponse = JSON.stringify({
+                    DataSetID: 5,
+                    Name: 'Test Dataset'
+                });
+
+                await mod.fetchDatasetDetails(5);
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetDataSetID',
+                    { DataSetID: 5 }
+                );
+            });
+
+            test('should return parsed response', async () => {
+                mockApiResponse = JSON.stringify({
+                    DataSetID: 5,
+                    Name: 'Test Dataset',
+                    Description: 'Dataset description',
+                    DataSourceID: 10,
+                    IsActive: true,
+                    Approvers: 'admin@test.com'
+                });
+
+                const result = await mod.fetchDatasetDetails(5);
+
+                expect(result.DataSetID).toBe(5);
+                expect(result.Name).toBe('Test Dataset');
+                expect(result.DataSourceID).toBe(10);
+            });
+        });
+
+        // =====================================================================
+        // getProjectsMapping Tests
+        // =====================================================================
+        describe('getProjectsMapping', () => {
+            test('should call API for projects', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [
+                        { AssistProjectID: 1, Name: 'Project 1', Description: 'Desc 1' },
+                        { AssistProjectID: 2, Name: 'Project 2', Description: 'Desc 2' }
+                    ]
+                });
+
+                await mod.getProjectsMapping();
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith('GetAllAssistProjects');
+            });
+
+            test('should return mapping from project ID to name and description', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [
+                        { AssistProjectID: 1, Name: 'Project 1', Description: 'Desc 1' },
+                        { AssistProjectID: 2, Name: 'Project 2', Description: 'Desc 2' }
+                    ]
+                });
+
+                const mapping = await mod.getProjectsMapping();
+
+                expect(mapping[1]).toEqual({ name: 'Project 1', description: 'Desc 1' });
+                expect(mapping[2]).toEqual({ name: 'Project 2', description: 'Desc 2' });
+            });
+
+            test('should cache results', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [
+                        { AssistProjectID: 1, Name: 'Project 1', Description: 'Desc 1' }
+                    ]
+                });
+
+                await mod.getProjectsMapping();
+                await mod.getProjectsMapping();
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledTimes(1);
+            });
+
+            test('should return empty object on error', async () => {
+                window.loomeApi.runApiRequest = jest.fn(() => Promise.reject(new Error('API Error')));
+                mod.projectsCache = null;
+
+                const result = await mod.getProjectsMapping();
+
+                expect(result).toEqual({});
+            });
+        });
+
+        // =====================================================================
+        // displayCombinedDetails Tests
+        // =====================================================================
+        describe('displayCombinedDetails', () => {
+            test('should show no details message when both details are empty', async () => {
+                const container = document.createElement('div');
+                await mod.displayCombinedDetails(container, {}, {});
+                expect(container.innerHTML).toContain('No details available');
+            });
+
+            test('should display dataset name', async () => {
+                mod.projectsCache = { 1: { name: 'Project 1', description: 'Desc' } };
+                const container = document.createElement('div');
+                const requestDetails = { ProjectID: 1 };
+                const datasetDetails = { Name: 'Test Dataset', DataSourceID: 10 };
+
+                await mod.displayCombinedDetails(container, requestDetails, datasetDetails);
+
+                expect(container.innerHTML).toContain('Test Dataset');
+            });
+
+            test('should display project name from mapping', async () => {
+                mod.projectsCache = { 1: { name: 'My Project', description: 'Project description' } };
+                const container = document.createElement('div');
+                const requestDetails = { ProjectID: 1 };
+                const datasetDetails = { Name: 'Dataset', DataSourceID: 10 };
+
+                await mod.displayCombinedDetails(container, requestDetails, datasetDetails);
+
+                expect(container.innerHTML).toContain('My Project');
+            });
+
+            test('should display Unknown Project for missing project', async () => {
+                mod.projectsCache = {};
+                const container = document.createElement('div');
+                const requestDetails = { ProjectID: 999 };
+                const datasetDetails = { Name: 'Dataset', DataSourceID: 10 };
+
+                await mod.displayCombinedDetails(container, requestDetails, datasetDetails);
+
+                expect(container.innerHTML).toContain('Unknown Project');
+            });
+        });
+
+        // =====================================================================
+        // renderTable Tests
+        // =====================================================================
+        describe('renderTable', () => {
+            const config = { showActions: true };
+
+            test('should render table with headers for Pending Approval', () => {
+                mod.renderTable('requests-table-area', [], config, 'Pending Approval');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('Request ID');
+                expect(container.innerHTML).toContain('Request Name');
+                expect(container.innerHTML).toContain('Requested On');
+                expect(container.innerHTML).toContain('Requested By');
+                expect(container.innerHTML).toContain('Approvers');
+            });
+
+            test('should render table with headers for Approved status', () => {
+                mod.renderTable('requests-table-area', [], config, 'Approved');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('Approved by');
+                expect(container.innerHTML).toContain('Approved on');
+            });
+
+            test('should render table with headers for Rejected status', () => {
+                mod.renderTable('requests-table-area', [], config, 'Rejected');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('Rejected by');
+                expect(container.innerHTML).toContain('Rejected on');
+            });
+
+            test('should render table with headers for Finalised status', () => {
+                mod.renderTable('requests-table-area', [], config, 'Finalised');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('Approved by');
+                expect(container.innerHTML).toContain('Finalised on');
+            });
+
+            test('should show no requests message when data is empty', () => {
+                mod.renderTable('requests-table-area', [], config, 'Pending Approval');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('No requests found');
+            });
+
+            test('should render data rows correctly', () => {
+                const data = [{
+                    RequestID: 1,
+                    Name: 'Test Request',
+                    CreateDate: '2024-06-15',
+                    CreateUser: 'user@test.com',
+                    status: 'Pending Approval',
+                    StatusID: 1,
+                    Approvers: 'admin@test.com',
+                    DataSetID: 5
+                }];
+                mod.renderTable('requests-table-area', data, config, 'Pending Approval');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('Test Request');
+                expect(container.innerHTML).toContain('user@test.com');
+                expect(container.innerHTML).toContain('admin@test.com');
+            });
+
+            test('should include chevron icon for expandable rows', () => {
+                const data = [{
+                    RequestID: 1,
+                    Name: 'Test',
+                    CreateDate: '2024-06-15',
+                    CreateUser: 'user@test.com',
+                    status: 'Pending Approval',
+                    StatusID: 1,
+                    Approvers: 'admin@test.com',
+                    DataSetID: 5
+                }];
+                mod.renderTable('requests-table-area', data, config, 'Pending Approval');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('chevron-icon');
+            });
+
+            test('should include action buttons for Pending Approval', () => {
+                const data = [{
+                    RequestID: 1,
+                    Name: 'Test',
+                    CreateDate: '2024-06-15',
+                    CreateUser: 'user@test.com',
+                    status: 'Pending Approval',
+                    StatusID: 1,
+                    Approvers: 'admin@test.com',
+                    DataSetID: 5
+                }];
+                mod.renderTable('requests-table-area', data, config, 'Pending Approval');
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('action-approve');
+                expect(container.innerHTML).toContain('action-reject');
+            });
+        });
+
+        // =====================================================================
+        // getCounts Tests
+        // =====================================================================
+        describe('getCounts', () => {
+            test('should call API with correct parameters for Pending Approval', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [],
+                    RowCount: 15
+                });
+
+                const count = await mod.getCounts('Pending Approval');
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetRequestList',
+                    expect.objectContaining({
+                        statusId: 1
+                    })
+                );
+                expect(count).toBe(15);
+            });
+
+            test('should call API with correct statusId for Approved', async () => {
+                mockApiResponse = JSON.stringify({ Results: [], RowCount: 10 });
+
+                await mod.getCounts('Approved');
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetRequestList',
+                    expect.objectContaining({ statusId: 2 })
+                );
+            });
+
+            test('should call API with correct statusId for Finalised', async () => {
+                mockApiResponse = JSON.stringify({ Results: [], RowCount: 5 });
+
+                await mod.getCounts('Finalised');
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetRequestList',
+                    expect.objectContaining({ statusId: 3 })
+                );
+            });
+
+            test('should call API with correct statusId for Rejected', async () => {
+                mockApiResponse = JSON.stringify({ Results: [], RowCount: 3 });
+
+                await mod.getCounts('Rejected');
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetRequestList',
+                    expect.objectContaining({ statusId: 4 })
+                );
+            });
+        });
+
+        // =====================================================================
+        // renderUI Tests
+        // =====================================================================
+        describe('renderUI', () => {
+            test('should call API with correct parameters', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [],
+                    RowCount: 0
+                });
+
+                await mod.renderUI();
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'GetRequestList',
+                    expect.objectContaining({
+                        page: 1,
+                        pageSize: 5,
+                        statusId: 1
+                    })
+                );
+            });
+
+            test('should render table with fetched data', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [{
+                        RequestID: 1,
+                        Name: 'API Request',
+                        CreateDate: '2024-06-15',
+                        CreateUser: 'user@test.com',
+                        StatusID: 1,
+                        Approvers: 'admin@test.com',
+                        DataSetID: 5
+                    }],
+                    RowCount: 1
+                });
+
+                await mod.renderUI();
+
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('API Request');
+            });
+
+            test('should not render if no active chip', async () => {
+                document.querySelectorAll('.chip').forEach(chip => chip.classList.remove('active'));
+
+                await mod.renderUI();
+
+                expect(window.loomeApi.runApiRequest).not.toHaveBeenCalled();
+            });
+
+            test('should transform StatusID to status name', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [{
+                        RequestID: 1,
+                        Name: 'Test',
+                        CreateDate: '2024-06-15',
+                        CreateUser: 'user@test.com',
+                        StatusID: 1,
+                        Approvers: 'admin',
+                        DataSetID: 5
+                    }],
+                    RowCount: 1
+                });
+
+                await mod.renderUI();
+
+                expect(mod.allRequests[0].status).toBe('Pending Approval');
+            });
+        });
+
+        // =====================================================================
+        // approveRequestFromAPI Tests
+        // =====================================================================
+        describe('approveRequestFromAPI', () => {
+            beforeEach(() => {
+                jest.useFakeTimers();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            test('should call API with request ID', async () => {
+                mockApiResponse = JSON.stringify({
+                    RequestID: 1,
+                    StatusID: 2
+                });
+
+                const promise = mod.approveRequestFromAPI(1);
+                await promise;
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'ApproveRequestID',
+                    { id: 1 }
+                );
+            });
+
+            test('should show loading toast', async () => {
+                mockApiResponse = JSON.stringify({ RequestID: 1 });
+
+                await mod.approveRequestFromAPI(1);
+
+                const container = document.getElementById('toast-container');
+                expect(container.innerHTML).toContain('Approving request');
+            });
+        });
+
+        // =====================================================================
+        // rejectRequestFromAPI Tests
+        // =====================================================================
+        describe('rejectRequestFromAPI', () => {
+            beforeEach(() => {
+                jest.useFakeTimers();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            test('should call API with request ID', async () => {
+                mockApiResponse = JSON.stringify({
+                    RequestID: 1,
+                    StatusID: 4
+                });
+
+                await mod.rejectRequestFromAPI(1);
+
+                expect(window.loomeApi.runApiRequest).toHaveBeenCalledWith(
+                    'RejectRequestID',
+                    { id: 1 }
+                );
+            });
+
+            test('should show loading toast', async () => {
+                mockApiResponse = JSON.stringify({ RequestID: 1 });
+
+                await mod.rejectRequestFromAPI(1);
+
+                const container = document.getElementById('toast-container');
+                expect(container.innerHTML).toContain('Rejecting request');
+            });
+        });
+
+        // =====================================================================
+        // State Management Tests
+        // =====================================================================
+        describe('State Management', () => {
+            test('should allow setting and getting currentPage', () => {
+                mod.currentPage = 5;
+                expect(mod.currentPage).toBe(5);
+            });
+
+            test('should allow setting and getting allRequests', () => {
+                mod.allRequests = [{ id: 1 }, { id: 2 }];
+                expect(mod.allRequests).toEqual([{ id: 1 }, { id: 2 }]);
+            });
+
+            test('should allow setting and getting projectsCache', () => {
+                mod.projectsCache = { 1: { name: 'Test' } };
+                expect(mod.projectsCache).toEqual({ 1: { name: 'Test' } });
+            });
+        });
+
+        // =====================================================================
+        // Integration Tests
+        // =====================================================================
+        describe('Integration Tests', () => {
+            test('should handle full approval flow rendering', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [
+                        {
+                            RequestID: 1,
+                            Name: 'Pending Request',
+                            CreateDate: '2024-06-15T10:00:00',
+                            CreateUser: 'researcher@test.com',
+                            StatusID: 1,
+                            Approvers: 'admin@test.com',
+                            DataSetID: 5
+                        }
+                    ],
+                    RowCount: 1
+                });
+
+                await mod.renderUI();
+
+                const container = document.getElementById('requests-table-area');
+                expect(container.querySelector('table')).toBeTruthy();
+                expect(container.innerHTML).toContain('Pending Request');
+                expect(container.innerHTML).toContain('researcher@test.com');
+            });
+
+            test('should format dates correctly in rendered table', async () => {
+                mockApiResponse = JSON.stringify({
+                    Results: [{
+                        RequestID: 1,
+                        Name: 'Test',
+                        CreateDate: '2024-01-15',
+                        CreateUser: 'user@test.com',
+                        StatusID: 2,
+                        CurrentlyApproved: 'approver@test.com',
+                        ApprovedDate: '2024-01-16',
+                        DataSetID: 5
+                    }],
+                    RowCount: 1
+                });
+
+                document.querySelector('.chip.active').classList.remove('active');
+                document.querySelector('.chip[data-status="Approved"]').classList.add('active');
+
+                await mod.renderUI();
+
+                const container = document.getElementById('requests-table-area');
+                expect(container.innerHTML).toContain('January 15, 2024');
+                expect(container.innerHTML).toContain('January 16, 2024');
+            });
+        });
+
+    }); // End describe('approver.js')
+} // End if (typeof describe === 'function')
