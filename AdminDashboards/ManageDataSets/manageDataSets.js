@@ -1066,8 +1066,8 @@ function gatherFormData(allColumnsData) {
 async function createDataSet(data) {
     const payload = {
         ...data, // Spread all properties from the original object
-        OptOutMessage: "string",
-        OptOutList: "string",
+        OptOutMessage: null,
+        OptOutList: null,
         OptOutColumn: "-1",
         DataSourceTypeID: currentDataSourceTypeID
     };
@@ -1090,8 +1090,8 @@ async function updateDataSet(data_set_id, data) {
     const payload = {
         ...data,
         id: parseInt(data_set_id, 10),
-        OptOutMessage: "string",
-        OptOutList: "string",
+        OptOutMessage: null,
+        OptOutList: null,
         OptOutColumn: "-1",
         DataSourceTypeID: currentDataSourceTypeID
     };
