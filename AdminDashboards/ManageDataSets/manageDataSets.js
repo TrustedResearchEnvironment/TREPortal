@@ -922,13 +922,15 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                     // 1. Fetch data for EXISTING set (SAVED data from DB)
                     const fetchedData = await (dataSetId); //NEED TO CHANGE THIS
 
-                const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
-                console.log("Original NEW Folder Columns Data: ", originalData);
-                // Apply the consistent mapping
-                newColumnsData = originalData.map(mapFolderData);
+                    const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
+                    console.log("Original NEW Folder Columns Data: ", originalData);
+                    // Apply the consistent mapping
+                    newColumnsData = originalData.map(mapFolderData);
 
-                console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
-            }
+                    console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
+                } catch (error) {
+                    console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
+                }
         } else if (dataSetId && dataSetId !== 'new') {
             try {
                 // 1. Fetch data for EXISTING set (SAVED data from DB)
