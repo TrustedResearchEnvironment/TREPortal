@@ -132,23 +132,22 @@ function displayColumnsTable(data, dataSetTypeId) {
             </tr>
         `).join('');
 
+
     } else if (dataSetTypeId == 2) { // REDCap type
         console.log("Data for REDCap columns:", data);
-        rowsHtml = data.map((row, index) => {
-            // If your backend returns strings, use colName directly. 
-            // If it returns objects, keep your col.ColumnName logic.
-
+        rowsHtml = data.map((row) => {
+            // For REDCap, always use ColumnName as the unique id
             return `
-                <tr data-id="${index}" data-column-name="${row.ColumnName}">
+                <tr data-id="${row.ColumnName}" data-column-name="${row.ColumnName}">
                     <td>${row.ColumnName || ''}</td>
-                    <td class="editable-cell" data-field="LogicalColumnName"></td>
-                    <td class="editable-cell" data-field="BusinessDescription"></td>
-                    <td class="editable-cell" data-field="ExampleValue"></td>
+                    <td class="editable-cell" data-field="LogicalColumnName">${row.LogicalColumnName || ''}</td>
+                    <td class="editable-cell" data-field="BusinessDescription">${row.BusinessDescription || ''}</td>
+                    <td class="editable-cell" data-field="ExampleValue">${row.ExampleValue || ''}</td>
                     <td class="checkbox-cell">
-                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact">
+                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
                     </td>
                     <td class="checkbox-cell">
-                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise">
+                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${row.Tokenise ? 'checked' : ''}>
                     </td>
                 </tr>
             `;
@@ -671,22 +670,71 @@ async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
 /**
  * Renders two static rows with input fields for REDCap API metadata.
  */
-function renderRedcapApiKeyRowMetaData(tbody, dataSource) {
-    const rowHtml = `
+async function renderRedcapApiKeyRowMetaData(tbody, dataSource, dataSetID) {
+    // Show loading state
+    tbody.innerHTML = `
         <tr>
-            <td>Citations for related publications <input type="hidden" value="1"></td>
+            <td>Citations for related publications <input type="hidden" value=5></td>
             <td width="70%">
-                <input id="redcapCitations" class="form-control">
+                <input id="redcapCitations" class="form-control" value="Loading..." disabled>
             </td>
         </tr>
         <tr>
-            <td>ANZCTR URL <input type="hidden" value="2"></td>
+            <td>ANZCTR URL <input type="hidden" value=2></td>
             <td width="70%">
-                <input id="redcapAnzctrUrl" class="form-control">
+                <input id="redcapAnzctrUrl" class="form-control" value="Loading..." disabled>
             </td>
         </tr>
     `;
-    tbody.innerHTML = rowHtml;
+
+    // If new, just show empty fields
+    if (!dataSetID || dataSetID === "new") {
+        tbody.innerHTML = `
+            <tr>
+                <td>Citations for related publications <input type="hidden" value=5></td>
+                <td width="70%">
+                    <input id="redcapCitations" class="form-control" value="">
+                </td>
+            </tr>
+            <tr>
+                <td>ANZCTR URL <input type="hidden" value=2></td>
+                <td width="70%">
+                    <input id="redcapAnzctrUrl" class="form-control" value="">
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    try {
+        // Fetch metadata values for this dataset
+        const metaValues = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": dataSetID });
+        let citations = '';
+        let anzctr = '';
+        if (Array.isArray(metaValues)) {
+            for (const mv of metaValues) {
+                if (mv.MetaDataID == 5) citations = mv.Value || '';
+                if (mv.MetaDataID == 2) anzctr = mv.Value || '';
+            }
+        }
+        tbody.innerHTML = `
+            <tr>
+                <td>Citations for related publications <input type="hidden" value=5></td>
+                <td width="70%">
+                    <input id="redcapCitations" class="form-control" value="${citations}">
+                </td>
+            </tr>
+            <tr>
+                <td>ANZCTR URL <input type="hidden" value=2></td>
+                <td width="70%">
+                    <input id="redcapAnzctrUrl" class="form-control" value="${anzctr}">
+                </td>
+            </tr>
+        `;
+    } catch (error) {
+        console.error("Failed to fetch REDCap metadata values:", error);
+        tbody.innerHTML = `<tr><td colspan="2" class="text-danger">Error loading REDCap metadata fields.</td></tr>`;
+    }
 }
 
 
@@ -731,7 +779,7 @@ function updateMetaDataTable(dataSource, dataSetID) {
             break;
 
         case 2: // REDCap API Type
-            renderRedcapApiKeyRowMetaData(tbody, dataSource);
+            renderRedcapApiKeyRowMetaData(tbody, dataSource, dataSetID);
             break;
 
         case 3: // Folder Type
@@ -1089,8 +1137,8 @@ function gatherFormData(allColumnsData) {
             const keyInput = row.querySelector('td:first-child input[type="hidden"]');
             const valueInput = row.querySelector('td:last-child input, td:last-child select');
             if (keyInput && valueInput) {
-                metaData.push({ //MetaDataID being 1 is only for those with "Tag" as the Metadata
-                    MetaDataID: 1, //parseInt(keyInput.value, 10),
+                metaData.push({
+                    MetaDataID: parseInt(keyInput.value, 10),
                     Value: valueInput.value
                 });
             }
@@ -1224,22 +1272,22 @@ async function updateDataSet(data_set_id, data) {
     }
 
     try {
-        // For REDCap type, skip fetching DataSetFieldValues and set to empty array
+        // Use values from the form (data) if present, otherwise fetch from DB
         if (currentDataSourceTypeID === 2) {
             payload.DataSetFieldValues = [];
-        } else {
-            // Always include existing DataSetFieldValues so backend re-inserts them after its delete
+        } else if (!payload.DataSetFieldValues || !Array.isArray(payload.DataSetFieldValues) || payload.DataSetFieldValues.length === 0) {
             const fieldValues = await getFromAPI(API_GET_DATASET_FIELD_VALUE, { "data_set_id": data_set_id });
             payload.DataSetFieldValues = Array.isArray(fieldValues)
                 ? fieldValues.map(fv => ({ FieldID: fv.FieldID, Value: fv.Value }))
                 : [];
         }
 
-        // Do the same for DataSetMetaDataValues (prevents wipe-out on update)
-        const metaValues = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": data_set_id });
-        payload.DataSetMetaDataValues = Array.isArray(metaValues)
-            ? metaValues.map(mv => ({ MetaDataID: mv.MetaDataID, Value: mv.Value }))
-            : [];
+        if (!payload.DataSetMetaDataValues || !Array.isArray(payload.DataSetMetaDataValues) || payload.DataSetMetaDataValues.length === 0) {
+            const metaValues = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": data_set_id });
+            payload.DataSetMetaDataValues = Array.isArray(metaValues)
+                ? metaValues.map(mv => ({ MetaDataID: mv.MetaDataID, Value: mv.Value }))
+                : [];
+        }
     } catch (e) {
         console.warn("Failed to preload related values; sending empty arrays to avoid crashes.", e);
         payload.DataSetFieldValues = payload.DataSetFieldValues || [];
@@ -1261,23 +1309,26 @@ async function updateDataSet(data_set_id, data) {
 
         showToast('Dataset updated successfully!');
 
-        // --- REFRESH DATASETS AND UI ---
-        // Re-fetch all datasets and data sources, then repopulate the UI
+        // --- ALWAYS REFRESH DATASETS AND UI ---
         if (typeof getAllDataSets === 'function' && typeof getAllDataSources === 'function') {
             const selectionDropdown = document.getElementById('dataSetSelection');
             const dataSourceDrpDwn = document.getElementById('dataSource');
             const optgroup = selectionDropdown ? selectionDropdown.querySelector('optgroup') : null;
+            // Force a fresh fetch by adding a cache-busting param (if supported)
             let allDataSets = await getAllDataSets();
             let allDataSources = await getAllDataSources();
             if (optgroup && allDataSets) populateExistingDataSets(optgroup, allDataSets);
             if (dataSourceDrpDwn && allDataSources) populateDataSourceOptions(dataSourceDrpDwn, allDataSources, 'DataSourceID', 'Name');
-            // Optionally, re-select the updated dataset to reload its details
-            if (selectionDropdown && selectionDropdown.value === data_set_id.toString()) {
-                // Find the updated dataset and data source
+
+            // Always re-select and reload the updated dataset
+            if (selectionDropdown) {
+                selectionDropdown.value = data_set_id.toString();
+                // Fetch again to ensure latest data (in case populateExistingDataSets uses stale data)
+                allDataSets = await getAllDataSets();
+                allDataSources = await getAllDataSources();
                 const updatedDataSet = allDataSets.find(ds => ds.DataSetID == data_set_id);
-                const updatedDataSource = allDataSources.find(dsrc => dsrc.DataSourceID == updatedDataSet.DataSourceID);
+                const updatedDataSource = updatedDataSet ? allDataSources.find(dsrc => dsrc.DataSourceID == updatedDataSet.DataSourceID) : null;
                 if (updatedDataSet && updatedDataSource) {
-                    // Repopulate the form and reload columns/metadata
                     if (typeof populateForm === 'function') populateForm(updatedDataSet, updatedDataSource);
                     if (typeof updateDataSetFieldsTable === 'function') await updateDataSetFieldsTable(updatedDataSource, data_set_id);
                     if (typeof updateMetaDataTable === 'function') updateMetaDataTable(updatedDataSource, data_set_id);
@@ -1397,7 +1448,7 @@ async function renderManageDataSetPage() {
             if (!selectedDataSet) return;
             const dataSource = allDataSources.find(dsrc => dsrc.DataSourceID == selectedDataSet.DataSourceID);
             if (!dataSource) return;
-
+            console.log("Selected Data Set and Data Source:", selectedDataSet, dataSource);
             // 1. Populate the main form fields
             populateForm(selectedDataSet, dataSource);
 
@@ -1463,6 +1514,9 @@ async function renderManageDataSetPage() {
 
             // Listener for TOP-LEVEL data set selection
             selectionDropdown.addEventListener('change', async () => {
+                // Always fetch fresh data on selection
+                allDataSets = await getAllDataSets();
+                allDataSources = await getAllDataSources();
                 await updateFormForSelection(allDataSets, allDataSources);
                 await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
             });
