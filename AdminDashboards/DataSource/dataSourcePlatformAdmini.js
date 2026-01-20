@@ -790,39 +790,38 @@ const renderAccordionDetails = (item) => {
     // Check if item.Fields exists and is not an empty object
     if (item.Fields && Object.keys(item.Fields).length > 0) {
         // Use Object.entries to iterate over key-value pairs
-        const fieldRows = Object.entries(item.Fields).map(([key, value]) => {
-            displayValue = value; // Default display value
+        const fieldRows = Object.entries(item.Fields)
+            .filter(([key, _]) => key !== 'REDCap API Key') // Exclude API Key from display
+            .map(([key, value]) => {
+                displayValue = value; // Default display value
 
-            // For overriding key display names
-            let displayKey = key;
+                // For overriding key display names
+                let displayKey = key;
 
-            // Check if the current field is Database Connection
-            if (key === 'Database Connection') {
-                // Look up the name from our map. Use parseInt because the ID might be a string.
-                // If not found, fall back to showing the original value (the ID).
-                displayValue = dbConnectionMap.get(parseInt(value)) || value;
-            } else if (key === 'Folder Connection') {
-                // Look up the name from our map. Use parseInt because the ID might be a string.
-                // If not found, fall back to showing the original value (the ID).
+                // Check if the current field is Database Connection
+                if (key === 'Database Connection') {
+                    // Look up the name from our map. Use parseInt because the ID might be a string.
+                    // If not found, fall back to showing the original value (the ID).
+                    displayValue = dbConnectionMap.get(parseInt(value)) || value;
+                } else if (key === 'Folder Connection') {
+                    // Look up the name from our map. Use parseInt because the ID might be a string.
+                    // If not found, fall back to showing the original value (the ID).
 
-                displayValue = folderConnectionMap.get(parseInt(value)) || value;
+                    displayValue = folderConnectionMap.get(parseInt(value)) || value;
 
-                // instead of Folder Name in the Name column, use 'Folder Connection'
-                displayKey = 'Folder Connection';
-            }
+                    // instead of Folder Name in the Name column, use 'Folder Connection'
+                    displayKey = 'Folder Connection';
+                }
 
-
-            return `
-                <tr>
-                    <td class="p-2 border-t">${displayKey}</td>
-                    <td class="p-2 border-t">
-                        <span id="dbConnValue" data-field-name="${displayKey}">${displayValue || ''}</span>
-                        
-                    </td>
-                </tr>
-            `;
-        }).join(''); // Join the array of HTML strings into one string
-        //<input type="text" value="${value || ''}" class="edit-state edit-state-field hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" data-field-name="${key}">
+                return `
+                    <tr>
+                        <td class="p-2 border-t">${displayKey}</td>
+                        <td class="p-2 border-t">
+                            <span id="dbConnValue" data-field-name="${displayKey}">${displayValue || ''}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join(''); // Join the array of HTML strings into one string
         fieldsTableHtml = `
             <table class="w-full text-sm bg-white rounded shadow-sm">
                 <thead class="bg-gray-100">
@@ -1332,7 +1331,6 @@ async function renderPlatformAdminDataSourcePage() {
         `;
 
         try {
-
             const response = await window.loomeApi.runApiRequest(API_ADD_DATASOURCE_ID, payload);
             console.log("RESPONSE: ", response)
 
