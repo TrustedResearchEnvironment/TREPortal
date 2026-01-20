@@ -793,31 +793,24 @@ const renderAccordionDetails = (item) => {
         const fieldRows = Object.entries(item.Fields)
             .filter(([key, _]) => key !== 'REDCap API Key') // Exclude API Key from display
             .map(([key, value]) => {
-                displayValue = value; // Default display value
-
-                // For overriding key display names
+                // Always use the raw value for the payload, but display mapped name for Database Connection
+                let displayValue = value;
                 let displayKey = key;
 
-                // Check if the current field is Database Connection
                 if (key === 'Database Connection') {
-                    // Look up the name from our map. Use parseInt because the ID might be a string.
-                    // If not found, fall back to showing the original value (the ID).
+                    // For display, show the mapped name, but keep the real value in a data attribute
                     displayValue = dbConnectionMap.get(parseInt(value)) || value;
                 } else if (key === 'Folder Connection') {
-                    // Look up the name from our map. Use parseInt because the ID might be a string.
-                    // If not found, fall back to showing the original value (the ID).
-
                     displayValue = folderConnectionMap.get(parseInt(value)) || value;
-
-                    // instead of Folder Name in the Name column, use 'Folder Connection'
                     displayKey = 'Folder Connection';
                 }
 
+                // Always store the real value in a data-value attribute for accurate update
                 return `
                     <tr>
-                        <td class="p-2 border-t">${displayKey}</td>
-                        <td class="p-2 border-t">
-                            <span id="dbConnValue" data-field-name="${displayKey}">${displayValue || ''}</span>
+                        <td class=\"p-2 border-t\">${displayKey}</td>
+                        <td class=\"p-2 border-t\">
+                            <span id=\"dbConnValue\" data-field-name=\"${displayKey}\" data-value=\"${value}\">${displayValue || ''}</span>
                         </td>
                     </tr>
                 `;
@@ -1035,6 +1028,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             if (editButton) toggleEditState(true);
 
             if (saveButton) {
+
                 // Stop the click from propagating and closing the accordion
                 event.stopPropagation();
 
@@ -1048,59 +1042,37 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 saveBtn.disabled = true;
 
                 try {
+
                     // --- 1. Gather Data from the Form ---
-                    // Use document.querySelector to find elements within the accordionBody
                     const updatedName = accordionBody.querySelector('.edit-state-name').value;
                     const updatedDescription = accordionBody.querySelector('.edit-state-description').value;
                     const updatedIsActive = accordionBody.querySelector('.edit-state-isactive').checked;
 
                     // Gather all dynamic field values into a dictionary
-                    //const updatedFields = {};
-                    // const dynamicFieldInput = accordionBody.querySelector('.edit-state-field');
-                    // const fieldName = dynamicFieldInput.dataset.fieldName;
-                    // const fieldValue = dynamicFieldInput.value;
-                    // accordionBody.querySelectorAll('.edit-state-field').forEach(input => {
-                    //     const fieldName = input.dataset.fieldName; // using .dataset
-                    //     const fieldValue = input.value;
-                    //     updatedFields[fieldName] = fieldValue;
-                    // });
-                    // const dbConnSpan = document.getElementById('dbConnValue'); // Replace with the actual I
-                    // let fieldValue = null;
-                    // if (dbConnSpan) {
-
-                    //     fieldValue = dbConnSpan.textContent;
-                    //     console.log("The value of 'Database Connection' is:", fieldValue);
-
-                    // }
+                    const updatedFields = {};
+                    accordionBody.querySelectorAll('span[id="dbConnValue"]').forEach(span => {
+                        const fieldName = span.dataset.fieldName;
+                        // Try to find an input for this field in edit mode
+                        const input = accordionBody.querySelector(`.edit-state-field[data-field-name="${fieldName}"]`);
+                        if (input) {
+                            updatedFields[fieldName] = input.value;
+                        } else {
+                            // Use the real value from data-value, not the mapped display
+                            updatedFields[fieldName] = span.dataset.value;
+                        }
+                    });
 
                     // --- 2. Send Request to the Endpoint using fetch ---
-                    const dbConnSpan = document.getElementById('dbConnValue');
-                    const connType = dbConnSpan.dataset.fieldName;
+                    const payload = {
+                        Description : updatedDescription,
+                        IsActive: updatedIsActive,
+                        Name: updatedName,
+                        Fields: updatedFields
+                    };
 
-                    let updateParams = {}
-                    if (connType == 'Database Connection') {
-                        updateParams = {
-                            "data_source_id": dataSourceId,
-                            "description": updatedDescription,
-                            "isActive": updatedIsActive,
-                            "name": updatedName,
-                            "fieldName": "Database Connection",
-                            "fieldValue": displayValue
-                        };
-                    } else if (connType == 'Folder Connection') {
-                        updateParams = {
-                            "data_source_id": dataSourceId,
-                            "description": updatedDescription,
-                            "isActive": updatedIsActive,
-                            "name": updatedName,
-                            "fieldName": "Folder Connection",
-                            "fieldValue": displayValue
-                        };
-                    }
+                    console.log('Update Params:', payload);
 
-
-
-                    const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, updateParams);
+                    const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, {data_source_id: dataSourceId, payload });
 
                     // --- 3. Handle the Server's Response ---
                     if (!updatedDataSource) {
@@ -1115,12 +1087,17 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     accordionBody.querySelector('.view-state-description').textContent = updatedDataSource.Description;
                     accordionBody.querySelector('.view-state-isactive').textContent = updatedDataSource.IsActive ? 'Yes' : 'No';
 
-                    // Update the dynamic fields
-                    for (const [fieldName, fieldValue] of Object.entries(updatedDataSource.Fields)) {
-                        const fieldSpan = accordionBody.querySelector(`.view-state-field[data-field-name="${fieldName}"]`);
-                        if (fieldSpan) {
-                            fieldSpan.textContent = fieldValue;
+                    // Update the dynamic fields (only if Fields exists and is an object)
+                    if (updatedDataSource.Fields && typeof updatedDataSource.Fields === 'object') {
+                        for (const [fieldName, fieldValue] of Object.entries(updatedDataSource.Fields)) {
+                            const fieldSpan = accordionBody.querySelector(`.view-state-field[data-field-name="${fieldName}"]`);
+                            if (fieldSpan) {
+                                fieldSpan.textContent = fieldValue;
+                            }
                         }
+                    } else {
+                        // Optionally, handle the case where Fields is missing or not an object
+                        console.warn('No dynamic fields to update for this Data Source.');
                     }
 
                     // Finally, switch back to view mode by calling your existing function
