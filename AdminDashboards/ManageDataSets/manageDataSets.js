@@ -18,6 +18,11 @@ const pageSize = 10;
 let currentPage = 1;
 let dataSourceTypeMap = new Map();
 let allColumnsData = [];
+let filteredColumnsData = [];
+let columnSearchTerm = '';
+let columnRedactFilter = 'both';
+let columnDeidentifyFilter = 'both';
+let columnNameSortDirection = 'asc';
 let currentDataSourceTypeID = 0;
 let currentDataSourceID = 0;
 
@@ -30,7 +35,7 @@ let currentDataSourceID = 0;
 function showToast(message, type = 'success', duration = 3000) {
     // Create the toast element
     const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
+        toast.className = `toast-notification toast-${type}`;
     toast.textContent = message;
 
     // Basic styling
@@ -99,14 +104,16 @@ async function syncREDCapDataSetColumns(data_source_id) {
  * Populates the column table's tbody with data from a paginated response.
  * @param {Object|null} paginatedResponse - The full response object from the API.
  */
-function displayColumnsTable(data, dataSetTypeId) {
+function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to display. Select a Data Source and Table.') {
     const tableBody = document.getElementById('dataSetColsBody');
 
     if (!data || data.length === 0) {
+        const headerRow = document.getElementById('dataSetColsHeader');
+        const columnCount = headerRow ? headerRow.querySelectorAll('th').length || 6 : 6;
         const placeholderHtml = `
             <tr>
-                <td colspan="7" class="text-center text-muted">
-                    No columns to display. Select a Data Source and Table.
+                <td colspan="${columnCount}" class="text-center text-muted">
+                    ${emptyMessage}
                 </td>
             </tr>`;
         tableBody.innerHTML = placeholderHtml;
@@ -270,6 +277,31 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     `;
 
     container.innerHTML = paginationHTML;
+}
+
+function showColumnsLoader() {
+    const loader = document.getElementById('dataSetColsLoader');
+    if (loader) {
+        loader.classList.remove('d-none');
+    }
+}
+
+function hideColumnsLoader() {
+    const loader = document.getElementById('dataSetColsLoader');
+    if (loader) {
+        loader.classList.add('d-none');
+    }
+}
+
+function normalizeBooleanFlag(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+        const trimmed = value.trim().toLowerCase();
+        if (!trimmed || trimmed === '0' || trimmed === 'false') return false;
+        return true;
+    }
+    return Boolean(value);
 }
 
 /**
@@ -967,10 +999,16 @@ async function fetchREDCapDataSetColumns(dataSetId) {
  * This is a "reset" action.
  */
 async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
-    const dataSetId = document.getElementById('dataSetSelection').value;
-    let newColumnsData = []; // Default to an empty array
+    showColumnsLoader();
+    try {
+        const dataSetId = document.getElementById('dataSetSelection').value;
+        let newColumnsData = []; // Default to an empty array
 
-    if (dataSourceTypeId === 1) { // SQL Database Type
+        if (dataSourceTypeId !== undefined && dataSourceTypeId !== null) {
+            currentDataSourceTypeID = dataSourceTypeId;
+        }
+
+        if (dataSourceTypeId === 1) { // SQL Database Type
         // --- SCENARIO 1: Editing an EXISTING Data Set ---
         if (dataSetId && dataSetId !== 'new') {
             try {
@@ -1082,12 +1120,14 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
     }
 
 
-    // --- CRITICAL: Update the master state ---
-    allColumnsData = newColumnsData || [];
-    currentPage = 1; // Always reset to the first page when data is reloaded
+        // --- CRITICAL: Update the master state ---
+        allColumnsData = newColumnsData || [];
 
-    // Finally, render the first page of the NEW data
-    renderTablePage(dataSourceTypeId);
+        // Reapply the search filter so pagination and table reflect the new data.
+        applyColumnSearchFilter(dataSourceTypeId);
+    } finally {
+        hideColumnsLoader();
+    }
 }
 
 /**
@@ -1095,18 +1135,65 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
  * This function DOES NOT fetch data.
  */
 function renderTablePage(dataSetTypeId) {
-    // Calculate the slice of data for the current page
+    const sourceData = filteredColumnsData || [];
+    const totalItems = sourceData.length;
+    const normalizedTotalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+    if (currentPage > normalizedTotalPages) {
+        currentPage = normalizedTotalPages;
+    }
+
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     console.log(startIndex, endIndex)
-    const pageData = allColumnsData.slice(startIndex, endIndex);
-    console.log("pageData: ", pageData, allColumnsData)
-    // Render the table with only the data for the current page
-    displayColumnsTable(pageData, dataSetTypeId);
+    const pageData = sourceData.slice(startIndex, endIndex);
+    console.log("pageData: ", pageData, sourceData)
 
-    console.log(allColumnsData.length, pageSize, currentPage)
-    // Render the pagination controls based on the FULL dataset length
-    renderPagination('pagination-controls', allColumnsData.length, pageSize, currentPage);
+    const emptyMessage = columnSearchTerm.trim() && totalItems === 0
+        ? 'No columns match your search term. Clear the search to view all columns.'
+        : 'No columns to display. Select a Data Source and Table.';
+
+    displayColumnsTable(pageData, dataSetTypeId, emptyMessage);
+
+    console.log(totalItems, pageSize, currentPage)
+    renderPagination('pagination-controls', totalItems, pageSize, currentPage);
+}
+
+function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
+    const normalizedTerm = (columnSearchTerm || '').trim().toLowerCase();
+    filteredColumnsData = allColumnsData.filter(column => {
+        const columnName = (column?.ColumnName || '').toLowerCase();
+        const matchesTerm = !normalizedTerm || columnName.includes(normalizedTerm);
+
+        let matchesRedact = true;
+        if (columnRedactFilter === 'yes') {
+            matchesRedact = normalizeBooleanFlag(column?.Redact);
+        } else if (columnRedactFilter === 'no') {
+            matchesRedact = !normalizeBooleanFlag(column?.Redact);
+        }
+
+        let matchesDeidentify = true;
+        if (columnDeidentifyFilter === 'yes') {
+            matchesDeidentify = normalizeBooleanFlag(column?.Tokenise);
+        } else if (columnDeidentifyFilter === 'no') {
+            matchesDeidentify = !normalizeBooleanFlag(column?.Tokenise);
+        }
+
+        return matchesTerm && matchesRedact && matchesDeidentify;
+    });
+
+    if (columnNameSortDirection) {
+        filteredColumnsData.sort((a, b) => {
+            const aName = (a?.ColumnName || '').toLowerCase();
+            const bName = (b?.ColumnName || '').toLowerCase();
+            if (aName === bName) return 0;
+            const comparison = aName < bName ? -1 : 1;
+            return columnNameSortDirection === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    currentPage = 1;
+    renderTablePage(dataSetTypeId);
 }
 
 /**
@@ -1351,26 +1438,93 @@ async function updateDataSet(data_set_id, data) {
  * @param {number | string} dataSourceType - The ID of the data source type (e.g., 1 for Database, 3 for Folder).
  */
 function updateTableHeader(dataSourceType) {
-    const headersConfig = {
-        1: ['Column Name', 'Logical Name', 'Business Description', 'Example Value', 'Redact', 'Deidentify'],
-        2: ['Column Name', 'Logical Name', 'Business Description', 'Example Value', 'Redact', 'Deidentify'],
-        3: ['Folder Name', 'File Type', 'File Description', 'Redact', 'Deidentify']
+    const headerDefinitions = {
+        1: [
+            { label: 'Column Name', sortKey: 'column-name' },
+            { label: 'Logical Name' },
+            { label: 'Business Description' },
+            { label: 'Example Value' },
+            { label: 'Redact', filterType: 'redact' },
+            { label: 'Deidentify', filterType: 'deidentify' }
+        ],
+        2: [
+            { label: 'Column Name', sortKey: 'column-name' },
+            { label: 'Logical Name' },
+            { label: 'Business Description' },
+            { label: 'Example Value' },
+            { label: 'Redact', filterType: 'redact' },
+            { label: 'Deidentify', filterType: 'deidentify' }
+        ],
+        3: [
+            { label: 'Folder Name' },
+            { label: 'File Type' },
+            { label: 'File Description' },
+            { label: 'Redact', filterType: 'redact' },
+            { label: 'Deidentify', filterType: 'deidentify' }
+        ]
     };
 
-    const tableHeaderRow = document.getElementById('dataSetColsHeader');
-    if (!tableHeaderRow) {
-        console.error("Error: Table header row with id 'data-table-header' not found.");
+    const headerRow = document.getElementById('dataSetColsHeader');
+    if (!headerRow) {
+        console.error("Error: Table header row with id 'dataSetColsHeader' not found.");
         return;
     }
 
-    const headers = headersConfig[dataSourceType];
-    if (!headers) {
-        tableHeaderRow.innerHTML = '<th>Please select a data source type first.</th>';
+    const definitions = headerDefinitions[dataSourceType];
+    if (!definitions) {
+        headerRow.innerHTML = '<th>Please select a data source type first.</th>';
         return;
     }
 
-    const headerHtml = headers.map(headerText => `<th>${headerText}</th>`).join('');
-    tableHeaderRow.innerHTML = headerHtml;
+    const filterOptions = [
+        { value: 'both', label: 'Both' },
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' }
+    ];
+
+    const buildHeaderCell = (def) => {
+        if (def.sortKey === 'column-name') {
+            const arrow = columnNameSortDirection === 'desc' ? '▲' : '▼';
+            const ariaLabel = columnNameSortDirection === 'desc' ? 'Sort ascending' : 'Sort descending';
+            return `
+                <th>
+                    <button type="button" class="header-sort-button" data-sort="${def.sortKey}" aria-label="${ariaLabel}">
+                        <span>${def.label}</span>
+                        <span class="header-filter-arrow">${arrow}</span>
+                    </button>
+                </th>`;
+        }
+
+        if (!def.filterType) {
+            return `<th>${def.label}</th>`;
+        }
+
+        const currentFilter = def.filterType === 'redact' ? columnRedactFilter : columnDeidentifyFilter;
+        const displayLabel = currentFilter === 'both'
+            ? def.label
+            : `${def.label} (${currentFilter === 'yes' ? 'Yes' : 'No'})`;
+
+        const optionsHtml = filterOptions.map(option => {
+            const isActive = option.value === currentFilter ? ' aria-current="true"' : '';
+            return `<li data-value="${option.value}"${isActive}>${option.label}</li>`;
+        }).join('');
+
+        return `
+            <th>
+                <details class="header-filter" data-filter="${def.filterType}">
+                    <summary>
+                        <span>${displayLabel}</span>
+                        <span class="header-filter-arrow">▾</span>
+                    </summary>
+                    <ul>
+                        ${optionsHtml}
+                    </ul>
+                </details>
+            </th>`;
+    };
+
+    const headerCells = definitions.map(buildHeaderCell).join('');
+    headerRow.innerHTML = `<tr>${headerCells}</tr>`;
 }
 
 async function renderManageDataSetPage() {
@@ -1531,6 +1685,47 @@ async function renderManageDataSetPage() {
 
                 }
             });
+
+            const columnsSearchInput = document.getElementById('dataSetColumnsSearch');
+            if (columnsSearchInput) {
+                columnsSearchInput.addEventListener('input', () => {
+                    columnSearchTerm = (columnsSearchInput.value || '').trim();
+                    applyColumnSearchFilter();
+                });
+            }
+            const columnsHeader = document.getElementById('dataSetColsHeader');
+            if (columnsHeader) {
+                columnsHeader.addEventListener('click', (event) => {
+                    const sortButton = event.target.closest('[data-sort]');
+                    if (sortButton) {
+                        if (sortButton.dataset.sort === 'column-name') {
+                            columnNameSortDirection = columnNameSortDirection === 'asc' ? 'desc' : 'asc';
+                            updateTableHeader(currentDataSourceTypeID);
+                            applyColumnSearchFilter();
+                        }
+                        return;
+                    }
+
+                    const menuItem = event.target.closest('li[data-value]');
+                    if (!menuItem) return;
+                    const detail = menuItem.closest('details[data-filter]');
+                    if (!detail) return;
+                    const filterType = detail.dataset.filter;
+                    const chosenValue = menuItem.dataset.value;
+
+                    if (filterType === 'redact') {
+                        columnRedactFilter = chosenValue;
+                    } else if (filterType === 'deidentify') {
+                        columnDeidentifyFilter = chosenValue;
+                    } else {
+                        return;
+                    }
+
+                    detail.removeAttribute('open');
+                    updateTableHeader(currentDataSourceTypeID);
+                    applyColumnSearchFilter();
+                });
+            }
 
             // --- "RENDER" EVENT LISTENER ---
             // This listener ONLY updates the view, it does not fetch data.
