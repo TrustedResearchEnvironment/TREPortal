@@ -13,6 +13,7 @@ const API_GET_DATASOURCE_SUBFOLDERS = 'GetLoomeDataSourceFirstSubFolders';
 const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWithFiles';
 const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
 const API_GET_REDCAP_DATA = 'SyncREDCapData';
+const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
 
 const pageSize = 10;
 let currentPage = 1;
@@ -23,6 +24,8 @@ let columnSearchTerm = '';
 let columnRedactFilter = 'both';
 let columnDeidentifyFilter = 'both';
 let columnNameSortDirection = 'asc';
+let columnVisibility = new Map();
+let columnNameDropdownSearchTerm = '';
 let currentDataSourceTypeID = 0;
 let currentDataSourceID = 0;
 
@@ -215,6 +218,68 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
     }
 
     tableBody.innerHTML = rowsHtml;
+    updateColumnRowsVisibility();
+}
+
+function escapeHtml(value) {
+    return (value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getAllColumnNames() {
+    const names = Array.from(new Set(allColumnsData
+        .map(col => (col?.ColumnName || '').trim())
+        .filter(name => name !== '')));
+    names.sort((a, b) => a.localeCompare(b));
+    return names;
+}
+
+function buildColumnNameDropdownList(term = '') {
+    const lowerTerm = (term || '').trim().toLowerCase();
+    const names = getAllColumnNames().filter(name => {
+        return !lowerTerm || name.toLowerCase().includes(lowerTerm);
+    });
+
+    if (names.length === 0) {
+        return '<li class="text-muted small px-2">No columns match your search.</li>';
+    }
+
+    return names.map(name => {
+        const safeName = escapeHtml(name);
+        const encoded = encodeURIComponent(name);
+        const isChecked = columnVisibility.get(name) !== false;
+        return `
+            <li data-column="${encoded}">
+                <label>
+                    <input type="checkbox" ${isChecked ? 'checked' : ''}>
+                    <span>${safeName}</span>
+                </label>
+            </li>`;
+    }).join('');
+}
+
+function refreshColumnVisibilityMap() {
+    const existing = new Map(columnVisibility);
+    columnVisibility = new Map();
+    getAllColumnNames().forEach(name => {
+        columnVisibility.set(name, existing.has(name) ? existing.get(name) : true);
+    });
+}
+
+function updateColumnRowsVisibility() {
+    document.querySelectorAll('#dataSetColsBody tr[data-column-name]').forEach(row => {
+        const columnName = row.dataset.columnName || '';
+        if (!columnName) return;
+        if (columnVisibility.get(columnName) === false) {
+            row.classList.add('d-none');
+        } else {
+            row.classList.remove('d-none');
+        }
+    });
 }
 
 /**
@@ -1122,6 +1187,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
 
         // --- CRITICAL: Update the master state ---
         allColumnsData = newColumnsData || [];
+        refreshColumnVisibilityMap();
 
         // Reapply the search filter so pagination and table reflect the new data.
         applyColumnSearchFilter(dataSourceTypeId);
@@ -1256,7 +1322,8 @@ function gatherFormData(allColumnsData) {
     if (fieldsTableBody) scrapeFieldsTable(fieldsTableBody);
     if (metaTableBody) scrapeMetaTable(metaTableBody);
 
-    const columns = allColumnsData;
+    var columns = allColumnsData;
+
 
     if (currentDataSourceTypeID === 1) {
         return {
@@ -1486,12 +1553,32 @@ function updateTableHeader(dataSourceType) {
         if (def.sortKey === 'column-name') {
             const arrow = columnNameSortDirection === 'desc' ? '▲' : '▼';
             const ariaLabel = columnNameSortDirection === 'desc' ? 'Sort ascending' : 'Sort descending';
+            const listHtml = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
             return `
                 <th>
-                    <button type="button" class="header-sort-button" data-sort="${def.sortKey}" aria-label="${ariaLabel}">
-                        <span>${def.label}</span>
-                        <span class="header-filter-arrow">${arrow}</span>
-                    </button>
+                    <details class="header-filter column-name-filter" data-filter="column-name">
+                        <summary>
+                            <span>${def.label}</span>
+                            <span class="header-filter-arrow">▾</span>
+                        </summary>
+                        <div class="column-name-dropdown">
+                            <div class="column-name-sort-row">
+                                <button type="button" data-action="sort-asc" title="Sort A-Z">A-Z</button>
+                                <button type="button" data-action="sort-desc" title="Sort Z-A">Z-A</button>
+                                <span style="flex:1"></span>
+                                
+                            </div>
+                          
+                            <input type="search" class="column-name-dropdown-search" placeholder="Search columns" value="${escapeHtml(columnNameDropdownSearchTerm)}">
+                            <div class="column-name-select-all">
+                                <input type="checkbox" id="column-name-select-all">
+                                <label for="column-name-select-all">Select All</label>
+                            </div>
+                            <ul class="column-name-dropdown-list">
+                                ${listHtml}
+                            </ul>
+                        </div>
+                    </details>
                 </th>`;
         }
 
@@ -1525,16 +1612,104 @@ function updateTableHeader(dataSourceType) {
 
     const headerCells = definitions.map(buildHeaderCell).join('');
     headerRow.innerHTML = `<tr>${headerCells}</tr>`;
+    setupColumnNameDropdownHandlers();
+}
+
+function attachColumnNameCheckboxListeners(listElement) {
+    if (!listElement) return;
+    listElement.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.addEventListener('change', () => {
+            const li = input.closest('li[data-column]');
+            if (!li) return;
+            const encoded = li.dataset.column || '';
+            if (!encoded) return;
+            const columnName = decodeURIComponent(encoded);
+            columnVisibility.set(columnName, input.checked);
+            updateColumnRowsVisibility();
+        });
+    });
+}
+
+function setupColumnNameDropdownHandlers() {
+    const container = document.querySelector('.column-name-filter');
+    if (!container) return;
+    const searchInput = container.querySelector('.column-name-dropdown-search');
+    const list = container.querySelector('.column-name-dropdown-list');
+    const selectAllCheckbox = container.querySelector('#column-name-select-all');
+    const sortAscBtn = container.querySelector('[data-action="sort-asc"]');
+    const sortDescBtn = container.querySelector('[data-action="sort-desc"]');
+
+    const refreshList = () => {
+        if (!list) return;
+        list.innerHTML = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
+        attachColumnNameCheckboxListeners(list);
+        // Update Select All state
+        if (selectAllCheckbox) {
+            const all = Array.from(list.querySelectorAll('li[data-column] input[type="checkbox"]'));
+            const checked = all.filter(i => i.checked).length;
+            selectAllCheckbox.checked = all.length > 0 && checked === all.length;
+            selectAllCheckbox.indeterminate = checked > 0 && checked < all.length;
+        }
+    };
+
+    if (searchInput) {
+        searchInput.value = columnNameDropdownSearchTerm;
+        searchInput.addEventListener('input', (event) => {
+            columnNameDropdownSearchTerm = event.target.value;
+            refreshList();
+        });
+    }
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checked = !!e.target.checked;
+            // apply to currently visible list items
+            if (list) {
+                list.querySelectorAll('li[data-column]').forEach(li => {
+                    const encoded = li.dataset.column;
+                    const name = decodeURIComponent(encoded || '');
+                    columnVisibility.set(name, checked);
+                    const cb = li.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = checked;
+                });
+            }
+            updateColumnRowsVisibility();
+        });
+    }
+
+    if (sortAscBtn) {
+        sortAscBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            columnNameSortDirection = 'asc';
+            applyColumnSearchFilter();
+            // keep dropdown open and refresh the arrow
+            updateTableHeader(currentDataSourceTypeID);
+            setupColumnNameDropdownHandlers();
+        });
+    }
+
+    if (sortDescBtn) {
+        sortDescBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            columnNameSortDirection = 'desc';
+            applyColumnSearchFilter();
+            updateTableHeader(currentDataSourceTypeID);
+            setupColumnNameDropdownHandlers();
+        });
+    }
+
+    refreshList();
 }
 
 async function renderManageDataSetPage() {
-
+    // Form input elements must be defined before running export logic
     const selectionDropdown = document.getElementById('dataSetSelection');
     const detailsContainer = document.getElementById('dataSetDetailsContainer');
     const optgroup = selectionDropdown.querySelector('optgroup');
     let dataSource = {};
 
-    // Form input elements
     const nameInput = document.getElementById('dataSetName');
     const descriptionInput = document.getElementById('dataSetDescription');
     const dataSourceDrpDwn = document.getElementById('dataSource');
@@ -1542,6 +1717,138 @@ async function renderManageDataSetPage() {
     const owner = document.getElementById('dataSetOwner');
     const approver = document.getElementById('dataSetApprover');
     const dataSetFieldsTable = document.getElementById('dataSetFieldsTable');
+
+    // Export button logic (now positioned after form elements)
+    const exportBtn = document.getElementById('export-ds-cols-btn');
+    const exportLoading = document.getElementById('export-ds-cols-loading');
+
+    if (exportBtn) {
+        
+        function getCurrentDataSourceName() {
+            const dsSelect = document.getElementById('dataSource');
+            const selected = dsSelect?.options[dsSelect.selectedIndex];
+            return selected ? selected.text : '';
+        }
+
+        function getTimestampString() {
+            const now = new Date();
+            return now.toISOString().replace(/[-:T]/g, '').slice(0, 15);
+        }
+
+        async function createAndDownloadExcelFile() {
+            const formData = gatherFormData(allColumnsData);
+            if (!formData.Name || !formData.Owner || !formData.Approvers) {
+                showToast('Please fill in Name, Owner, and Approver before exporting.', true);
+                return;
+            }
+
+            const payload = {
+                ...formData, // Spread all properties from the original object
+                OptOutMessage: null,
+                OptOutList: null,
+                OptOutColumn: "-1",
+                DataSourceTypeID: currentDataSourceTypeID
+            };
+
+
+            exportLoading.style.display = 'inline-block';
+            exportBtn.disabled = true;
+
+            try {
+                const dataSourceName = getCurrentDataSourceName() || 'DataSource';
+                const timestamp = getTimestampString();
+                const filename = `DataSetColumns_${dataSourceName}_${timestamp}.zip`;
+
+                // 1. Get the response (which is the Blob)
+                const response = await window.loomeApi.runApiRequest(API_EXPORT_DATASET_COLUMNS_EXCEL, {
+                    "payload": payload 
+                });
+
+                console.log("--- DEBUG START ---");
+                console.log("Constructor:", response.constructor.name);
+                console.log("Keys:", Object.keys(response));
+                console.log("Full Object:", response);
+                console.log("Typeof:", typeof response);
+                console.log("--- DEBUG END ---");
+                
+                // 1. Get the base64 string from the object
+                const base64String = response.fileData;
+
+                // 2. Convert Base64 to a Blob
+                const byteCharacters = atob(base64String);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const finalBlob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+                // 3. Download
+                const url = window.URL.createObjectURL(finalBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'DataExport.xlsx';
+                document.body.appendChild(link);
+                link.click();
+
+                // Cleanup
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+
+
+                // // 1. Convert the response to an ArrayBuffer (Raw Bytes)
+                // // This is more reliable than using the Blob directly if the Blob is 'dirty'
+                // const buffer = await response.arrayBuffer();
+                // console.log("Actual bytes received:", buffer.byteLength); 
+
+                // // 2. Create the Blob from the BUFFER, not the response object
+                // // This ensures we are only saving the 10,508 bytes of data
+                // const finalBlob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+                // // 3. Verify the size one last time in the console
+                // console.log("Final Blob Size:", finalBlob.size); 
+
+                // // 4. Download
+                // const url = window.URL.createObjectURL(finalBlob);
+                // const a = document.createElement('a');
+                // a.href = url;
+                // a.download = filename; // Ensure this ends in .xlsx
+                // document.body.appendChild(a);
+                // a.click();
+
+                // // Cleanup
+                // setTimeout(() => {
+                //     document.body.removeChild(a);
+                //     window.URL.revokeObjectURL(url);
+                // }, 250);
+
+                showToast('Dataset Columns exported successfully!');
+
+            } catch (error) {
+                console.error("Export Error:", error);
+                showToast(error.message || 'Failed to export. Please try again.', true);
+            } finally {
+                exportLoading.style.display = 'none';
+                updateExportButtonState();
+            }
+        }
+
+
+        function updateExportButtonState() {
+            const dsSelected = dataSourceDrpDwn?.value && dataSourceDrpDwn.value !== '';
+            const tableHasRows = document.querySelectorAll('#dataSetColsBody tr').length > 0;
+            exportBtn.style.display = dsSelected ? '' : 'none';
+            exportBtn.disabled = !tableHasRows;
+            exportBtn.title = tableHasRows ? 'Export columns and dataset info to Excel.' : 'Select a Data Source and ensure columns are loaded to enable export.';
+        }
+
+        dataSourceDrpDwn?.addEventListener('change', updateExportButtonState);
+        document.getElementById('dataSetColsBody').addEventListener('DOMSubtreeModified', updateExportButtonState);
+        updateExportButtonState();
+        exportBtn.addEventListener('click', createAndDownloadExcelFile);
+    }
+
+ 
 
     /**
      * Clears the form fields to their default state for creating a new entry.
@@ -1698,6 +2005,8 @@ async function renderManageDataSetPage() {
                 columnsHeader.addEventListener('click', (event) => {
                     const sortButton = event.target.closest('[data-sort]');
                     if (sortButton) {
+                        event.preventDefault();
+                        event.stopPropagation();
                         if (sortButton.dataset.sort === 'column-name') {
                             columnNameSortDirection = columnNameSortDirection === 'asc' ? 'desc' : 'asc';
                             updateTableHeader(currentDataSourceTypeID);
