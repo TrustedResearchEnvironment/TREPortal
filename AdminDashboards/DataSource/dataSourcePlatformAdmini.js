@@ -8,6 +8,7 @@ const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
 const API__DATASOURCE_FIELDVALUE_ID = 'GetDataSourceFieldValues';
 const API__DATASOURCE_FOLDER_ID = 'GetFolderConnection';
 const API_ADD_DATASOURCE_ID = 'AddDataSource';
+const API_DELETE_DATASOURCE_ID = 'DeleteDataSource';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -197,15 +198,24 @@ function AddDataSource(typeNamesList, allFields) {
         3: [2]     // Folder type -> "UNC Path"
     };
 
-    // Generate the HTML string for the <option> elements.
-    // We use map() to transform each name in the list into an <option> tag.
-    // The `index` is used to create a simple value (1, 2, 3, etc.).
-    const optionsHtml = typeNamesList.map((typeName, index) => {
-        // In a real app, you'd likely use an ID from your data source type object
-        // for the value, but index + 1 works for this example.
-        return `<option value="${index + 1}">${typeName}</option>`;
-    }).join(''); // .join('') concatenates all the strings in the array into one big string.
+    // COMMENTING THIS OUT FOR NOW WHILE WE EXCLUDE FOLDER TYPE, BUT THIS IS HOW WE WOULD SCALE TO MULTIPLE FIELDS PER TYPE
+    // // Generate the HTML string for the <option> elements.
+    // // We use map() to transform each name in the list into an <option> tag.
+    // // The `index` is used to create a simple value (1, 2, 3, etc.).
+    // const optionsHtml = typeNamesList.map((typeName, index) => {
+    //     // In a real app, you'd likely use an ID from your data source type object
+    //     // for the value, but index + 1 works for this example.
+    //     return `<option value="${index + 1}">${typeName}</option>`;
+    // }).join(''); // .join('') concatenates all the strings in the array into one big string.
 
+    // EXCLUDE FOLDER TYPE FOR NOW
+    const optionsHtml = typeNamesList
+        .filter(typeName => typeName !== 'Folder')
+        .map((typeName, index) => {
+            // In a real app, you'd likely use an ID from your data source type object
+            // for the value. Using index+1 here preserves a simple numeric value.
+            return `<option value="${index + 1}">${typeName}</option>`;
+        }).join(''); // .join('') concatenates all the strings in the array into one big string.
 
     // Populate the modal body with the provided HTML content (your markup)
     modalBody.innerHTML = `
@@ -878,8 +888,10 @@ const renderAccordionDetails = (item) => {
             </div>
         </div>
         
-        <!-- Action buttons remain the same -->
-        <div class="mt-6 text-right">
+        <!-- Action buttons: Delete (always visible) and Edit/Save/Cancel (stateful) -->
+        <div class="mt-6 flex justify-end items-center gap-2">
+            <!-- Delete is visible in both view and edit modes; placed to the left of Edit -->
+            <button class="btn-delete inline-flex justify-center rounded-md border border-transparent bg-red-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-red-700">Delete</button>
             <div class="view-state">
                 <button class="btn-edit inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Edit</button>
             </div>
@@ -1011,7 +1023,51 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 return;
             }
 
-            // --- Logic for Edit/Save/Cancel Buttons (remains the same) ---
+            // --- Logic for Delete/Edit/Save/Cancel Buttons ---
+            const deleteButton = event.target.closest('.btn-delete');
+            if (deleteButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const parentAccordion = deleteButton.closest('.accordion-body');
+                const dataSourceId = parentAccordion ? parentAccordion.dataset.id : null;
+                if (!dataSourceId) {
+                    showToast('Unable to determine Data Source ID for deletion.', 'error');
+                    return;
+                }
+                if (!confirm('Are you sure you want to delete this Data Source? This action cannot be undone.')) return;
+                try {
+                    const params = { id: parseInt(dataSourceId, 10) };
+                    const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASOURCE_ID, params);
+                    const parsed = safeParseJson(raw);
+                    if (parsed && parsed.detail) {
+                        showToast(parsed.detail, 'error');
+                        return;
+                    }
+                    showToast('Data Source deleted successfully.', 'success');
+                    // Refresh the table
+                    await fetchAndRenderPage(tableConfig, 1, '');
+                } catch (err) {
+                    let detailMsg = 'Failed to delete Data Source.';
+                    try {
+                        if (err && typeof err === 'object') {
+                            if (err.detail) detailMsg = err.detail;
+                            else if (err.response) {
+                                const parsed = safeParseJson(err.response);
+                                detailMsg = parsed && parsed.detail ? parsed.detail : (err.message || JSON.stringify(err));
+                            } else {
+                                detailMsg = err.message || JSON.stringify(err);
+                            }
+                        } else if (typeof err === 'string') {
+                            detailMsg = err;
+                        }
+                    } catch (e) {
+                        detailMsg = 'Failed to delete Data Source.';
+                    }
+                    showToast(detailMsg, 'error');
+                }
+                return;
+            }
+
             const editButton = event.target.closest('.btn-edit');
             const saveButton = event.target.closest('.btn-save');
             const cancelButton = event.target.closest('.btn-cancel');

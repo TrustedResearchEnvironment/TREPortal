@@ -9,6 +9,7 @@ const API_GET_DATASETS = 'GetDataSet';
 const API_GET_DATASOURCES = 'GetDataSource';
 const API_CREATE_DATASET = 'CreateDataSet';
 const API_UPDATE_DATASET = 'UpdateDataSet';
+const API_DELETE_DATASET = 'DeleteDataSet';
 const API_GET_DATASOURCE_SUBFOLDERS = 'GetLoomeDataSourceFirstSubFolders';
 const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWithFiles';
 const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
@@ -1787,40 +1788,13 @@ async function renderManageDataSetPage() {
                 const url = window.URL.createObjectURL(finalBlob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = 'DataExport.xlsx';
+                link.download = filename;
                 document.body.appendChild(link);
                 link.click();
 
                 // Cleanup
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
-
-
-                // // 1. Convert the response to an ArrayBuffer (Raw Bytes)
-                // // This is more reliable than using the Blob directly if the Blob is 'dirty'
-                // const buffer = await response.arrayBuffer();
-                // console.log("Actual bytes received:", buffer.byteLength); 
-
-                // // 2. Create the Blob from the BUFFER, not the response object
-                // // This ensures we are only saving the 10,508 bytes of data
-                // const finalBlob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-                // // 3. Verify the size one last time in the console
-                // console.log("Final Blob Size:", finalBlob.size); 
-
-                // // 4. Download
-                // const url = window.URL.createObjectURL(finalBlob);
-                // const a = document.createElement('a');
-                // a.href = url;
-                // a.download = filename; // Ensure this ends in .xlsx
-                // document.body.appendChild(a);
-                // a.click();
-
-                // // Cleanup
-                // setTimeout(() => {
-                //     document.body.removeChild(a);
-                //     window.URL.revokeObjectURL(url);
-                // }, 250);
 
                 showToast('Dataset Columns exported successfully!');
 
@@ -1846,6 +1820,56 @@ async function renderManageDataSetPage() {
         document.getElementById('dataSetColsBody').addEventListener('DOMSubtreeModified', updateExportButtonState);
         updateExportButtonState();
         exportBtn.addEventListener('click', createAndDownloadExcelFile);
+    }
+
+    // Delete button handler: call delete API and show API detail on error
+    const deleteBtn = document.getElementById('delete-button');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            const selectedId = selectionDropdown ? selectionDropdown.value : null;
+            if (!selectedId || selectedId === 'new') {
+                showToast('Select an existing Data Set to delete.', 'error');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to delete this Data Set? This action cannot be undone.')) return;
+
+            try {
+                const params = { id: parseInt(selectedId, 10) };
+                // Use the low-level runApiRequest so we can inspect error payloads directly
+                const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASET, params);
+                const parsed = safeParseJson(raw);
+
+                // If the API responded with a detail message, treat it as an error
+                if (parsed && parsed.detail) {
+                    showToast(parsed.detail, 'error');
+                    return;
+                }
+
+                // Some APIs may return a truthy success value or empty array; consider that success
+                showToast('Data Set deleted successfully.', 'success');
+                setTimeout(() => window.location.reload(), 700);
+            } catch (err) {
+                // Prefer API `detail` when available in thrown error objects
+                let detailMsg = 'Failed to delete Data Set.';
+                try {
+                    if (err && typeof err === 'object') {
+                        if (err.detail) detailMsg = err.detail;
+                        else if (err.response) {
+                            const parsed = safeParseJson(err.response);
+                            detailMsg = parsed && parsed.detail ? parsed.detail : (err.message || JSON.stringify(err));
+                        } else {
+                            detailMsg = err.message || JSON.stringify(err);
+                        }
+                    } else if (typeof err === 'string') {
+                        detailMsg = err;
+                    }
+                } catch (e) {
+                    detailMsg = 'Failed to delete Data Set.';
+                }
+                showToast(detailMsg, 'error');
+            }
+        });
     }
 
  
@@ -1926,6 +1950,14 @@ async function renderManageDataSetPage() {
         }
     }
 
+    // Toggle visibility of the delete button based on whether an existing Data Set is selected
+    function updateDeleteButtonState() {
+        if (!deleteBtn) return;
+        const selected = selectionDropdown ? selectionDropdown.value : 'new';
+        deleteBtn.style.display = (selected && selected !== 'new') ? '' : 'none';
+    }
+
+
 
     // Add the 'async' keyword to the function that wraps this logic.
     // For example, if it's inside a DOMContentLoaded listener:
@@ -1945,7 +1977,9 @@ async function renderManageDataSetPage() {
             populateDataSourceOptions(dataSourceDrpDwn, allDataSources, 'DataSourceID', 'Name');
 
             // Create the Empty Columns Table
-            updateFormForSelection(allDataSets, allDataSources);
+            await updateFormForSelection(allDataSets, allDataSources);
+            // Ensure delete button visibility is correct after initial selection population
+            try { updateDeleteButtonState(); } catch (e) { /* ignore */ }
 
 
             // // Listener for DATA SOURCE dropdown
@@ -1980,6 +2014,7 @@ async function renderManageDataSetPage() {
                 allDataSources = await getAllDataSources();
                 await updateFormForSelection(allDataSets, allDataSources);
                 await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
+                try { updateDeleteButtonState(); } catch (e) { /* ignore */ }
             });
 
             // Listener for TABLE NAME dropdown
