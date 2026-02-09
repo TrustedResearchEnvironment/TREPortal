@@ -4,6 +4,7 @@ const TABLE_CONTAINER_ID = 'requests-table-area';
 const API_REQUEST_ID = 'GetMetadata';
 const API_ADD_METADATA = 'AddMetaData';
 const API_UPDATE_METADATA = 'UpdateMetaData';
+const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -62,36 +63,108 @@ function showToast(message, type = 'success', duration = 3000) {
     }, duration);
 }
 
-function AddMetadata() {
+
+function AddMetadata(typeNamesList) {
     // Get the modal's body element
     const modalBody = document.getElementById('addMetaDataModalBody');
-    console.log("IN add Metadata")
 
-    // Populate the modal body with the provided HTML content (your markup)
+    // 1. Generate the HTML for the checkboxes (this part is mostly the same)
+    const checkboxesHtml = typeNamesList
+        .filter(typeName => typeName !== 'Folder')
+        .map((typeName, index) => {
+            const checkboxId = `dataSourceType-checkbox-${index}`;
+            return `
+                <li>
+                    <a class="dropdown-item" href="#">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="${typeName}" id="${checkboxId}" onclick="event.stopPropagation()">
+                            <label class="form-check-label" for="${checkboxId}">
+                                ${typeName}
+                            </label>
+                        </div>
+                    </a>
+                </li>
+            `;
+        }).join('');
+
+    // 2. Populate the modal body with the form structure
     modalBody.innerHTML = `
-                <form id="addMetaDataForm">
-                        <!-- Name Field -->
-                        <div class="mb-3">
-                            <label for="Name" class="form-label">Name</label>
-                            <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control">
-                        </div>
-
-                        <!-- Description Field -->
-                        <div class="mb-3">
-                            <label for="Description" class="form-label">Description</label>
-                            <textarea rows="2" id="metaDataDescription" placeholder="Description of this Meta Data" class="form-control"></textarea>
-                        </div>
-
-                        <!-- Active Checkbox -->
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" id="metaDataActive" class="form-check-input" checked>
-                            <label class="form-check-label" for="metaDataActive">Active</label>
-                        </div>
-
-                    </form>
+        <form id="addMetaDataForm">
+            <!-- Name, Description, Active fields... -->
+            <div class="mb-3">
+                <label for="metaDataName" class="form-label">Name</label>
+                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label for="metaDataDescription" class="form-label">Description</label>
+                <textarea rows="2" id="metaDataDescription" placeholder="Description of this Meta Data" class="form-control"></textarea>
+            </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" id="metaDataActive" class="form-check-input" checked>
+                <label class="form-check-label" for="metaDataActive">Active</label>
+            </div>
             
+            <!-- Dropdown with Checkboxes -->
+            <div class="mb-3">
+                <label for="dataSourceTypeDropdown" class="form-label">Apply to Data Source Type/s</label>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="dataSourceTypeDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                        Select Types
+                    </button>
+                    <ul class="dropdown-menu w-100" aria-labelledby="dataSourceTypeDropdown" id="dataSourceTypeMenu">
+                        ${checkboxesHtml}
+                    </ul>
+                </div>
+            </div>
+        </form>
     `;
+
+    // 3. Add JavaScript to make the dropdown interactive (THIS PART IS REVISED)
+    const dropdownButton = document.getElementById('dataSourceTypeDropdown');
+    const dropdownMenu = document.getElementById('dataSourceTypeMenu');
+    const checkboxes = dropdownMenu.querySelectorAll('input[type="checkbox"]');
+    const dropdownItems = dropdownMenu.querySelectorAll('.dropdown-item');
+
+    // Function to update the button text based on selections
+    const updateButtonText = () => {
+        const selected = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        if (selected.length === 0) {
+            dropdownButton.textContent = 'Select Types';
+        } else if (selected.length <= 2) {
+            dropdownButton.textContent = selected.join(', ');
+        } else {
+            dropdownButton.textContent = `${selected.length} types selected`;
+        }
+    };
+
+    // *** THE FIX IS HERE ***
+    // Add a click listener to each dropdown item (the <a> tag)
+    dropdownItems.forEach(item => {
+        item.addEventListener('click', (event) => {
+            // Prevent the link's default behavior
+            event.preventDefault();
+            
+            // Find the checkbox inside the clicked item
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            
+            if (checkbox) {
+                // Manually toggle the checkbox's state
+                checkbox.checked = !checkbox.checked;
+                
+                // Manually trigger a 'change' event so our other listener catches it
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+    });
+
+    // Add a listener that waits for any checkbox to change
+    dropdownMenu.addEventListener('change', updateButtonText);
     
+    // Initialize button text on load
+    updateButtonText();
 }
 
 /**
@@ -112,13 +185,22 @@ function getMetaDataFormData(formElement) {
     const name = formElement.querySelector('#metaDataName').value;
     const description = formElement.querySelector('#metaDataDescription').value;
     const isActive = formElement.querySelector('#metaDataActive').checked;
+    // Capture multiple selected Data Source Type IDs (if any)
+    const dataSourceTypeSelect = formElement.querySelector('#dataSourceType');
+    let dataSourceTypeIDs = [];
+    if (dataSourceTypeSelect) {
+        dataSourceTypeIDs = Array.from(dataSourceTypeSelect.selectedOptions)
+            .map(opt => parseInt(opt.value, 10))
+            .filter(n => !isNaN(n));
+    }
 
     // --- 3. Combine everything into a final payload object ---
     // This structure is designed to match your Pydantic "Create" model.
     const formData = {
         "name": name,
         "description": description,
-        "isActive": isActive
+        "isActive": isActive,
+        "dataSourceTypeIDs": dataSourceTypeIDs
     };
 
     return formData;
@@ -570,6 +652,56 @@ function formatDate(inputDate) {
 // }
 
 /**
+ * Fetches ALL DataSourceTypes from the paginated API.
+ * This is a self-contained function that returns the results.
+ * @param {number} [pageSize=100] - The number of items per page.
+ * @returns {Promise<Array>} A promise that resolves to an array of all data source types.
+ */
+async function getAllDataSourceTypes(pageSize = 100) {
+
+    let allResults = []; // Use a local variable to store results
+
+    try {
+        // --- 1. Initial request ---
+        const initialParams = { "page": 1, "pageSize": pageSize, "search": '' };
+        const initialResponse = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        if (!parsedInitial || parsedInitial.RowCount === 0) {
+            console.log("No data source types found.");
+            return []; // Return an empty array if there's no data
+        }
+
+        allResults = parsedInitial.Results;
+        const totalPages = parsedInitial.PageCount;
+
+        // If only one page, we're done
+        if (totalPages <= 1) {
+            return allResults;
+        }
+
+        // --- 2. Loop for remaining pages ---
+        for (let page = 2; page <= totalPages; page++) {
+            console.log(`Fetching page ${page} of ${totalPages}...`);
+            const params = { "page": page, "pageSize": pageSize, "search": '' };
+            // FIXED BUG: Use the correct API ID in the loop
+            const response = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, params);
+            const parsed = safeParseJson(response);
+            if (parsed && parsed.Results) {
+                allResults = allResults.concat(parsed.Results);
+            }
+        }
+
+        console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
+        return allResults;
+
+    } catch (error) {
+        console.error("An error occurred while fetching data source types:", error);
+        return []; // Return empty array on failure
+    }
+}
+
+/**
  * Safely parses a response that might be a JSON string or an object.
  * @param {string | object} response The API response.
  * @returns {object}
@@ -580,6 +712,10 @@ function safeParseJson(response) {
 
 
 async function renderPlatformAdminMetaDataPage() {
+
+    const allTypesArray = await getAllDataSourceTypes();
+    const typeNamesList = allTypesArray.map(item => item.Name);
+
     // --- 1. Define the table configuration ---
     // (Moved outside the try block so it's accessible to fetchAndRenderPage)
     const tableConfig = {
@@ -641,7 +777,7 @@ async function renderPlatformAdminMetaDataPage() {
     const addMetaDataBtn = document.querySelector('#addMetaDataBtn');;
     if (addMetaDataBtn) {
         addMetaDataBtn.addEventListener('click', () => {
-            AddMetadata();
+            AddMetadata(typeNamesList);
         });
     }
     const saveButton = document.getElementById('modal-save-add-metadata-button');
