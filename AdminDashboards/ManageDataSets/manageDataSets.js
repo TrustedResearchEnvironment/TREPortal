@@ -37,7 +37,7 @@ let currentDataSourceID = 0;
  * @param {string} [type='success'] - The type of toast ('success', 'error', 'info').
  * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
  */
-function showToast(message, type = 'success', duration = 3000) {
+function showToast(message, type = 'success', duration = 5000) {
     // Create the toast element
     const toast = document.createElement('div');
         toast.className = `toast-notification toast-${type}`;
@@ -63,6 +63,7 @@ function showToast(message, type = 'success', duration = 3000) {
     `);
     style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
     style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
+    style.sheet.insertRule('.toast-warning { background-color: #FF5F15; }');
 
     // Append to body and trigger animation
     document.body.appendChild(toast);
@@ -1744,6 +1745,7 @@ async function renderManageDataSetPage() {
     const owner = document.getElementById('dataSetOwner');
     const approver = document.getElementById('dataSetApprover');
     const dataSetFieldsTable = document.getElementById('dataSetFieldsTable');
+    const submitButton = document.getElementById('submit-button');
 
     // Export button logic (now positioned after form elements)
     const exportBtn = document.getElementById('export-ds-cols-btn');
@@ -1765,7 +1767,7 @@ async function renderManageDataSetPage() {
         async function createAndDownloadExcelFile() {
             const formData = gatherFormData(allColumnsData);
             if (!formData.Name || !formData.Owner || !formData.Approvers) {
-                showToast('Please fill in Name, Owner, and Approver before exporting.', true);
+                showToast('Please fill in Name, Owner, and Approver before exporting.', 'warning');
                 return;
             }
 
@@ -1826,7 +1828,7 @@ async function renderManageDataSetPage() {
 
             } catch (error) {
                 console.error("Export Error:", error);
-                showToast(error.message || 'Failed to export. Please try again.', true);
+                showToast(error.message || 'Failed to export. Please try again.', 'warning');
             } finally {
                 exportLoading.style.display = 'none';
                 updateExportButtonState();
@@ -1959,11 +1961,24 @@ async function renderManageDataSetPage() {
             if (!selectedDataSet) return;
             
             let dataSource = allDataSources.find(dsrc => dsrc.DataSourceID == selectedDataSet.DataSourceID);
+            submitButton.textContent = 'Save Data Set';
+            submitButton.disabled = false;
+            // The data source might be inactive and thus not included in the initial dropdown population. If it's not found, we should still fetch it to populate the form correctly.
             if (!dataSource) {
                 // try fetching the single data source even if getAllDataSources() excluded inactive ones
                 const fetched = await getFromAPI(API_GET_DATASOURCE_BY_ID, { data_source_id: selectedDataSet.DataSourceID });
                 dataSource = Array.isArray(fetched) && fetched.length ? fetched[0] : null;
+                const option = document.createElement('option');
+                option.value = String(dataSource.DataSourceID);
+                option.textContent = dataSource.Name + (dataSource.IsActive ? '' : ' (Inactive)');
+                dataSourceDrpDwn.appendChild(option);
+
+                submitButton.disabled = true;
+                submitButton.textContent = 'Disabled Save Data Set';
+                showToast('This dataset is based on an inactive data source. It is not available for requests or edits. Please contact the platform administrator for assistance.', 'warning');
             }
+
+            // The data source might still be missing if the API call failed or if the ID is invalid. In that case, we should log a warning and avoid trying to populate the form with undefined data.
             if (!dataSource) {
                 console.warn('Data source not found for dataset', selectedDataSet.DataSourceID);
                 return;
@@ -2231,8 +2246,7 @@ async function renderManageDataSetPage() {
             // =================================================================
 
             const manageDataSetForm = document.getElementById('manageDataSetForm');
-            const submitButton = document.getElementById('submit-button');
-
+            
             /**
              * The main submit handler for the entire form.
              */
@@ -2251,7 +2265,7 @@ async function renderManageDataSetPage() {
                     console.log("Form Data to Submit:", formData);
                     // --- Client-side validation (optional but recommended) ---
                     if (!formData.Name) {
-                        showToast('Data Set Name is required.', 'info');
+                        showToast('Data Set Name is required.', 'warning');
                         throw new Error('Validation failed: Name is required.');
                     }
 
