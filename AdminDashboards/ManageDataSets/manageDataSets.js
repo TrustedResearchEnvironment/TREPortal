@@ -7,6 +7,7 @@ const API_GET_DATASET_FIELD_VALUE = 'GetDataSetFieldValuesByDataSetID';
 const API_GET_DATASET_METADATA_VALUE = 'GetDataSetMetaDataValue';
 const API_GET_DATASETS = 'GetDataSet';
 const API_GET_DATASOURCES = 'GetDataSource';
+const API_GET_DATASOURCE_BY_ID = 'GetDataSourceByID';
 const API_CREATE_DATASET = 'CreateDataSet';
 const API_UPDATE_DATASET = 'UpdateDataSet';
 const API_DELETE_DATASET = 'DeleteDataSet';
@@ -964,12 +965,12 @@ async function getFromAPI(API_ID, initialParams) {
 }
 
 async function getAllDataSets() {
-    const initialParams = { "page": 1, "pageSize": 100, "search": '', activeStatus: 3 }; //Get both active and inactive Data Set
+    const initialParams = { "page": 1, "pageSize": 100, "search": '', "activeStatus": 3 }; //Get both active and inactive Data Set
     return getFromAPI(API_GET_DATASETS, initialParams)
 }
 
 async function getAllDataSources() {
-    const initialParams = { "page": 1, "pageSize": 100, "search": '' };
+    const initialParams = { "page": 1, "pageSize": 100, "search": '', "activeStatus": 1 };
     return getFromAPI(API_GET_DATASOURCES, initialParams)
 }
 
@@ -989,14 +990,39 @@ function populateExistingDataSets(optgroup, allResults) {
 }
 
 function populateDataSourceOptions(selectElement, data, valueField, textField) {
-    if (!selectElement || !Array.isArray(data)) return;
-    while (selectElement.options.length > 1) {
-        selectElement.remove(1);
+    if (!selectElement) return;
+
+    // Clear all existing options first to avoid leftover/undefined options
+    selectElement.innerHTML = '';
+
+    // If data is not an array or empty, show a disabled placeholder saying no data
+    if (!Array.isArray(data) || data.length === 0) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'No available Data Sources';
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        selectElement.appendChild(placeholder);
+        return;
     }
+
+    // Add the default prompt option
+    const prompt = document.createElement('option');
+    prompt.value = '';
+    prompt.textContent = 'Select a Data Source...';
+    prompt.disabled = true;
+    prompt.selected = true;
+    selectElement.appendChild(prompt);
+
+    // Append valid options from the provided data array, skipping invalid entries
     data.forEach(item => {
+        if (!item) return;
+        const val = item[valueField];
+        // skip undefined/null values
+        if (val === undefined || val === null) return;
         const option = document.createElement('option');
-        option.value = item[valueField];
-        option.textContent = item[textField];
+        option.value = String(val);
+        option.textContent = item[textField] || '';
         selectElement.appendChild(option);
     });
 }
@@ -1931,8 +1957,18 @@ async function renderManageDataSetPage() {
 
             const selectedDataSet = allDataSets.find(ds => ds.DataSetID == selectedId);
             if (!selectedDataSet) return;
-            const dataSource = allDataSources.find(dsrc => dsrc.DataSourceID == selectedDataSet.DataSourceID);
-            if (!dataSource) return;
+            
+            let dataSource = allDataSources.find(dsrc => dsrc.DataSourceID == selectedDataSet.DataSourceID);
+            if (!dataSource) {
+                // try fetching the single data source even if getAllDataSources() excluded inactive ones
+                const fetched = await getFromAPI(API_GET_DATASOURCE_BY_ID, { data_source_id: selectedDataSet.DataSourceID });
+                dataSource = Array.isArray(fetched) && fetched.length ? fetched[0] : null;
+            }
+            if (!dataSource) {
+                console.warn('Data source not found for dataset', selectedDataSet.DataSourceID);
+                return;
+            }
+
             console.log("Selected Data Set and Data Source:", selectedDataSet, dataSource);
             // 1. Populate the main form fields
             populateForm(selectedDataSet, dataSource);
