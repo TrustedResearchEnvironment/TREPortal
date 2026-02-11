@@ -1974,7 +1974,7 @@ async function renderManageDataSetPage() {
                 dataSourceDrpDwn.appendChild(option);
 
                 submitButton.disabled = true;
-                submitButton.textContent = 'Disabled Save Data Set';
+                submitButton.textContent = 'Saving Disabled';
                 showToast('This dataset is based on an inactive data source. It is not available for requests or edits. Please contact the platform administrator for assistance.', 'warning');
             }
 
