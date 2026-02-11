@@ -16,6 +16,7 @@ const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWi
 const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
 const API_GET_REDCAP_DATA = 'SyncREDCapData';
 const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
+const API_GET_METADATA = 'GetMetadata';
 
 const pageSize = 10;
 let currentPage = 1;
@@ -715,142 +716,21 @@ async function updateDataSetFieldsTable(dataSource, dataSetID) {
 /**
  * Fetches the metadata value for a given DataSetID and renders it in an input field.
  */
-async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
-    // Step 1: Provide immediate feedback to the user with a loading state.
-    tbody.innerHTML = `
-        <tr>
-            <td>Tag <input type="hidden"></td>
-            <td width="70%">
-                <input class="form-control" value="Loading..." disabled>
-            </td>
-        </tr>
-    `;
-
-    // A guard clause to handle cases where there's no ID to fetch.
-    if (!dataSetID || dataSetID === "new") {
-        tbody.innerHTML = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input id="metaDataTag" class="form-control valid" value="">
-                </td>
-            </tr>`;
-        return;
-    }
-
-    try {
-        // Step 2: AWAIT the data. The code will pause here until the API responds.
-        const result = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": dataSetID });
-        const tagValue = (result && result.length > 0) ? result[0].Value : '';
-
-        // Let's assume the MetadataID for "Tag" is 5.
-        const rowHtml = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input id="metaDataTag" class="form-control valid" value="${tagValue}">
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML = rowHtml;
-
-    } catch (error) {
-        console.error("Failed to fetch metadata value:", error);
-        tbody.innerHTML = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input class="form-control is-invalid" value="Error loading data" disabled>
-                </td>
-            </tr>
-        `;
-    }
-}
+// NOTE: Per recent refactor, individual metadata renderers were removed.
+// Metadata rows are now created dynamically inside `updateMetaDataTable`.
 
 /**
  * Renders two static rows with input fields for REDCap API metadata.
  */
-async function renderRedcapApiKeyRowMetaData(tbody, dataSource, dataSetID) {
-    // Show loading state
-    tbody.innerHTML = `
-        <tr>
-            <td>Citations for related publications <input type="hidden" value=5></td>
-            <td width="70%">
-                <input id="redcapCitations" class="form-control" value="Loading..." disabled>
-            </td>
-        </tr>
-        <tr>
-            <td>ANZCTR URL <input type="hidden" value=2></td>
-            <td width="70%">
-                <input id="redcapAnzctrUrl" class="form-control" value="Loading..." disabled>
-            </td>
-        </tr>
-    `;
-
-    // If new, just show empty fields
-    if (!dataSetID || dataSetID === "new") {
-        tbody.innerHTML = `
-            <tr>
-                <td>Citations for related publications <input type="hidden" value=5></td>
-                <td width="70%">
-                    <input id="redcapCitations" class="form-control" value="">
-                </td>
-            </tr>
-            <tr>
-                <td>ANZCTR URL <input type="hidden" value=2></td>
-                <td width="70%">
-                    <input id="redcapAnzctrUrl" class="form-control" value="">
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    try {
-        // Fetch metadata values for this dataset
-        const metaValues = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": dataSetID });
-        let citations = '';
-        let anzctr = '';
-        if (Array.isArray(metaValues)) {
-            for (const mv of metaValues) {
-                if (mv.MetaDataID == 5) citations = mv.Value || '';
-                if (mv.MetaDataID == 2) anzctr = mv.Value || '';
-            }
-        }
-        tbody.innerHTML = `
-            <tr>
-                <td>Citations for related publications <input type="hidden" value=5></td>
-                <td width="70%">
-                    <input id="redcapCitations" class="form-control" value="${citations}">
-                </td>
-            </tr>
-            <tr>
-                <td>ANZCTR URL <input type="hidden" value=2></td>
-                <td width="70%">
-                    <input id="redcapAnzctrUrl" class="form-control" value="${anzctr}">
-                </td>
-            </tr>
-        `;
-    } catch (error) {
-        console.error("Failed to fetch REDCap metadata values:", error);
-        tbody.innerHTML = `<tr><td colspan="2" class="text-danger">Error loading REDCap metadata fields.</td></tr>`;
-    }
-}
+// REDCap-specific static renderer removed. See `updateMetaDataTable`.
 
 
 /**
  * Hides the metadata table and shows the placeholder text.
  */
-function renderFolderSelectorMetaData(tbody) {
-    const metaDataTable = document.getElementById('metaDataTable');
-    const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
+// Folder-specific metadata renderer removed. See `updateMetaDataTable`.
 
-    metaDataTable.style.display = 'none';
-    metaDataPlaceholder.style.display = 'block';
-    metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
-}
-
-function updateMetaDataTable(dataSource, dataSetID) {
+async function updateMetaDataTable(dataSource, dataSetID) {
     const metaDataTable = document.getElementById('metaDataTable');
     const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
     const tbody = metaDataTable.querySelector('tbody');
@@ -858,41 +738,66 @@ function updateMetaDataTable(dataSource, dataSetID) {
     // Clear any old data
     tbody.innerHTML = '';
 
-    // If there's no data source selected, show the placeholder and exit.
+    // Guard: no data source selected
     if (!dataSource || !dataSource.DataSourceTypeID) {
         metaDataPlaceholder.style.display = 'block';
         metaDataTable.style.display = 'none';
         return;
     }
 
-    // A valid data source is selected, so ensure the table is visible.
+    // Basic visibility
     metaDataPlaceholder.style.display = 'none';
     metaDataTable.style.display = 'table';
 
-    console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
+    const initialParams = { "page": 1, "pageSize": 100, "search": '' };
+    const results = await getFromAPI(API_GET_METADATA, initialParams) || [];
 
-    // Use a switch to decide which content to render
-    switch (dataSource.DataSourceTypeID) {
-        case 1: // SQL Database Type
-            console.log("In Render SQL Metadata: ", dataSetID)
-            renderSqlTableSelectorMetaData(tbody, dataSetID);
-            break;
+    // Build metadata definitions dynamically from API `results`.
+    // Each result has: MetaDataID, Name, Description, IsActive, DataSourceTypeIDs[]
+    const defs = (Array.isArray(results) ? results : [])
+        .filter(r => r && r.IsActive && Array.isArray(r.DataSourceTypeIDs) && r.DataSourceTypeIDs.some(id => String(id) === String(dataSource.DataSourceTypeID)))
+        .map(r => ({
+            id: r.MetaDataID,
+            label: r.Name || `Meta ${r.MetaDataID}`,
+            inputId: `meta_${r.MetaDataID}`,
+            type: 'text',
+            description: r.Description || ''
+        }));
 
-        case 2: // REDCap API Type
-            renderRedcapApiKeyRowMetaData(tbody, dataSource, dataSetID);
-            break;
-
-        case 3: // Folder Type
-            renderFolderSelectorMetaData(tbody, dataSource);
-            break;
-
-        default:
-            // If the type is unknown, revert to the placeholder state.
-            console.warn(`Unknown DataSourceTypeID: ${dataSource.DataSourceTypeID}`);
-            metaDataPlaceholder.style.display = 'block';
-            metaDataTable.style.display = 'none';
-            break;
+    if (!defs.length) {
+        // No metadata fields for this type
+        metaDataTable.style.display = 'none';
+        metaDataPlaceholder.style.display = 'block';
+        metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
+        return;
     }
+
+    // If editing an existing dataset, fetch existing metadata values
+    let existingMeta = [];
+    if (dataSetID && dataSetID !== 'new') {
+        try {
+            existingMeta = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { data_set_id: dataSetID }) || [];
+        } catch (e) {
+            console.error('Failed to fetch existing metadata values:', e);
+            existingMeta = [];
+        }
+    }
+
+    // Build rows
+    const rowsHtml = defs.map(def => {
+        const found = existingMeta.find(m => String(m.MetaDataID) === String(def.id));
+        const value = found ? (found.Value || '') : '';
+        const safeValue = escapeHtml(value);
+        return `
+            <tr>
+                <td>${def.label} <input type="hidden" value="${def.id}"></td>
+                <td width="70%">
+                    <input id="${def.inputId}" class="form-control" value="${safeValue}">
+                </td>
+            </tr>`;
+    }).join('');
+
+    tbody.innerHTML = rowsHtml;
 }
 
 // End MetaData Table Rendering Functions
