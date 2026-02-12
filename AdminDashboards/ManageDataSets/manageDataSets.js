@@ -7,16 +7,28 @@ const API_GET_DATASET_FIELD_VALUE = 'GetDataSetFieldValuesByDataSetID';
 const API_GET_DATASET_METADATA_VALUE = 'GetDataSetMetaDataValue';
 const API_GET_DATASETS = 'GetDataSet';
 const API_GET_DATASOURCES = 'GetDataSource';
+const API_GET_DATASOURCE_BY_ID = 'GetDataSourceByID';
 const API_CREATE_DATASET = 'CreateDataSet';
 const API_UPDATE_DATASET = 'UpdateDataSet';
+const API_DELETE_DATASET = 'DeleteDataSet';
 const API_GET_DATASOURCE_SUBFOLDERS = 'GetLoomeDataSourceFirstSubFolders';
 const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWithFiles';
 const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
+const API_GET_REDCAP_DATA = 'SyncREDCapData';
+const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
+const API_GET_METADATA = 'GetMetadata';
 
 const pageSize = 10;
 let currentPage = 1;
 let dataSourceTypeMap = new Map();
 let allColumnsData = [];
+let filteredColumnsData = [];
+let columnSearchTerm = '';
+let columnRedactFilter = 'both';
+let columnDeidentifyFilter = 'both';
+let columnNameSortDirection = 'asc';
+let columnVisibility = new Map();
+let columnNameDropdownSearchTerm = '';
 let currentDataSourceTypeID = 0;
 let currentDataSourceID = 0;
 
@@ -26,47 +38,47 @@ let currentDataSourceID = 0;
  * @param {string} [type='success'] - The type of toast ('success', 'error', 'info').
  * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
  */
-function showToast(message, type = 'success', duration = 3000) {
-    // Create the toast element
+function showToast(message, type = 'success', duration = 5000) {
+    const container = document.getElementById('toast-container') || (function(){
+        const c = document.createElement('div');
+        c.id = 'toast-container';
+        c.style.cssText = 'position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; flex-direction: column; gap:10px;';
+        document.body.appendChild(c);
+        return c;
+    })();
+
     const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.textContent = message;
+    toast.className = `toast-item toast-${type}`;
+    toast.style.cssText = 'margin-bottom:0;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:420px;opacity:0;transform:translateY(-6px);transition:opacity .2s ease,transform .2s ease;';
 
-    // Basic styling
-    const style = document.createElement('style');
-    document.head.appendChild(style);
-    style.sheet.insertRule(`
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: #fff;
-            font-family: sans-serif;
-            z-index: 9999;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(-20px);
-        }
-    `);
-    style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
-    style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
+    let bg = '#2196F3';
+    if (type === 'success') bg = '#1AABA3';
+    if (type === 'error') bg = '#f44336';
+    if (type === 'warning') bg = '#ff9800';
+    toast.style.backgroundColor = bg;
 
-    // Append to body and trigger animation
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-    }, 10); // A tiny delay to allow the CSS transition to work
+    const text = document.createElement('div');
+    text.style.flex = '1';
+    text.textContent = message;
+    toast.appendChild(text);
 
-    // Set a timer to remove the toast
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
-        // Remove the element from the DOM after the fade-out animation
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, duration);
+    if (type === 'error') {
+        const btn = document.createElement('button');
+        btn.innerHTML = '&times;';
+        btn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
+        btn.onclick = () => { if (toast.parentNode) toast.remove(); };
+        toast.appendChild(btn);
+    }
+
+    container.appendChild(toast);
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+
+    if (type !== 'error') {
+        const t = (typeof duration === 'number') ? duration : 5000;
+        setTimeout(() => { if (toast.parentNode) { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 200); } }, t);
+    }
+
+    return toast;
 }
 
 /**
@@ -75,7 +87,7 @@ function showToast(message, type = 'success', duration = 3000) {
  * @param {number} [page=1] - The page number to fetch.
  * @returns {Promise<Object>} A promise that resolves with the paginated response object.
  */
-async function fetchSQLDataSetColumns(data_set_id, page = 1) {
+async function fetchSQLorREDCAPDataSetColumns(data_set_id, page = 1) {
     // Add page and pageSize to the parameters sent to the API
     const params = {
         "data_set_id": data_set_id,
@@ -87,18 +99,27 @@ async function fetchSQLDataSetColumns(data_set_id, page = 1) {
     return getFromAPI(API_GET_COLUMNS_DATA, params);
 }
 
+// This gets the column names directly from the REDCap Server and not the TRE's Workflow database
+async function syncREDCapDataSetColumns(data_source_id) {
+    const initialParams = { "data_source_id": data_source_id };
+    const result = await getFromAPI(API_GET_REDCAP_DATA, initialParams);
+    return result[0];
+}
+
 /**
  * Populates the column table's tbody with data from a paginated response.
  * @param {Object|null} paginatedResponse - The full response object from the API.
  */
-function displayColumnsTable(data, dataSetTypeId) {
+function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to display. Select a Data Source and Table.') {
     const tableBody = document.getElementById('dataSetColsBody');
 
     if (!data || data.length === 0) {
+        const headerRow = document.getElementById('dataSetColsHeader');
+        const columnCount = headerRow ? headerRow.querySelectorAll('th').length || 6 : 6;
         const placeholderHtml = `
             <tr>
-                <td colspan="7" class="text-center text-muted">
-                    No columns to display. Select a Data Source and Table.
+                <td colspan="${columnCount}" class="text-center text-muted">
+                    ${emptyMessage}
                 </td>
             </tr>`;
         tableBody.innerHTML = placeholderHtml;
@@ -124,6 +145,28 @@ function displayColumnsTable(data, dataSetTypeId) {
             </tr>
         `).join('');
 
+
+    } else if (dataSetTypeId == 2) { // REDCap type
+        console.log("Data for REDCap columns:", data);
+        rowsHtml = data.map((row) => {
+            // For REDCap, always use ColumnName as the unique id
+            return `
+                <tr data-id="${row.ColumnName}" data-column-name="${row.ColumnName}">
+                    <td>${row.ColumnName || ''}</td>
+                    <td class="editable-cell" data-field="LogicalColumnName">${row.LogicalColumnName || ''}</td>
+                    <td class="editable-cell" data-field="BusinessDescription">${row.BusinessDescription || ''}</td>
+                    <td class="editable-cell" data-field="ExampleValue">${row.ExampleValue || ''}</td>
+                    <td class="checkbox-cell">
+                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
+                    </td>
+                    <td class="checkbox-cell">
+                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${row.Tokenise ? 'checked' : ''}>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+
     } else if (dataSetTypeId == 3) { // Folder type   
         // 1. Group the data by FolderName
         const groupedByFolderName = new Map();
@@ -140,7 +183,7 @@ function displayColumnsTable(data, dataSetTypeId) {
             const rowspan = items.length;
 
             items.forEach((col, index) => {
-                const fileExtension = col.FileType || col.FileExtensions ||'';
+                const fileExtension = col.FileType || col.FileExtensions || '';
                 const fileDescription = col.FileDescription || '';
                 const isRedacted = col.Redact ? 1 : 0;  // Convert to 1/0
                 const isTokenised = col.Tokenise ? 1 : 0;  // Convert to 1/0
@@ -178,6 +221,68 @@ function displayColumnsTable(data, dataSetTypeId) {
     }
 
     tableBody.innerHTML = rowsHtml;
+    updateColumnRowsVisibility();
+}
+
+function escapeHtml(value) {
+    return (value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getAllColumnNames() {
+    const names = Array.from(new Set(allColumnsData
+        .map(col => (col?.ColumnName || '').trim())
+        .filter(name => name !== '')));
+    names.sort((a, b) => a.localeCompare(b));
+    return names;
+}
+
+function buildColumnNameDropdownList(term = '') {
+    const lowerTerm = (term || '').trim().toLowerCase();
+    const names = getAllColumnNames().filter(name => {
+        return !lowerTerm || name.toLowerCase().includes(lowerTerm);
+    });
+
+    if (names.length === 0) {
+        return '<li class="text-muted small px-2">No columns match your search.</li>';
+    }
+
+    return names.map(name => {
+        const safeName = escapeHtml(name);
+        const encoded = encodeURIComponent(name);
+        const isChecked = columnVisibility.get(name) !== false;
+        return `
+            <li data-column="${encoded}">
+                <label>
+                    <input type="checkbox" ${isChecked ? 'checked' : ''}>
+                    <span>${safeName}</span>
+                </label>
+            </li>`;
+    }).join('');
+}
+
+function refreshColumnVisibilityMap() {
+    const existing = new Map(columnVisibility);
+    columnVisibility = new Map();
+    getAllColumnNames().forEach(name => {
+        columnVisibility.set(name, existing.has(name) ? existing.get(name) : true);
+    });
+}
+
+function updateColumnRowsVisibility() {
+    document.querySelectorAll('#dataSetColsBody tr[data-column-name]').forEach(row => {
+        const columnName = row.dataset.columnName || '';
+        if (!columnName) return;
+        if (columnVisibility.get(columnName) === false) {
+            row.classList.add('d-none');
+        } else {
+            row.classList.remove('d-none');
+        }
+    });
 }
 
 /**
@@ -242,6 +347,31 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     container.innerHTML = paginationHTML;
 }
 
+function showColumnsLoader() {
+    const loader = document.getElementById('dataSetColsLoader');
+    if (loader) {
+        loader.classList.remove('d-none');
+    }
+}
+
+function hideColumnsLoader() {
+    const loader = document.getElementById('dataSetColsLoader');
+    if (loader) {
+        loader.classList.add('d-none');
+    }
+}
+
+function normalizeBooleanFlag(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+        const trimmed = value.trim().toLowerCase();
+        if (!trimmed || trimmed === '0' || trimmed === 'false') return false;
+        return true;
+    }
+    return Boolean(value);
+}
+
 /**
  * A central function to handle page changes.
  */
@@ -251,7 +381,7 @@ function handlePageChange(newPage) {
     // Validate the page number to ensure it's within bounds
     if (newPage >= 1 && newPage <= totalPages) {
         currentPage = newPage;
-        renderTablePage(currentDataSourceTypeID); 
+        renderTablePage(currentDataSourceTypeID);
     } else {
         const pageInput = document.getElementById('page-input');
         if (pageInput) {
@@ -275,7 +405,7 @@ async function fetchDataSetFolderValue(data_set_id) {
 
     const initialParams = { "data_set_id": data_set_id };
     const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
-    
+
     if (!resultsArray || resultsArray.length === 0) {
         console.warn("API returned no data for data_set_id:", data_set_id);
         return { id: null, name: null }; // Return a default value
@@ -368,32 +498,38 @@ async function fetchSubFoldersWithFiles(subFolderName, currentDataSourceID) {
  * Renders the row for the REDCap API Key.
  */
 function renderRedcapApiKeyRowDataSetFields(tbody) {
+    // const rowHtml = `
+    //     <tr>
+    //         <td>REDCap API Key <input type="text" hidden="true"></td>
+    //         <td width="70%">
+    //             <div class="container">
+    //                 <div class="row">
+    //                     <div class="col">
+    //                         <input id="redcapapi" type="password" class="form-control valid">
+    //                         <div class="validation-message"></div>
+    //                     </div>
+    //                     <div class="col col-lg-3">
+    //                         <button id="redcapRefreshBtn" class="btn btn-accent float-right" title="RedCap">Refresh</button>
+    //                     </div>
+    //                 </div>
+    //             </div>
+    //         </td>
+    //     </tr>`;
+
     const rowHtml = `
         <tr>
-            <td>REDCap API Key <input type="text" hidden="true"></td>
-            <td width="70%">
-                <div class="container">
-                    <div class="row">
-                        <div class="col">
-                            <input id="redcapapi" type="password" class="form-control valid">
-                            <div class="validation-message"></div>
-                        </div>
-                        <div class="col col-lg-3">
-                            <button id="redcapRefreshBtn" class="btn btn-accent float-right" title="RedCap">Refresh</button>
-                        </div>
-                    </div>
-                </div>
-            </td>
-        </tr>`;
+            <p class="text-muted">Not applicable for REDCap Data Sources</p>
+        </tr>
+    `;
 
     tbody.innerHTML = rowHtml;
 
     // Optional: Add an event listener to the new button
-    tbody.querySelector('#redcapRefreshBtn').addEventListener('click', () => {
-        const apiKey = tbody.querySelector('#redcapapi').value;
-        console.log(`Refresh button clicked! API Key: ${apiKey}`);
-        showToast('Refresh clicked!');
-    });
+    // tbody.querySelector('#redcapRefreshBtn').addEventListener('click', () => {
+    //     const apiKey = tbody.querySelector('#redcapapi').value;
+    //     console.log(`Refresh button clicked! API Key: ${apiKey}`);
+    //     showToast('Refresh clicked!');
+    // });
 }
 
 async function fetchLoomeDataSourceTablesByTableId(tableId) {
@@ -411,8 +547,8 @@ async function fetchDataSetFieldValue(data_set_id) {
         };
     }
 
-    const initialParams = { "data_set_id": data_set_id }; 
-   
+    const initialParams = { "data_set_id": data_set_id };
+
     const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
     console.log("Fetched DataSet Field Value (as array):", resultsArray);
     if (!resultsArray || resultsArray.length === 0) {
@@ -427,13 +563,13 @@ async function fetchDataSetFieldValue(data_set_id) {
     // If Field Value is a Table Name, the result is the ID of the table
     // Get the actual table name from another endpoint
     // Case 1: The value is a table ID, so we need to fetch the name
-    if (result.FieldID == 3) { 
+    if (result.FieldID == 3) {
         console.log("FieldID indicates a table reference. Fetching table name...");
         const tableIdAsString = result.Value; // The value is a string, e.g., "9"
 
         // --- CONVERT TO INTEGER HERE ---
         const tableId = parseInt(tableIdAsString, 10);
-        
+
         const tableInfo = await fetchLoomeDataSourceTablesByTableId(tableId);
         console.log("Fetched Table Info:", tableId, tableInfo[0]);
         // Return an object with BOTH the ID and the fetched name
@@ -442,7 +578,7 @@ async function fetchDataSetFieldValue(data_set_id) {
             name: tableInfo[0].TableName
         };
 
-    // Case 2: The value is just a simple value, not a reference to another table
+        // Case 2: The value is just a simple value, not a reference to another table
     } else {
         console.log("FieldID indicates a direct value. Using value as-is.");
         // Return an object with the same shape for consistency.
@@ -579,93 +715,21 @@ async function updateDataSetFieldsTable(dataSource, dataSetID) {
 /**
  * Fetches the metadata value for a given DataSetID and renders it in an input field.
  */
-async function renderSqlTableSelectorMetaData(tbody, dataSetID) {
-    // Step 1: Provide immediate feedback to the user with a loading state.
-    tbody.innerHTML = `
-        <tr>
-            <td>Tag <input type="hidden"></td>
-            <td width="70%">
-                <input class="form-control" value="Loading..." disabled>
-            </td>
-        </tr>
-    `;
-
-    // A guard clause to handle cases where there's no ID to fetch.
-    if (!dataSetID || dataSetID === "new") {
-        tbody.innerHTML = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input id="metaDataTag" class="form-control valid" value="">
-                </td>
-            </tr>`;
-        return;
-    }
-
-    try {
-        // Step 2: AWAIT the data. The code will pause here until the API responds.
-        const result = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": dataSetID });
-        const tagValue = (result && result.length > 0) ? result[0].Value : '';
-
-        // Let's assume the MetadataID for "Tag" is 5.
-        const rowHtml = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input id="metaDataTag" class="form-control valid" value="${tagValue}">
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML = rowHtml;
-
-    } catch (error) {
-        console.error("Failed to fetch metadata value:", error);
-        tbody.innerHTML = `
-            <tr>
-                <td>Tag <input type="hidden" value="5"></td>
-                <td width="70%">
-                    <input class="form-control is-invalid" value="Error loading data" disabled>
-                </td>
-            </tr>
-        `;
-    }
-}
+// NOTE: Per recent refactor, individual metadata renderers were removed.
+// Metadata rows are now created dynamically inside `updateMetaDataTable`.
 
 /**
  * Renders two static rows with input fields for REDCap API metadata.
  */
-function renderRedcapApiKeyRowMetaData(tbody, dataSource) {
-    const rowHtml = `
-        <tr>
-            <td>Citations for related publications <input type="hidden" value="1"></td>
-            <td width="70%">
-                <input id="redcapCitations" class="form-control">
-            </td>
-        </tr>
-        <tr>
-            <td>ANZCTR URL <input type="hidden" value="2"></td>
-            <td width="70%">
-                <input id="redcapAnzctrUrl" class="form-control">
-            </td>
-        </tr>
-    `;
-    tbody.innerHTML = rowHtml;
-}
+// REDCap-specific static renderer removed. See `updateMetaDataTable`.
 
 
 /**
  * Hides the metadata table and shows the placeholder text.
  */
-function renderFolderSelectorMetaData(tbody) {
-    const metaDataTable = document.getElementById('metaDataTable');
-    const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
+// Folder-specific metadata renderer removed. See `updateMetaDataTable`.
 
-    metaDataTable.style.display = 'none';
-    metaDataPlaceholder.style.display = 'block';
-    metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
-}
-
-function updateMetaDataTable(dataSource, dataSetID) {
+async function updateMetaDataTable(dataSource, dataSetID) {
     const metaDataTable = document.getElementById('metaDataTable');
     const metaDataPlaceholder = document.getElementById('metaDataPlaceholder');
     const tbody = metaDataTable.querySelector('tbody');
@@ -673,41 +737,113 @@ function updateMetaDataTable(dataSource, dataSetID) {
     // Clear any old data
     tbody.innerHTML = '';
 
-    // If there's no data source selected, show the placeholder and exit.
+    // Guard: no data source selected
     if (!dataSource || !dataSource.DataSourceTypeID) {
         metaDataPlaceholder.style.display = 'block';
         metaDataTable.style.display = 'none';
         return;
     }
 
-    // A valid data source is selected, so ensure the table is visible.
+    // Basic visibility
     metaDataPlaceholder.style.display = 'none';
     metaDataTable.style.display = 'table';
 
-    console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
+    const initialParams = { "page": 1, "pageSize": 100, "search": '' };
+    const results = await getFromAPI(API_GET_METADATA, initialParams) || [];
 
-    // Use a switch to decide which content to render
-    switch (dataSource.DataSourceTypeID) {
-        case 1: // SQL Database Type
-            console.log("In Render SQL Metadata: ", dataSetID)
-            renderSqlTableSelectorMetaData(tbody, dataSetID);
-            break;
-
-        case 2: // REDCap API Type
-            renderRedcapApiKeyRowMetaData(tbody, dataSource);
-            break;
-
-        case 3: // Folder Type
-            renderFolderSelectorMetaData(tbody, dataSource);
-            break;
-
-        default:
-            // If the type is unknown, revert to the placeholder state.
-            console.warn(`Unknown DataSourceTypeID: ${dataSource.DataSourceTypeID}`);
-            metaDataPlaceholder.style.display = 'block';
-            metaDataTable.style.display = 'none';
-            break;
+    // If editing an existing dataset, fetch existing metadata values first
+    let existingMeta = [];
+    if (dataSetID && dataSetID !== 'new') {
+        try {
+            existingMeta = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { data_set_id: dataSetID }) || [];
+        } catch (e) {
+            console.error('Failed to fetch existing metadata values:', e);
+            existingMeta = [];
+        }
     }
+
+    // Build metadata definitions dynamically from API `results`.
+    // Each result has: MetaDataID, Name, Description, IsActive, DataSourceTypeIDs[]
+    const allDefsById = (Array.isArray(results) ? results : []).reduce((acc, r) => {
+        if (!r || r.MetaDataID === undefined) return acc;
+        acc[String(r.MetaDataID)] = r;
+        return acc;
+    }, {});
+
+    // Base defs: those currently associated with this DataSourceType and active
+    const baseDefs = (Array.isArray(results) ? results : [])
+        .filter(r => r && r.IsActive && Array.isArray(r.DataSourceTypeIDs) && r.DataSourceTypeIDs.some(id => String(id) === String(dataSource.DataSourceTypeID)))
+        .map(r => ({
+            id: r.MetaDataID,
+            label: r.Name || `Meta ${r.MetaDataID}`,
+            inputId: `meta_${r.MetaDataID}`,
+            type: 'text',
+            description: r.Description || '',
+            legacy: false
+        }));
+
+    // If editing an existing dataset, include any metadata values that were previously assigned
+    // even if the metadata is no longer associated with the current DataSourceType.
+    const extraDefs = [];
+    if (existingMeta && existingMeta.length > 0) {
+        const baseIds = new Set(baseDefs.map(d => String(d.id)));
+        existingMeta.forEach(mv => {
+            const mid = String(mv.MetaDataID);
+            if (!baseIds.has(mid)) {
+                const metaDef = allDefsById[mid];
+                if (metaDef) {
+                    extraDefs.push({
+                        id: metaDef.MetaDataID,
+                        label: `${metaDef.Name || `Meta ${metaDef.MetaDataID}`} (legacy)`,
+                        inputId: `meta_${metaDef.MetaDataID}`,
+                        type: 'text',
+                        description: metaDef.Description || '',
+                        legacy: true
+                    });
+                    baseIds.add(mid);
+                } else {
+                    // Metadata definition removed entirely; still render a fallback so value is preserved
+                    extraDefs.push({
+                        id: parseInt(mid, 10),
+                        label: `Meta ${mid} (legacy)`,
+                        inputId: `meta_${mid}`,
+                        type: 'text',
+                        description: '',
+                        legacy: true
+                    });
+                    baseIds.add(mid);
+                }
+            }
+        });
+    }
+
+    const defs = baseDefs.concat(extraDefs);
+
+    if (!defs.length) {
+        // No metadata fields for this type and nothing saved previously
+        metaDataTable.style.display = 'none';
+        metaDataPlaceholder.style.display = 'block';
+        metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
+        return;
+    }
+
+    // Build rows
+    const rowsHtml = defs.map(def => {
+        const found = existingMeta.find(m => String(m.MetaDataID) === String(def.id));
+        const value = found ? (found.Value || '') : '';
+        const safeValue = escapeHtml(value);
+        const safeLabel = escapeHtml(def.label || `Meta ${def.id}`);
+        const labelClass = def.legacy ? 'text-muted' : '';
+        return `
+            <tr>
+                <td><small class="${labelClass}">${safeLabel}</small> <input type="hidden" value="${def.id}"></td>
+                <td width="70%">
+                    <input id="${def.inputId}" class="form-control" value="${safeValue}">
+                </td>
+            </tr>`;
+    }).join('');
+
+    tbody.innerHTML = rowsHtml;
 }
 
 // End MetaData Table Rendering Functions
@@ -781,12 +917,12 @@ async function getFromAPI(API_ID, initialParams) {
 }
 
 async function getAllDataSets() {
-    const initialParams = { "page": 1, "pageSize": 100, "search": '', activeStatus: 3 }; //Get both active and inactive Data Set
+    const initialParams = { "page": 1, "pageSize": 100, "search": '', "activeStatus": 3 }; //Get both active and inactive Data Set
     return getFromAPI(API_GET_DATASETS, initialParams)
 }
 
 async function getAllDataSources() {
-    const initialParams = { "page": 1, "pageSize": 100, "search": '' };
+    const initialParams = { "page": 1, "pageSize": 100, "search": '', "activeStatus": 1 };
     return getFromAPI(API_GET_DATASOURCES, initialParams)
 }
 
@@ -806,14 +942,39 @@ function populateExistingDataSets(optgroup, allResults) {
 }
 
 function populateDataSourceOptions(selectElement, data, valueField, textField) {
-    if (!selectElement || !Array.isArray(data)) return;
-    while (selectElement.options.length > 1) {
-        selectElement.remove(1);
+    if (!selectElement) return;
+
+    // Clear all existing options first to avoid leftover/undefined options
+    selectElement.innerHTML = '';
+
+    // If data is not an array or empty, show a disabled placeholder saying no data
+    if (!Array.isArray(data) || data.length === 0) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'No available Data Sources';
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        selectElement.appendChild(placeholder);
+        return;
     }
+
+    // Add the default prompt option
+    const prompt = document.createElement('option');
+    prompt.value = '';
+    prompt.textContent = 'Select a Data Source...';
+    prompt.disabled = true;
+    prompt.selected = true;
+    selectElement.appendChild(prompt);
+
+    // Append valid options from the provided data array, skipping invalid entries
     data.forEach(item => {
+        if (!item) return;
+        const val = item[valueField];
+        // skip undefined/null values
+        if (val === undefined || val === null) return;
         const option = document.createElement('option');
-        option.value = item[valueField];
-        option.textContent = item[textField];
+        option.value = String(val);
+        option.textContent = item[textField] || '';
         selectElement.appendChild(option);
     });
 }
@@ -842,7 +1003,7 @@ async function formatSQLColumnsFromSchema(tableId) {
         const formattedColumns = columnNames.map((name, index) => ({
             "ColumnName": name,
             "ColumnType": columnTypes[index],
-            "LogicalColumnName": '', 
+            "LogicalColumnName": '',
             "BusinessDescription": '',
             "ExampleValue": '',
             "Tokenise": false,
@@ -860,21 +1021,43 @@ async function formatSQLColumnsFromSchema(tableId) {
     }
 }
 
+/**
+ * Fetches the columns for a given Data Set ID and formats it into a standard array of column objects.
+ */
+async function fetchREDCapDataSetColumns(dataSetId) {
+    try {
+        const response = await window.loomeApi.runApiRequest(API_GET_DATASETS, { "DataSetID": dataSetId });
+        const parsed = safeParseJson(response);
+
+        if (parsed && parsed.Results) {
+            return parsed.Results;
+        }
+    } catch (error) {
+        console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
+        return [];
+    }
+}
 
 /**
  * The single function responsible for FETCHING data and populating the master `allColumnsData` array.
  * This is a "reset" action.
  */
 async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
-    const dataSetId = document.getElementById('dataSetSelection').value;
-    let newColumnsData = []; // Default to an empty array
+    showColumnsLoader();
+    try {
+        const dataSetId = document.getElementById('dataSetSelection').value;
+        let newColumnsData = []; // Default to an empty array
 
-    if (dataSourceTypeId === 1) { // SQL Database Type
+        if (dataSourceTypeId !== undefined && dataSourceTypeId !== null) {
+            currentDataSourceTypeID = dataSourceTypeId;
+        }
+
+        if (dataSourceTypeId === 1) { // SQL Database Type
         // --- SCENARIO 1: Editing an EXISTING Data Set ---
         if (dataSetId && dataSetId !== 'new') {
             try {
                 console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
-                newColumnsData = await fetchSQLDataSetColumns(dataSetId);
+                newColumnsData = await fetchSQLorREDCAPDataSetColumns(dataSetId);
 
                 console.log("newColumnsData:", newColumnsData)
             } catch (error) {
@@ -890,6 +1073,39 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 newColumnsData = await formatSQLColumnsFromSchema(tableId);
             }
         }
+    } else if (dataSourceTypeId === 2) { // REDCap Type
+        // --- SCENARIO 1: Editing an EXISTING Data Set ---
+        if (dataSetId && dataSetId !== 'new') {
+            try {
+                console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
+                newColumnsData = await fetchSQLorREDCAPDataSetColumns(dataSetId);
+
+                console.log("newColumnsData:", newColumnsData)
+            } catch (error) {
+                console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
+            }
+        }
+        // --- SCENARIO 2: Creating a NEW Data Set ---
+        else if (dataSetId === 'new') {
+            const redCapColumns = await syncREDCapDataSetColumns(currentDataSourceID);
+            console.log(redCapColumns);
+            if (redCapColumns.status == "success") {
+                newColumnsData = redCapColumns.columns_detected.map((colName, idx) => ({
+                    ColumnName: colName,
+                    ColumnType: "",
+                    LogicalColumnName: "",
+                    BusinessDescription: "",
+                    ExampleValue: "",
+                    Tokenise: false,
+                    TokenIdentifierType: 0,
+                    Redact: false,
+                    DisplayOrder: idx + 1,
+                    IsFilter: false
+                }));
+            } else {
+                console.log(`Error fetching columns for Data Set ID ${dataSetId}: Pull from REDCap server did not succeed`);
+            }
+        }
     } else if (dataSourceTypeId === 3) { // Folder Type
         newColumnsData = [];
 
@@ -903,24 +1119,24 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             };
         };
         if (dataSetId === 'new') {
-                const tableNameSelector = document.getElementById('tableNameSelector');
-                if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
-                    const subFolderName = tableNameSelector.value;
-                    
-                    // Fetch data for NEW set
-                    const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
-                    
-                    // Apply the consistent mapping
-                    newColumnsData = originalData.map(mapFolderData);
-                    
-                    console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
-                }
-            } else if (dataSetId && dataSetId !== 'new') {
-                try {
-                    console.log(`FETCHING SAVED columns for existing Data Set ID: ${dataSetId}...`);
-                    
-                    // 1. Fetch data for EXISTING set (SAVED data from DB)
-                    const fetchedData = await (dataSetId); //NEED TO CHANGE THIS
+            const tableNameSelector = document.getElementById('tableNameSelector');
+            if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
+                const subFolderName = tableNameSelector.value;
+
+                // Fetch data for NEW set
+                const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
+
+                // Apply the consistent mapping
+                newColumnsData = originalData.map(mapFolderData);
+
+                console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
+            }
+        } else if (dataSetId && dataSetId !== 'new') {
+            try {
+                console.log(`FETCHING SAVED columns for existing Data Set ID: ${dataSetId}...`);
+
+                // 1. Fetch data for EXISTING set (SAVED data from DB)
+                const fetchedData = await (dataSetId); //NEED TO CHANGE THIS
 
                 const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
                 console.log("Original NEW Folder Columns Data: ", originalData);
@@ -928,6 +1144,8 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 newColumnsData = originalData.map(mapFolderData);
 
                 console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
+            } catch (error) {
+                console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
             }
         } else if (dataSetId && dataSetId !== 'new') {
             try {
@@ -946,12 +1164,26 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
     }
 
 
-    // --- CRITICAL: Update the master state ---
-    allColumnsData = newColumnsData || [];
-    currentPage = 1; // Always reset to the first page when data is reloaded
+        // --- CRITICAL: Update the master state ---
+        allColumnsData = newColumnsData || [];
+        refreshColumnVisibilityMap();
 
-    // Finally, render the first page of the NEW data
-    renderTablePage(dataSourceTypeId);
+        // Ensure the column-name dropdown initialization runs again after a fresh load
+        // so the "Select All" checkbox and per-column checkboxes are enabled on first real populate.
+        columnNameDropdownInitialized = false;
+
+        // Reapply the search filter so pagination and table reflect the new data.
+        applyColumnSearchFilter(dataSourceTypeId);
+
+        // Rebuild the table header (and the column-name dropdown) now that columns are available.
+        try {
+            updateTableHeader(currentDataSourceTypeID);
+        } catch (e) {
+            console.warn('Failed to update table header after loading columns:', e);
+        }
+    } finally {
+        hideColumnsLoader();
+    }
 }
 
 /**
@@ -959,18 +1191,65 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
  * This function DOES NOT fetch data.
  */
 function renderTablePage(dataSetTypeId) {
-    // Calculate the slice of data for the current page
+    const sourceData = filteredColumnsData || [];
+    const totalItems = sourceData.length;
+    const normalizedTotalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+    if (currentPage > normalizedTotalPages) {
+        currentPage = normalizedTotalPages;
+    }
+
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     console.log(startIndex, endIndex)
-    const pageData = allColumnsData.slice(startIndex, endIndex);
-    console.log("pageData: ", pageData, allColumnsData)
-    // Render the table with only the data for the current page
-    displayColumnsTable(pageData, dataSetTypeId);
+    const pageData = sourceData.slice(startIndex, endIndex);
+    console.log("pageData: ", pageData, sourceData)
 
-    console.log(allColumnsData.length, pageSize, currentPage)
-    // Render the pagination controls based on the FULL dataset length
-    renderPagination('pagination-controls', allColumnsData.length, pageSize, currentPage);
+    const emptyMessage = columnSearchTerm.trim() && totalItems === 0
+        ? 'No columns match your search term. Clear the search to view all columns.'
+        : 'No columns to display. Select a Data Source and Table.';
+
+    displayColumnsTable(pageData, dataSetTypeId, emptyMessage);
+
+    console.log(totalItems, pageSize, currentPage)
+    renderPagination('pagination-controls', totalItems, pageSize, currentPage);
+}
+
+function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
+    const normalizedTerm = (columnSearchTerm || '').trim().toLowerCase();
+    filteredColumnsData = allColumnsData.filter(column => {
+        const columnName = (column?.ColumnName || '').toLowerCase();
+        const matchesTerm = !normalizedTerm || columnName.includes(normalizedTerm);
+
+        let matchesRedact = true;
+        if (columnRedactFilter === 'yes') {
+            matchesRedact = normalizeBooleanFlag(column?.Redact);
+        } else if (columnRedactFilter === 'no') {
+            matchesRedact = !normalizeBooleanFlag(column?.Redact);
+        }
+
+        let matchesDeidentify = true;
+        if (columnDeidentifyFilter === 'yes') {
+            matchesDeidentify = normalizeBooleanFlag(column?.Tokenise);
+        } else if (columnDeidentifyFilter === 'no') {
+            matchesDeidentify = !normalizeBooleanFlag(column?.Tokenise);
+        }
+
+        return matchesTerm && matchesRedact && matchesDeidentify;
+    });
+
+    if (columnNameSortDirection) {
+        filteredColumnsData.sort((a, b) => {
+            const aName = (a?.ColumnName || '').toLowerCase();
+            const bName = (b?.ColumnName || '').toLowerCase();
+            if (aName === bName) return 0;
+            const comparison = aName < bName ? -1 : 1;
+            return columnNameSortDirection === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    currentPage = 1;
+    renderTablePage(dataSetTypeId);
 }
 
 /**
@@ -1001,8 +1280,8 @@ function gatherFormData(allColumnsData) {
             const keyInput = row.querySelector('td:first-child input[type="hidden"]');
             const valueInput = row.querySelector('td:last-child input, td:last-child select');
             if (keyInput && valueInput) {
-                metaData.push({ //MetaDataID being 1 is only for those with "Tag" as the Metadata
-                    MetaDataID: 1, //parseInt(keyInput.value, 10),
+                metaData.push({
+                    MetaDataID: parseInt(keyInput.value, 10),
                     Value: valueInput.value
                 });
             }
@@ -1033,13 +1312,22 @@ function gatherFormData(allColumnsData) {
     if (fieldsTableBody) scrapeFieldsTable(fieldsTableBody);
     if (metaTableBody) scrapeMetaTable(metaTableBody);
 
-    const columns = allColumnsData;
+    var columns = allColumnsData;
+
 
     if (currentDataSourceTypeID === 1) {
         return {
             ...mainDetails,
             DataSetMetaDataValues: metaData,
             DataSetFieldValues: dataSetFieldValues,
+            DataSetColumns: columns,
+            DataSetFolderFiles: []
+        };
+    } else if (currentDataSourceTypeID === 2) {
+        return {
+            ...mainDetails,
+            DataSetMetaDataValues: metaData,
+            DataSetFieldValues: [],
             DataSetColumns: columns,
             DataSetFolderFiles: []
         };
@@ -1064,8 +1352,8 @@ function gatherFormData(allColumnsData) {
 async function createDataSet(data) {
     const payload = {
         ...data, // Spread all properties from the original object
-        OptOutMessage: "string",
-        OptOutList: "string",
+        OptOutMessage: null,
+        OptOutList: null,
         OptOutColumn: "-1",
         DataSourceTypeID: currentDataSourceTypeID
     };
@@ -1088,8 +1376,8 @@ async function updateDataSet(data_set_id, data) {
     const payload = {
         ...data,
         id: parseInt(data_set_id, 10),
-        OptOutMessage: "string",
-        OptOutList: "string",
+        OptOutMessage: null,
+        OptOutList: null,
         OptOutColumn: "-1",
         DataSourceTypeID: currentDataSourceTypeID
     };
@@ -1128,17 +1416,22 @@ async function updateDataSet(data_set_id, data) {
     }
 
     try {
-        // Always include existing DataSetFieldValues so backend re-inserts them after its delete
-        const fieldValues = await getFromAPI(API_GET_DATASET_FIELD_VALUE, { "data_set_id": data_set_id });
-        payload.DataSetFieldValues = Array.isArray(fieldValues)
-            ? fieldValues.map(fv => ({ FieldID: fv.FieldID, Value: fv.Value }))
-            : [];
+        // Use values from the form (data) if present, otherwise fetch from DB
+        if (currentDataSourceTypeID === 2) {
+            payload.DataSetFieldValues = [];
+        } else if (!payload.DataSetFieldValues || !Array.isArray(payload.DataSetFieldValues) || payload.DataSetFieldValues.length === 0) {
+            const fieldValues = await getFromAPI(API_GET_DATASET_FIELD_VALUE, { "data_set_id": data_set_id });
+            payload.DataSetFieldValues = Array.isArray(fieldValues)
+                ? fieldValues.map(fv => ({ FieldID: fv.FieldID, Value: fv.Value }))
+                : [];
+        }
 
-        // Do the same for DataSetMetaDataValues (prevents wipe-out on update)
-        const metaValues = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": data_set_id });
-        payload.DataSetMetaDataValues = Array.isArray(metaValues)
-            ? metaValues.map(mv => ({ MetaDataID: mv.MetaDataID, Value: mv.Value }))
-            : [];
+        if (!payload.DataSetMetaDataValues || !Array.isArray(payload.DataSetMetaDataValues) || payload.DataSetMetaDataValues.length === 0) {
+            const metaValues = await getFromAPI(API_GET_DATASET_METADATA_VALUE, { "data_set_id": data_set_id });
+            payload.DataSetMetaDataValues = Array.isArray(metaValues)
+                ? metaValues.map(mv => ({ MetaDataID: mv.MetaDataID, Value: mv.Value }))
+                : [];
+        }
     } catch (e) {
         console.warn("Failed to preload related values; sending empty arrays to avoid crashes.", e);
         payload.DataSetFieldValues = payload.DataSetFieldValues || [];
@@ -1159,6 +1452,36 @@ async function updateDataSet(data_set_id, data) {
         if (!response) throw new Error("Failed to update dataset - no response from server");
 
         showToast('Dataset updated successfully!');
+
+        // --- ALWAYS REFRESH DATASETS AND UI ---
+        if (typeof getAllDataSets === 'function' && typeof getAllDataSources === 'function') {
+            const selectionDropdown = document.getElementById('dataSetSelection');
+            const dataSourceDrpDwn = document.getElementById('dataSource');
+            const optgroup = selectionDropdown ? selectionDropdown.querySelector('optgroup') : null;
+            // Force a fresh fetch by adding a cache-busting param (if supported)
+            let allDataSets = await getAllDataSets();
+            let allDataSources = await getAllDataSources();
+            if (optgroup && allDataSets) populateExistingDataSets(optgroup, allDataSets);
+            if (dataSourceDrpDwn && allDataSources) populateDataSourceOptions(dataSourceDrpDwn, allDataSources, 'DataSourceID', 'Name');
+
+            // Always re-select and reload the updated dataset
+            if (selectionDropdown) {
+                selectionDropdown.value = data_set_id.toString();
+                // Fetch again to ensure latest data (in case populateExistingDataSets uses stale data)
+                allDataSets = await getAllDataSets();
+                allDataSources = await getAllDataSources();
+                const updatedDataSet = allDataSets.find(ds => ds.DataSetID == data_set_id);
+                const updatedDataSource = updatedDataSet ? allDataSources.find(dsrc => dsrc.DataSourceID == updatedDataSet.DataSourceID) : null;
+                if (updatedDataSet && updatedDataSource) {
+                    if (typeof populateForm === 'function') populateForm(updatedDataSet, updatedDataSource);
+                    if (typeof updateDataSetFieldsTable === 'function') await updateDataSetFieldsTable(updatedDataSource, data_set_id);
+                    if (typeof updateMetaDataTable === 'function') updateMetaDataTable(updatedDataSource, data_set_id);
+                    if (typeof updateTableHeader === 'function') updateTableHeader(updatedDataSource.DataSourceTypeID);
+                    if (typeof loadColumnsData === 'function') await loadColumnsData(updatedDataSource.DataSourceTypeID, updatedDataSource.DataSourceID);
+                }
+            }
+        }
+
         return response;
 
     } catch (error) {
@@ -1172,35 +1495,211 @@ async function updateDataSet(data_set_id, data) {
  * @param {number | string} dataSourceType - The ID of the data source type (e.g., 1 for Database, 3 for Folder).
  */
 function updateTableHeader(dataSourceType) {
-    const headersConfig = {
-        1: ['Column Name', 'Logical Name', 'Business Description', 'Example Value', 'Redact', 'Deidentify'],
-        3: ['Folder Name', 'File Type', 'File Description', 'Redact', 'Deidentify']
+    const headerDefinitions = {
+        1: [
+            { label: 'Column Name', sortKey: 'column-name' },
+            { label: 'Logical Name' },
+            { label: 'Business Description' },
+            { label: 'Example Value' },
+            { label: 'Redact', filterType: 'redact' },
+            { label: 'Deidentify', filterType: 'deidentify' }
+        ],
+        2: [
+            { label: 'Column Name', sortKey: 'column-name' },
+            { label: 'Logical Name' },
+            { label: 'Business Description' },
+            { label: 'Example Value' },
+            { label: 'Redact', filterType: 'redact' },
+            { label: 'Deidentify', filterType: 'deidentify' }
+        ],
+        3: [
+            { label: 'Folder Name' },
+            { label: 'File Type' },
+            { label: 'File Description' },
+            { label: 'Redact', filterType: 'redact' },
+            { label: 'Deidentify', filterType: 'deidentify' }
+        ]
     };
 
-    const tableHeaderRow = document.getElementById('dataSetColsHeader');
-    if (!tableHeaderRow) {
-        console.error("Error: Table header row with id 'data-table-header' not found.");
+    const headerRow = document.getElementById('dataSetColsHeader');
+    if (!headerRow) {
+        console.error("Error: Table header row with id 'dataSetColsHeader' not found.");
         return;
     }
 
-    const headers = headersConfig[dataSourceType];
-    if (!headers) {
-        tableHeaderRow.innerHTML = '<th>Please select a data source type first.</th>';
+    const definitions = headerDefinitions[dataSourceType];
+    if (!definitions) {
+        headerRow.innerHTML = '<th>Please select a data source type first.</th>';
         return;
     }
 
-    const headerHtml = headers.map(headerText => `<th>${headerText}</th>`).join('');
-    tableHeaderRow.innerHTML = headerHtml;
+    const filterOptions = [
+        { value: 'both', label: 'Both' },
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' }
+    ];
+
+    const buildHeaderCell = (def) => {
+        if (def.sortKey === 'column-name') {
+            const arrow = columnNameSortDirection === 'desc' ? '▲' : '▼';
+            const ariaLabel = columnNameSortDirection === 'desc' ? 'Sort ascending' : 'Sort descending';
+            const listHtml = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
+            return `
+                <th>
+                    <details class="header-filter column-name-filter" data-filter="column-name">
+                        <summary>
+                            <span>${def.label}</span>
+                            <span class="header-filter-arrow">▾</span>
+                        </summary>
+                        <div class="column-name-dropdown">
+                            <div class="column-name-sort-row">
+                                <button type="button" data-action="sort-asc" title="Sort A-Z">A-Z</button>
+                                <button type="button" data-action="sort-desc" title="Sort Z-A">Z-A</button>
+                                <span style="flex:1"></span>
+                                
+                            </div>
+                          
+                            <input type="search" class="column-name-dropdown-search" placeholder="Search columns" value="${escapeHtml(columnNameDropdownSearchTerm)}">
+                            <div class="column-name-select-all">
+                                <input type="checkbox" id="column-name-select-all">
+                                <label for="column-name-select-all">Select All</label>
+                            </div>
+                            <ul class="column-name-dropdown-list">
+                                ${listHtml}
+                            </ul>
+                        </div>
+                    </details>
+                </th>`;
+        }
+
+        if (!def.filterType) {
+            return `<th>${def.label}</th>`;
+        }
+
+        const currentFilter = def.filterType === 'redact' ? columnRedactFilter : columnDeidentifyFilter;
+        const displayLabel = currentFilter === 'both'
+            ? def.label
+            : `${def.label} (${currentFilter === 'yes' ? 'Yes' : 'No'})`;
+
+        const optionsHtml = filterOptions.map(option => {
+            const isActive = option.value === currentFilter ? ' aria-current="true"' : '';
+            return `<li data-value="${escapeHtml(String(option.value))}"${isActive}>${escapeHtml(String(option.label))}</li>`;
+        }).join('');
+
+        return `
+            <th>
+                <details class="header-filter" data-filter="${def.filterType}">
+                    <summary>
+                        <span>${displayLabel}</span>
+                        <span class="header-filter-arrow">▾</span>
+                    </summary>
+                    <ul>
+                        ${optionsHtml}
+                    </ul>
+                </details>
+            </th>`;
+    };
+
+    const headerCells = definitions.map(buildHeaderCell).join('');
+    headerRow.innerHTML = `<tr>${headerCells}</tr>`;
+    setupColumnNameDropdownHandlers();
 }
 
-async function renderManageDataSourcePage() {
+function attachColumnNameCheckboxListeners(listElement) {
+    if (!listElement) return;
+    listElement.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        input.addEventListener('change', () => {
+            const li = input.closest('li[data-column]');
+            if (!li) return;
+            const encoded = li.dataset.column || '';
+            if (!encoded) return;
+            const columnName = decodeURIComponent(encoded);
+            columnVisibility.set(columnName, input.checked);
+            updateColumnRowsVisibility();
+        });
+    });
+}
 
+function setupColumnNameDropdownHandlers() {
+    const container = document.querySelector('.column-name-filter');
+    if (!container) return;
+    const searchInput = container.querySelector('.column-name-dropdown-search');
+    const list = container.querySelector('.column-name-dropdown-list');
+    const selectAllCheckbox = container.querySelector('#column-name-select-all');
+    const sortAscBtn = container.querySelector('[data-action="sort-asc"]');
+    const sortDescBtn = container.querySelector('[data-action="sort-desc"]');
+
+    const refreshList = () => {
+        if (!list) return;
+        list.innerHTML = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
+        attachColumnNameCheckboxListeners(list);
+        // Update Select All state
+        if (selectAllCheckbox) {
+            const all = Array.from(list.querySelectorAll('li[data-column] input[type="checkbox"]'));
+            const checked = all.filter(i => i.checked).length;
+            selectAllCheckbox.checked = all.length > 0 && checked === all.length;
+            selectAllCheckbox.indeterminate = checked > 0 && checked < all.length;
+        }
+    };
+
+    if (searchInput) {
+        searchInput.value = columnNameDropdownSearchTerm;
+        searchInput.addEventListener('input', (event) => {
+            columnNameDropdownSearchTerm = event.target.value;
+            refreshList();
+        });
+    }
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checked = !!e.target.checked;
+            // apply to currently visible list items
+            if (list) {
+                list.querySelectorAll('li[data-column]').forEach(li => {
+                    const encoded = li.dataset.column;
+                    const name = decodeURIComponent(encoded || '');
+                    columnVisibility.set(name, checked);
+                    const cb = li.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = checked;
+                });
+            }
+            updateColumnRowsVisibility();
+        });
+    }
+
+    if (sortAscBtn) {
+        sortAscBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            columnNameSortDirection = 'asc';
+            applyColumnSearchFilter();
+            // keep dropdown open and refresh the arrow
+            updateTableHeader(currentDataSourceTypeID);
+            setupColumnNameDropdownHandlers();
+        });
+    }
+
+    if (sortDescBtn) {
+        sortDescBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            columnNameSortDirection = 'desc';
+            applyColumnSearchFilter();
+            updateTableHeader(currentDataSourceTypeID);
+            setupColumnNameDropdownHandlers();
+        });
+    }
+
+    refreshList();
+}
+
+async function renderManageDataSetPage() {
+    // Form input elements must be defined before running export logic
     const selectionDropdown = document.getElementById('dataSetSelection');
     const detailsContainer = document.getElementById('dataSetDetailsContainer');
     const optgroup = selectionDropdown.querySelector('optgroup');
     let dataSource = {};
 
-    // Form input elements
     const nameInput = document.getElementById('dataSetName');
     const descriptionInput = document.getElementById('dataSetDescription');
     const dataSourceDrpDwn = document.getElementById('dataSource');
@@ -1208,6 +1707,162 @@ async function renderManageDataSourcePage() {
     const owner = document.getElementById('dataSetOwner');
     const approver = document.getElementById('dataSetApprover');
     const dataSetFieldsTable = document.getElementById('dataSetFieldsTable');
+    const submitButton = document.getElementById('submit-button');
+
+    // Export button logic (now positioned after form elements)
+    const exportBtn = document.getElementById('export-ds-cols-btn');
+    const exportLoading = document.getElementById('export-ds-cols-loading');
+
+    if (exportBtn) {
+        
+        function getCurrentDataSourceName() {
+            const dsSelect = document.getElementById('dataSource');
+            const selected = dsSelect?.options[dsSelect.selectedIndex];
+            return selected ? selected.text : '';
+        }
+
+        function getTimestampString() {
+            const now = new Date();
+            return now.toISOString().replace(/[-:T]/g, '').slice(0, 15);
+        }
+
+        async function createAndDownloadExcelFile() {
+            const formData = gatherFormData(allColumnsData);
+            if (!formData.Name || !formData.Owner || !formData.Approvers) {
+                showToast('Please fill in Name, Owner, and Approver before exporting.', 'warning');
+                return;
+            }
+
+            const payload = {
+                ...formData, // Spread all properties from the original object
+                OptOutMessage: null,
+                OptOutList: null,
+                OptOutColumn: "-1",
+                DataSourceTypeID: currentDataSourceTypeID
+            };
+
+
+            exportLoading.style.display = 'inline-block';
+            exportBtn.disabled = true;
+
+            try {
+                const dataSourceName = getCurrentDataSourceName() || 'DataSource';
+                const timestamp = getTimestampString();
+                const filename = `DataSetColumns_${dataSourceName}_${timestamp}.zip`;
+
+                // 1. Get the response (which is the Blob)
+                const response = await window.loomeApi.runApiRequest(API_EXPORT_DATASET_COLUMNS_EXCEL, {
+                    "payload": payload 
+                });
+
+                console.log("--- DEBUG START ---");
+                console.log("Constructor:", response.constructor.name);
+                console.log("Keys:", Object.keys(response));
+                console.log("Full Object:", response);
+                console.log("Typeof:", typeof response);
+                console.log("--- DEBUG END ---");
+                
+                // 1. Get the base64 string from the object
+                const base64String = response.fileData;
+
+                // 2. Convert Base64 to a Blob
+                const byteCharacters = atob(base64String);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const finalBlob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+                // 3. Download
+                const url = window.URL.createObjectURL(finalBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+
+                // Cleanup
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+
+                showToast('Dataset Columns exported successfully!');
+
+            } catch (error) {
+                console.error("Export Error:", error);
+                showToast(error.message || 'Failed to export. Please try again.', 'warning');
+            } finally {
+                exportLoading.style.display = 'none';
+                updateExportButtonState();
+            }
+        }
+
+
+        function updateExportButtonState() {
+            const dsSelected = dataSourceDrpDwn?.value && dataSourceDrpDwn.value !== '';
+            const tableHasRows = document.querySelectorAll('#dataSetColsBody tr').length > 0;
+            exportBtn.style.display = dsSelected ? '' : 'none';
+            exportBtn.disabled = !tableHasRows;
+            exportBtn.title = tableHasRows ? 'Export columns and dataset info to Excel.' : 'Select a Data Source and ensure columns are loaded to enable export.';
+        }
+
+        dataSourceDrpDwn?.addEventListener('change', updateExportButtonState);
+        document.getElementById('dataSetColsBody').addEventListener('DOMSubtreeModified', updateExportButtonState);
+        updateExportButtonState();
+        exportBtn.addEventListener('click', createAndDownloadExcelFile);
+    }
+
+    // Delete button handler: call delete API and show API detail on error
+    const deleteBtn = document.getElementById('delete-button');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            const selectedId = selectionDropdown ? selectionDropdown.value : null;
+            if (!selectedId || selectedId === 'new') {
+                showToast('Select an existing Data Set to delete.', 'error');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to delete this Data Set? This action cannot be undone.')) return;
+
+            try {
+                const params = { id: parseInt(selectedId, 10) };
+                // Use the low-level runApiRequest so we can inspect error payloads directly
+                const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASET, params);
+                const parsed = safeParseJson(raw);
+
+                // If the API responded with a detail message, treat it as an error
+                if (parsed && parsed.detail) {
+                    showToast(parsed.detail, 'error');
+                    return;
+                }
+
+                // Some APIs may return a truthy success value or empty array; consider that success
+                showToast('Data Set deleted successfully.', 'success');
+                setTimeout(() => window.location.reload(), 700);
+            } catch (err) {
+                // Prefer API `detail` when available in thrown error objects
+                let detailMsg = 'Failed to delete Data Set.';
+                try {
+                    if (err && typeof err === 'object') {
+                        if (err.detail) detailMsg = err.detail;
+                        else if (err.response) {
+                            const parsed = safeParseJson(err.response);
+                            detailMsg = parsed && parsed.detail ? parsed.detail : (err.message || JSON.stringify(err));
+                        } else {
+                            detailMsg = err.message || JSON.stringify(err);
+                        }
+                    } else if (typeof err === 'string') {
+                        detailMsg = err;
+                    }
+                } catch (e) {
+                    detailMsg = 'Failed to delete Data Set.';
+                }
+                showToast(detailMsg, 'error');
+            }
+        });
+    }
+
+ 
 
     /**
      * Clears the form fields to their default state for creating a new entry.
@@ -1266,9 +1921,32 @@ async function renderManageDataSourcePage() {
 
             const selectedDataSet = allDataSets.find(ds => ds.DataSetID == selectedId);
             if (!selectedDataSet) return;
-            const dataSource = allDataSources.find(dsrc => dsrc.DataSourceID == selectedDataSet.DataSourceID);
-            if (!dataSource) return;
+            
+            let dataSource = allDataSources.find(dsrc => dsrc.DataSourceID == selectedDataSet.DataSourceID);
+            submitButton.textContent = 'Save Data Set';
+            submitButton.disabled = false;
+            // The data source might be inactive and thus not included in the initial dropdown population. If it's not found, we should still fetch it to populate the form correctly.
+            if (!dataSource) {
+                // try fetching the single data source even if getAllDataSources() excluded inactive ones
+                const fetched = await getFromAPI(API_GET_DATASOURCE_BY_ID, { data_source_id: selectedDataSet.DataSourceID });
+                dataSource = Array.isArray(fetched) && fetched.length ? fetched[0] : null;
+                const option = document.createElement('option');
+                option.value = String(dataSource.DataSourceID);
+                option.textContent = dataSource.Name + (dataSource.IsActive ? '' : ' (Inactive)');
+                dataSourceDrpDwn.appendChild(option);
 
+                submitButton.disabled = true;
+                submitButton.textContent = 'Saving Disabled';
+                showToast('This dataset is based on an inactive data source. It is not available for requests or edits. Please contact the platform administrator for assistance.', 'warning');
+            }
+
+            // The data source might still be missing if the API call failed or if the ID is invalid. In that case, we should log a warning and avoid trying to populate the form with undefined data.
+            if (!dataSource) {
+                console.warn('Data source not found for dataset', selectedDataSet.DataSourceID);
+                return;
+            }
+
+            console.log("Selected Data Set and Data Source:", selectedDataSet, dataSource);
             // 1. Populate the main form fields
             populateForm(selectedDataSet, dataSource);
 
@@ -1284,6 +1962,14 @@ async function renderManageDataSourcePage() {
             updateTableHeader(currentDataSourceTypeID);
         }
     }
+
+    // Toggle visibility of the delete button based on whether an existing Data Set is selected
+    function updateDeleteButtonState() {
+        if (!deleteBtn) return;
+        const selected = selectionDropdown ? selectionDropdown.value : 'new';
+        deleteBtn.style.display = (selected && selected !== 'new') ? '' : 'none';
+    }
+
 
 
     // Add the 'async' keyword to the function that wraps this logic.
@@ -1304,7 +1990,9 @@ async function renderManageDataSourcePage() {
             populateDataSourceOptions(dataSourceDrpDwn, allDataSources, 'DataSourceID', 'Name');
 
             // Create the Empty Columns Table
-            updateFormForSelection(allDataSets, allDataSources);
+            await updateFormForSelection(allDataSets, allDataSources);
+            // Ensure delete button visibility is correct after initial selection population
+            try { updateDeleteButtonState(); } catch (e) { /* ignore */ }
 
 
             // // Listener for DATA SOURCE dropdown
@@ -1334,8 +2022,12 @@ async function renderManageDataSourcePage() {
 
             // Listener for TOP-LEVEL data set selection
             selectionDropdown.addEventListener('change', async () => {
+                // Always fetch fresh data on selection
+                allDataSets = await getAllDataSets();
+                allDataSources = await getAllDataSources();
                 await updateFormForSelection(allDataSets, allDataSources);
                 await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
+                try { updateDeleteButtonState(); } catch (e) { /* ignore */ }
             });
 
             // Listener for TABLE NAME dropdown
@@ -1345,9 +2037,52 @@ async function renderManageDataSourcePage() {
                     //await updateColumnsForTable(1);
                     console.log("Table Name Selector Changed");
                     await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
-                    
+
                 }
             });
+
+            const columnsSearchInput = document.getElementById('dataSetColumnsSearch');
+            if (columnsSearchInput) {
+                columnsSearchInput.addEventListener('input', () => {
+                    columnSearchTerm = (columnsSearchInput.value || '').trim();
+                    applyColumnSearchFilter();
+                });
+            }
+            const columnsHeader = document.getElementById('dataSetColsHeader');
+            if (columnsHeader) {
+                columnsHeader.addEventListener('click', (event) => {
+                    const sortButton = event.target.closest('[data-sort]');
+                    if (sortButton) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (sortButton.dataset.sort === 'column-name') {
+                            columnNameSortDirection = columnNameSortDirection === 'asc' ? 'desc' : 'asc';
+                            updateTableHeader(currentDataSourceTypeID);
+                            applyColumnSearchFilter();
+                        }
+                        return;
+                    }
+
+                    const menuItem = event.target.closest('li[data-value]');
+                    if (!menuItem) return;
+                    const detail = menuItem.closest('details[data-filter]');
+                    if (!detail) return;
+                    const filterType = detail.dataset.filter;
+                    const chosenValue = menuItem.dataset.value;
+
+                    if (filterType === 'redact') {
+                        columnRedactFilter = chosenValue;
+                    } else if (filterType === 'deidentify') {
+                        columnDeidentifyFilter = chosenValue;
+                    } else {
+                        return;
+                    }
+
+                    detail.removeAttribute('open');
+                    updateTableHeader(currentDataSourceTypeID);
+                    applyColumnSearchFilter();
+                });
+            }
 
             // --- "RENDER" EVENT LISTENER ---
             // This listener ONLY updates the view, it does not fetch data.
@@ -1434,7 +2169,7 @@ async function renderManageDataSourcePage() {
                     console.error("Cannot update: missing row or field information.");
                     return;
                 }
-                
+
                 const uniqueId = rowElement.dataset.id;
                 if (!uniqueId) {
                     console.error("Cannot update: missing data-id on the row.");
@@ -1473,8 +2208,7 @@ async function renderManageDataSourcePage() {
             // =================================================================
 
             const manageDataSetForm = document.getElementById('manageDataSetForm');
-            const submitButton = document.getElementById('submit-button');
-
+            
             /**
              * The main submit handler for the entire form.
              */
@@ -1493,7 +2227,7 @@ async function renderManageDataSourcePage() {
                     console.log("Form Data to Submit:", formData);
                     // --- Client-side validation (optional but recommended) ---
                     if (!formData.Name) {
-                        showToast('Data Set Name is required.', 'info');
+                        showToast('Data Set Name is required.', 'warning');
                         throw new Error('Validation failed: Name is required.');
                     }
 
@@ -1547,4 +2281,4 @@ async function renderManageDataSourcePage() {
 
 }
 
-renderManageDataSourcePage();
+renderManageDataSetPage();
