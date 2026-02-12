@@ -133,7 +133,7 @@
     {
         "id": 42,
         "name": "GetDataSet",
-        "url": "https://PLACEHOLDER/ca-tre-prod-australiaeast.gentleglacier-05e23736.australiaeast.azurecontainerapps.io/api/DataSet?search={{search}}&page={{page}}&pageSize={{pageSize}}&activeStatus={{activeStatus}}",
+        "url": "https://PLACEHOLDER/api/DataSet?search={{search}}&page={{page}}&pageSize={{pageSize}}&activeStatus={{activeStatus}}",
         "body": "",
         "headers": [
             {
