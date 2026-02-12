@@ -752,27 +752,7 @@ async function updateMetaDataTable(dataSource, dataSetID) {
     const initialParams = { "page": 1, "pageSize": 100, "search": '' };
     const results = await getFromAPI(API_GET_METADATA, initialParams) || [];
 
-    // Build metadata definitions dynamically from API `results`.
-    // Each result has: MetaDataID, Name, Description, IsActive, DataSourceTypeIDs[]
-    const defs = (Array.isArray(results) ? results : [])
-        .filter(r => r && r.IsActive && Array.isArray(r.DataSourceTypeIDs) && r.DataSourceTypeIDs.some(id => String(id) === String(dataSource.DataSourceTypeID)))
-        .map(r => ({
-            id: r.MetaDataID,
-            label: r.Name || `Meta ${r.MetaDataID}`,
-            inputId: `meta_${r.MetaDataID}`,
-            type: 'text',
-            description: r.Description || ''
-        }));
-
-    if (!defs.length) {
-        // No metadata fields for this type
-        metaDataTable.style.display = 'none';
-        metaDataPlaceholder.style.display = 'block';
-        metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
-        return;
-    }
-
-    // If editing an existing dataset, fetch existing metadata values
+    // If editing an existing dataset, fetch existing metadata values first
     let existingMeta = [];
     if (dataSetID && dataSetID !== 'new') {
         try {
@@ -783,14 +763,80 @@ async function updateMetaDataTable(dataSource, dataSetID) {
         }
     }
 
+    // Build metadata definitions dynamically from API `results`.
+    // Each result has: MetaDataID, Name, Description, IsActive, DataSourceTypeIDs[]
+    const allDefsById = (Array.isArray(results) ? results : []).reduce((acc, r) => {
+        if (!r || r.MetaDataID === undefined) return acc;
+        acc[String(r.MetaDataID)] = r;
+        return acc;
+    }, {});
+
+    // Base defs: those currently associated with this DataSourceType and active
+    const baseDefs = (Array.isArray(results) ? results : [])
+        .filter(r => r && r.IsActive && Array.isArray(r.DataSourceTypeIDs) && r.DataSourceTypeIDs.some(id => String(id) === String(dataSource.DataSourceTypeID)))
+        .map(r => ({
+            id: r.MetaDataID,
+            label: r.Name || `Meta ${r.MetaDataID}`,
+            inputId: `meta_${r.MetaDataID}`,
+            type: 'text',
+            description: r.Description || '',
+            legacy: false
+        }));
+
+    // If editing an existing dataset, include any metadata values that were previously assigned
+    // even if the metadata is no longer associated with the current DataSourceType.
+    const extraDefs = [];
+    if (existingMeta && existingMeta.length > 0) {
+        const baseIds = new Set(baseDefs.map(d => String(d.id)));
+        existingMeta.forEach(mv => {
+            const mid = String(mv.MetaDataID);
+            if (!baseIds.has(mid)) {
+                const metaDef = allDefsById[mid];
+                if (metaDef) {
+                    extraDefs.push({
+                        id: metaDef.MetaDataID,
+                        label: `${metaDef.Name || `Meta ${metaDef.MetaDataID}`} (legacy)`,
+                        inputId: `meta_${metaDef.MetaDataID}`,
+                        type: 'text',
+                        description: metaDef.Description || '',
+                        legacy: true
+                    });
+                    baseIds.add(mid);
+                } else {
+                    // Metadata definition removed entirely; still render a fallback so value is preserved
+                    extraDefs.push({
+                        id: parseInt(mid, 10),
+                        label: `Meta ${mid} (legacy)`,
+                        inputId: `meta_${mid}`,
+                        type: 'text',
+                        description: '',
+                        legacy: true
+                    });
+                    baseIds.add(mid);
+                }
+            }
+        });
+    }
+
+    const defs = baseDefs.concat(extraDefs);
+
+    if (!defs.length) {
+        // No metadata fields for this type and nothing saved previously
+        metaDataTable.style.display = 'none';
+        metaDataPlaceholder.style.display = 'block';
+        metaDataPlaceholder.textContent = 'No metadata fields for this data source type.';
+        return;
+    }
+
     // Build rows
     const rowsHtml = defs.map(def => {
         const found = existingMeta.find(m => String(m.MetaDataID) === String(def.id));
         const value = found ? (found.Value || '') : '';
         const safeValue = escapeHtml(value);
+        const legacyNote = def.legacy ? ' <small class="text-muted">(previously assigned)</small>' : '';
         return `
             <tr>
-                <td>${def.label} <input type="hidden" value="${def.id}"></td>
+                <td>${def.label}${legacyNote} <input type="hidden" value="${def.id}"></td>
                 <td width="70%">
                     <input id="${def.inputId}" class="form-control" value="${safeValue}">
                 </td>

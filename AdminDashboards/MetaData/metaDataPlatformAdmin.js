@@ -5,6 +5,7 @@ const API_GET_ALL_METADATA = 'GetMetadata';
 const API_ADD_METADATA = 'AddMetaData';
 const API_UPDATE_METADATA = 'UpdateMetaData';
 const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
+const API_DELETE_METADATA = 'DeleteMetaData';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -17,19 +18,14 @@ let dataSourceTypeNames = [];
 let dataSourceTypesList = [];
 let dataSourceTypeIdToName = new Map();
 const searchInput = document.getElementById('searchRequests');
-/**
- * Displays a temporary "toast" notification on the screen.
- * @param {string} message - The message to display.
- * @param {string} [type='success'] - The type of toast ('success', 'error', 'info').
- * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
- */
-function showToast(message, type = 'success', duration = 3000) {
+
+function showToast(message, type = 'success', duration = 5000) {
     // Create the toast element
     const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
+        toast.className = `toast-notification toast-${type}`;
     toast.textContent = message;
 
-    // Basic styling (add this to your CSS file for better results)
+    // Basic styling
     const style = document.createElement('style');
     document.head.appendChild(style);
     style.sheet.insertRule(`
@@ -49,6 +45,7 @@ function showToast(message, type = 'success', duration = 3000) {
     `);
     style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
     style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
+    style.sheet.insertRule('.toast-warning { background-color: #FF5F15; }');
 
     // Append to body and trigger animation
     document.body.appendChild(toast);
@@ -340,6 +337,7 @@ const renderAccordionDetails = (item) => {
         <!-- Action buttons remain the same -->
         <div class="mt-6 text-right">
             <div class="view-state">
+                <button type="button" class="btn btn-danger me-2 btn-delete" data-metaid="${item.MetaDataID}" title="Delete this Meta Data">Delete</button>
                 <button class="btn-edit inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Edit</button>
             </div>
             <div class="edit-state hidden space-x-2">
@@ -607,8 +605,9 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             const editButton = event.target.closest('.btn-edit');
             const saveButton = event.target.closest('.btn-save');
             const cancelButton = event.target.closest('.btn-cancel');
+            const deleteButton = event.target.closest('.btn-delete');
             
-            if (!editButton && !saveButton && !cancelButton) return;
+            if (!editButton && !saveButton && !cancelButton && !deleteButton) return;
             event.stopPropagation();
             
             const parentAccordion = event.target.closest('.accordion-body');
@@ -698,6 +697,49 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             }
 
             if (cancelButton) toggleEditState(false);
+
+            if (deleteButton) {
+                // Implement delete functionality here, similar to save but with a confirmation step
+                const confirmDelete = confirm("Are you sure you want to delete this Meta Data item? This action cannot be undone.");
+                if (!confirmDelete) return; 
+
+                try {
+                    const metaDataID = deleteButton?.dataset?.metaid || accordionBody?.dataset?.id;
+                    const params = { meta_data_id : parseInt(metaDataID, 10) };
+                    // Use the low-level runApiRequest so we can inspect error payloads directly
+                    const raw = await window.loomeApi.runApiRequest(API_DELETE_METADATA, params);
+                    const parsed = safeParseJson(raw);
+
+                    // If the API responded with a detail message, treat it as an error
+                    if (parsed && parsed.detail) {
+                        showToast(parsed.detail, 'error');
+                        return;
+                    }
+
+                    // Some APIs may return a truthy success value or empty array; consider that success
+                    showToast('Meta Data deleted successfully.', 'success');
+                    setTimeout(() => window.location.reload(), 700);
+                } catch (err) {
+                    // Prefer API `detail` when available in thrown error objects
+                    let detailMsg = 'Failed to delete Data Set.';
+                    try {
+                        if (err && typeof err === 'object') {
+                            if (err.detail) detailMsg = err.detail;
+                            else if (err.response) {
+                                const parsed = safeParseJson(err.response);
+                                detailMsg = parsed && parsed.detail ? parsed.detail : (err.message || JSON.stringify(err));
+                            } else {
+                                detailMsg = err.message || JSON.stringify(err);
+                            }
+                        } else if (typeof err === 'string') {
+                            detailMsg = err;
+                        }
+                    } catch (e) {
+                        detailMsg = 'Failed to delete Data Set.';
+                    }
+                    showToast(detailMsg, 'error');
+                }
+            }
         });
     }
 }
@@ -984,5 +1026,4 @@ async function renderPlatformAdminMetaDataPage() {
 }
 
 
-renderPlatformAdminMetaDataPage()
-
+renderPlatformAdminMetaDataPage();
