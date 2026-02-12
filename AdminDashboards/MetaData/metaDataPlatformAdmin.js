@@ -721,7 +721,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     setTimeout(() => window.location.reload(), 700);
                 } catch (err) {
                     // Prefer API `detail` when available in thrown error objects
-                    let detailMsg = 'Failed to delete Data Set.';
+                    let detailMsg = 'Failed to delete Meta Data.';
                     try {
                         if (err && typeof err === 'object') {
                             if (err.detail) detailMsg = err.detail;
@@ -735,7 +735,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                             detailMsg = err;
                         }
                     } catch (e) {
-                        detailMsg = 'Failed to delete Data Set.';
+                        detailMsg = 'Failed to delete Meta Data.';
                     }
                     showToast(detailMsg, 'error');
                 }
