@@ -39,47 +39,46 @@ let currentDataSourceID = 0;
  * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
  */
 function showToast(message, type = 'success', duration = 5000) {
-    // Create the toast element
+    const container = document.getElementById('toast-container') || (function(){
+        const c = document.createElement('div');
+        c.id = 'toast-container';
+        c.style.cssText = 'position: fixed; top: 12px; right: 12px; z-index: 9999; display: flex; flex-direction: column; gap:10px;';
+        document.body.appendChild(c);
+        return c;
+    })();
+
     const toast = document.createElement('div');
-        toast.className = `toast-notification toast-${type}`;
-    toast.textContent = message;
+    toast.className = `toast-item toast-${type}`;
+    toast.style.cssText = 'margin-bottom:0;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:420px;opacity:0;transform:translateY(-6px);transition:opacity .2s ease,transform .2s ease;';
 
-    // Basic styling
-    const style = document.createElement('style');
-    document.head.appendChild(style);
-    style.sheet.insertRule(`
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: #fff;
-            font-family: sans-serif;
-            z-index: 9999;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(-20px);
-        }
-    `);
-    style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
-    style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
-    style.sheet.insertRule('.toast-warning { background-color: #FF5F15; }');
+    let bg = '#2196F3';
+    if (type === 'success') bg = '#1AABA3';
+    if (type === 'error') bg = '#f44336';
+    if (type === 'warning') bg = '#ff9800';
+    toast.style.backgroundColor = bg;
 
-    // Append to body and trigger animation
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-    }, 10); // A tiny delay to allow the CSS transition to work
+    const text = document.createElement('div');
+    text.style.flex = '1';
+    text.textContent = message;
+    toast.appendChild(text);
 
-    // Set a timer to remove the toast
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
-        // Remove the element from the DOM after the fade-out animation
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, duration);
+    if (type === 'error') {
+        const btn = document.createElement('button');
+        btn.innerHTML = '&times;';
+        btn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
+        btn.onclick = () => { if (toast.parentNode) toast.remove(); };
+        toast.appendChild(btn);
+    }
+
+    container.appendChild(toast);
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+
+    if (type !== 'error') {
+        const t = (typeof duration === 'number') ? duration : 5000;
+        setTimeout(() => { if (toast.parentNode) { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 200); } }, t);
+    }
+
+    return toast;
 }
 
 /**
@@ -1168,8 +1167,19 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
         allColumnsData = newColumnsData || [];
         refreshColumnVisibilityMap();
 
+        // Ensure the column-name dropdown initialization runs again after a fresh load
+        // so the "Select All" checkbox and per-column checkboxes are enabled on first real populate.
+        columnNameDropdownInitialized = false;
+
         // Reapply the search filter so pagination and table reflect the new data.
         applyColumnSearchFilter(dataSourceTypeId);
+
+        // Rebuild the table header (and the column-name dropdown) now that columns are available.
+        try {
+            updateTableHeader(currentDataSourceTypeID);
+        } catch (e) {
+            console.warn('Failed to update table header after loading columns:', e);
+        }
     } finally {
         hideColumnsLoader();
     }

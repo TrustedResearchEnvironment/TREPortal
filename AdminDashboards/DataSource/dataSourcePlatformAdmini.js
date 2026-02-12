@@ -30,46 +30,49 @@ let folderConnectionMap = new Map();
  * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
  */
 function showToast(message, type = 'success', duration = 3000) {
-    // Create the toast element
+    const container = document.getElementById('toast-container') || createToastContainer();
     const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.textContent = message;
+    toast.className = `toast-item toast-${type}`;
+    toast.style.cssText = 'margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
 
-    // Basic styling (add this to your CSS file for better results)
-    const style = document.createElement('style');
-    document.head.appendChild(style);
-    style.sheet.insertRule(`
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: #fff;
-            font-family: sans-serif;
-            z-index: 9999;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(-20px);
-        }
-    `);
-    style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
-    style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
+    let bgColor = '#2196F3'; // info default
+    if (type === 'success') bgColor = '#1AABA3';
+    if (type === 'error') bgColor = '#f44336';
+    if (type === 'warning') bgColor = '#ff9800';
+    toast.style.backgroundColor = bgColor;
 
-    // Append to body and trigger animation
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-    }, 10); // A tiny delay to allow the CSS transition to work
+    const textWrap = document.createElement('div');
+    textWrap.style.flex = '1';
+    textWrap.textContent = message;
+    toast.appendChild(textWrap);
 
-    // Set a timer to remove the toast
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
-        // Remove the element from the DOM after the fade-out animation
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, duration);
+    // Add close button for error toasts (persistent)
+    if (type === 'error') {
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
+        closeBtn.onclick = () => {
+            if (toast.parentNode) toast.remove();
+        };
+        toast.appendChild(closeBtn);
+    }
+
+    container.appendChild(toast);
+    // Trigger animation
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+
+    // Auto-dismiss for non-error toasts
+    const dismissDuration = (typeof duration === 'number') ? duration : 5000;
+    if (type !== 'error') {
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 250);
+            }
+        }, dismissDuration);
+    }
+
+    return toast;
 }
 
 /**
@@ -211,10 +214,10 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
     // EXCLUDE FOLDER TYPE FOR NOW
      // Use the real DataSourceTypeID from allTypesArray instead of index-based values
     const optionsHtml = allTypesArray
-        .filter(typeObj => typeObj.TypeName !== 'Folder')
+        .filter(typeObj => typeObj.Name !== 'Folder')
         .map(typeObj => {
             // Use the stable backend ID for the option value to keep selectedTypeId checks correct
-            return `<option value="${typeObj.DataSourceTypeID}">${typeObj.TypeName}</option>`;
+            return `<option value="${typeObj.DataSourceTypeID}">${typeObj.Name}</option>`;
         }).join(''); // .join('') concatenates all the strings in the array into one big string.
 
     // Populate the modal body with the provided HTML content (your markup)
