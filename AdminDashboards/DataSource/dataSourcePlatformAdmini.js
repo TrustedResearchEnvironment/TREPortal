@@ -832,7 +832,7 @@ const renderAccordionDetails = (item) => {
                     <tr>
                         <td class="p-2 border-t">${escapeHtml(displayKey)}</td>
                         <td class="p-2 border-t">
-                            <span id="dbConnValue" data-field-name="${escapeHtml(displayKey)}" data-value="${escapeHtml(value)}">${escapeHtml(displayValue || '')}</span>
+                            <span class="dbConnValue" data-field-name="${escapeHtml(displayKey)}" data-value="${escapeHtml(value)}">${escapeHtml(displayValue || '')}</span>
                         </td>
                     </tr>
                 `;
