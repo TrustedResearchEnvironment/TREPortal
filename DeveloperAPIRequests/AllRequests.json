@@ -25,7 +25,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:14.8431414",
-        "dateModified": "2025-11-03T03:58:17.2649802"
+        "dateModified": "2025-11-14T10:51:28.1593089"
     },
     {
         "id": 38,
@@ -51,7 +51,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:19.1539031",
-        "dateModified": "2025-11-03T03:58:21.5795415"
+        "dateModified": "2025-11-14T10:51:32.42706"
     },
     {
         "id": 39,
@@ -77,7 +77,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:23.4484891",
-        "dateModified": "2025-11-03T04:01:49.0816874"
+        "dateModified": "2025-11-14T10:51:36.7112196"
     },
     {
         "id": 40,
@@ -103,7 +103,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:27.7678051",
-        "dateModified": "2025-11-03T04:01:53.4334328"
+        "dateModified": "2025-11-14T10:51:40.992493"
     },
     {
         "id": 41,
@@ -128,12 +128,12 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:32.0798735",
-        "dateModified": "2025-11-03T04:01:57.737481"
+        "dateModified": "2025-11-14T10:51:45.2656437"
     },
     {
         "id": 42,
         "name": "GetDataSet",
-        "url": "https://PLACEHOLDER/ca-tre-prod-australiaeast.gentleglacier-05e23736.australiaeast.azurecontainerapps.io/api/DataSet?search={{search}}&page={{page}}&pageSize={{pageSize}}&activeStatus={{activeStatus}}",
+        "url": "https://PLACEHOLDER/api/DataSet?search={{search}}&page={{page}}&pageSize={{pageSize}}&activeStatus={{activeStatus}}",
         "body": "",
         "headers": [
             {
@@ -155,9 +155,9 @@
             "upn"
         ],
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
-        "modifiedBy": "d2e75a1b-56d2-4bd5-9ee2-4daa4704baf3",
+        "modifiedBy": "e1e72d99-d7c9-4832-8c2c-e632c14e9d3d",
         "dateCreated": "2025-11-03T03:14:36.469108",
-        "dateModified": "2025-11-14T10:39:18.8465475"
+        "dateModified": "2025-11-17T03:31:39.262646"
     },
     {
         "id": 43,
@@ -185,7 +185,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:40.7753057",
-        "dateModified": "2025-11-03T04:02:06.3953718"
+        "dateModified": "2025-11-14T10:51:53.7992562"
     },
     {
         "id": 44,
@@ -213,7 +213,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:45.1069556",
-        "dateModified": "2025-11-03T04:02:10.7411483"
+        "dateModified": "2025-11-14T10:51:58.0831525"
     },
     {
         "id": 45,
@@ -241,7 +241,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:49.4348467",
-        "dateModified": "2025-11-03T04:02:15.1279057"
+        "dateModified": "2025-11-14T10:52:02.353771"
     },
     {
         "id": 46,
@@ -270,7 +270,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:53.7636146",
-        "dateModified": "2025-11-03T04:02:19.4541012"
+        "dateModified": "2025-11-14T10:52:06.6749768"
     },
     {
         "id": 47,
@@ -299,7 +299,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:14:58.0868104",
-        "dateModified": "2025-11-03T04:02:23.7463118"
+        "dateModified": "2025-11-14T10:52:10.9657741"
     },
     {
         "id": 48,
@@ -329,7 +329,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:02.4162436",
-        "dateModified": "2025-11-03T04:02:28.0583795"
+        "dateModified": "2025-11-14T10:52:15.2864873"
     },
     {
         "id": 49,
@@ -354,7 +354,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:06.7106276",
-        "dateModified": "2025-11-03T04:02:32.3734917"
+        "dateModified": "2025-11-14T10:52:19.565192"
     },
     {
         "id": 50,
@@ -379,7 +379,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:11.0844407",
-        "dateModified": "2025-11-03T04:02:36.6883144"
+        "dateModified": "2025-11-14T10:52:23.828604"
     },
     {
         "id": 51,
@@ -405,7 +405,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:15.4135081",
-        "dateModified": "2025-11-03T04:02:41.0109061"
+        "dateModified": "2025-11-14T10:52:28.1205124"
     },
     {
         "id": 52,
@@ -436,7 +436,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:19.7160137",
-        "dateModified": "2025-11-03T04:02:45.3541833"
+        "dateModified": "2025-11-14T10:52:32.3876529"
     },
     {
         "id": 53,
@@ -467,7 +467,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:24.0105076",
-        "dateModified": "2025-11-03T04:02:49.6482767"
+        "dateModified": "2025-11-14T10:52:36.6508515"
     },
     {
         "id": 54,
@@ -493,7 +493,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:28.2994588",
-        "dateModified": "2025-11-03T04:02:53.9806551"
+        "dateModified": "2025-11-14T10:52:40.9002688"
     },
     {
         "id": 55,
@@ -519,7 +519,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:32.6285254",
-        "dateModified": "2025-11-03T04:02:58.2942683"
+        "dateModified": "2025-11-14T10:52:45.1882104"
     },
     {
         "id": 56,
@@ -545,7 +545,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:36.9314181",
-        "dateModified": "2025-11-03T04:03:02.5954961"
+        "dateModified": "2025-11-14T10:52:49.4504625"
     },
     {
         "id": 57,
@@ -573,13 +573,13 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:41.2664202",
-        "dateModified": "2025-11-03T04:03:06.8870022"
+        "dateModified": "2025-11-14T10:52:53.7442111"
     },
     {
         "id": 58,
         "name": "UpdateMetaData",
         "url": "https://PLACEHOLDER/api/MetaData/Update/{{meta_data_id}}?meta_data_id={{meta_data_id}}",
-        "body": "{\r\n \"Name\": \"{{name}}\",\r\n \"Description\": \"{{description}}\",\r\n \"IsActive\": \"{{isActive}}\"\r\n}\r\n",
+        "body": "{\n    \"Name\": \"{{name}}\",\n    \"Description\": \"{{description}}\",\n    \"IsActive\": \"{{isActive}}\",\n    \"DataSourceTypeIDs\": {{dataSourceTypeIDs}}\n}",
         "headers": [
             {
                 "key": "X-API-Key",
@@ -597,12 +597,13 @@
             "name",
             "description",
             "isActive",
+            "dataSourceTypeIDs",
             "upn"
         ],
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
-        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
+        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
         "dateCreated": "2025-11-03T03:15:45.5869976",
-        "dateModified": "2025-11-03T04:03:11.1904247"
+        "dateModified": "2026-02-12T03:51:38.1285138"
     },
     {
         "id": 59,
@@ -627,9 +628,9 @@
             "upn"
         ],
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
-        "modifiedBy": "e1e72d99-d7c9-4832-8c2c-e632c14e9d3d",
+        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:49.8979725",
-        "dateModified": "2025-11-09T21:00:57.2349874"
+        "dateModified": "2025-11-14T10:53:02.2756201"
     },
     {
         "id": 60,
@@ -653,9 +654,9 @@
             "upn"
         ],
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
-        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:54.1969433",
-        "dateModified": "2025-11-05T08:13:13.6654321"
+        "dateModified": "2025-11-14T10:53:06.522357"
     },
     {
         "id": 61,
@@ -680,7 +681,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:15:58.5258417",
-        "dateModified": "2025-11-03T04:03:24.3221177"
+        "dateModified": "2025-11-14T10:53:10.8158322"
     },
     {
         "id": 62,
@@ -703,9 +704,9 @@
             "upn"
         ],
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
-        "modifiedBy": "e1e72d99-d7c9-4832-8c2c-e632c14e9d3d",
+        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:02.8797427",
-        "dateModified": "2025-11-03T10:02:27.489999"
+        "dateModified": "2025-11-14T10:53:15.125799"
     },
     {
         "id": 63,
@@ -730,7 +731,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:07.1970154",
-        "dateModified": "2025-11-03T04:03:32.9580674"
+        "dateModified": "2025-11-14T10:53:19.3768863"
     },
     {
         "id": 64,
@@ -760,7 +761,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:11.5217416",
-        "dateModified": "2025-11-03T04:03:37.2751699"
+        "dateModified": "2025-11-14T10:53:23.6342138"
     },
     {
         "id": 65,
@@ -790,7 +791,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:15.8292797",
-        "dateModified": "2025-11-03T04:03:41.5671437"
+        "dateModified": "2025-11-14T10:53:27.9126005"
     },
     {
         "id": 66,
@@ -816,7 +817,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:20.1381806",
-        "dateModified": "2025-11-03T04:03:45.9285887"
+        "dateModified": "2025-11-14T10:53:32.1822255"
     },
     {
         "id": 67,
@@ -842,7 +843,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:24.4415096",
-        "dateModified": "2025-11-03T04:03:50.2351451"
+        "dateModified": "2025-11-14T10:53:36.4577547"
     },
     {
         "id": 68,
@@ -874,7 +875,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:28.7322485",
-        "dateModified": "2025-11-03T04:03:54.5330193"
+        "dateModified": "2025-11-14T10:53:40.7272914"
     },
     {
         "id": 69,
@@ -910,7 +911,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:33.0550601",
-        "dateModified": "2025-11-03T04:03:58.843164"
+        "dateModified": "2025-11-14T10:53:44.9997491"
     },
     {
         "id": 70,
@@ -936,7 +937,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:37.3601521",
-        "dateModified": "2025-11-03T04:04:03.1501027"
+        "dateModified": "2025-11-14T10:53:49.2595617"
     },
     {
         "id": 71,
@@ -963,7 +964,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:41.6646306",
-        "dateModified": "2025-11-03T04:04:07.4479915"
+        "dateModified": "2025-11-14T10:53:53.5377971"
     },
     {
         "id": 72,
@@ -991,21 +992,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:45.976228",
-        "dateModified": "2025-11-03T04:04:11.7570055"
-    },
-    {
-        "id": 73,
-        "name": "REMOVE",
-        "url": "https://PLACEHOLDER/",
-        "body": "",
-        "headers": [],
-        "method": "GET",
-        "contentType": "application/x-www-form-urlencoded",
-        "parameters": [],
-        "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
-        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
-        "dateCreated": "2025-11-03T03:16:50.2807435",
-        "dateModified": "2025-11-03T04:04:16.040212"
+        "dateModified": "2025-11-14T10:53:57.7950247"
     },
     {
         "id": 74,
@@ -1024,7 +1011,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:54.5729599",
-        "dateModified": "2025-11-03T04:04:20.3489801"
+        "dateModified": "2025-11-14T10:54:06.3343988"
     },
     {
         "id": 75,
@@ -1053,7 +1040,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T03:16:58.8603133",
-        "dateModified": "2025-11-03T04:04:24.6492684"
+        "dateModified": "2025-11-14T10:54:10.6079777"
     },
     {
         "id": 76,
@@ -1085,7 +1072,7 @@
         "createdBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-03T04:01:36.1456346",
-        "dateModified": "2025-11-03T04:01:36.1456373"
+        "dateModified": "2025-11-14T10:54:14.8779799"
     },
     {
         "id": 77,
@@ -1113,9 +1100,9 @@
             "upn"
         ],
         "createdBy": "05f47618-9283-493f-ba8b-301932e43792",
-        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-04T06:57:36.5100099",
-        "dateModified": "2025-11-04T06:57:36.5102072"
+        "dateModified": "2025-11-14T10:54:19.1451507"
     },
     {
         "id": 78,
@@ -1144,35 +1131,9 @@
             "upn"
         ],
         "createdBy": "05f47618-9283-493f-ba8b-301932e43792",
-        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-04T06:59:30.9289642",
-        "dateModified": "2025-11-04T15:17:43.2601941"
-    },
-    {
-        "id": 79,
-        "name": "CreateDataSet 2",
-        "url": "https://PLACEHOLDER/api/DataSet/Create",
-        "body": "{{payload}}",
-        "headers": [
-            {
-                "key": "X-UPN",
-                "value": "{{upn}}"
-            },
-            {
-                "key": "X-API-Key",
-                "value": "PLACEHOLDER"
-            }
-        ],
-        "method": "POST",
-        "contentType": "application/json",
-        "parameters": [
-            "payload",
-            "upn"
-        ],
-        "createdBy": "2cdcc66b-b706-405f-93ac-31cce44536bc",
-        "modifiedBy": "2cdcc66b-b706-405f-93ac-31cce44536bc",
-        "dateCreated": "2025-11-05T07:19:06.9923373",
-        "dateModified": "2025-11-05T07:19:06.9923393"
+        "dateModified": "2025-11-14T10:54:23.4092614"
     },
     {
         "id": 81,
@@ -1195,9 +1156,9 @@
             "upn"
         ],
         "createdBy": "05f47618-9283-493f-ba8b-301932e43792",
-        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-05T14:24:47.0509443",
-        "dateModified": "2025-11-05T14:24:47.0509468"
+        "dateModified": "2025-11-14T10:54:31.9451339"
     },
     {
         "id": 82,
@@ -1221,8 +1182,108 @@
             "upn"
         ],
         "createdBy": "e1e72d99-d7c9-4832-8c2c-e632c14e9d3d",
-        "modifiedBy": "e1e72d99-d7c9-4832-8c2c-e632c14e9d3d",
+        "modifiedBy": "933fe020-ee58-4d03-bcdf-89f3aecf4d7c",
         "dateCreated": "2025-11-08T08:11:06.9585713",
-        "dateModified": "2025-11-08T08:11:06.9587027"
+        "dateModified": "2025-11-14T10:54:36.2027084"
+    },
+    {
+        "id": 83,
+        "name": "DeleteDataSet",
+        "url": "https://PLACEHOLDER/api/DataSet/{{id}}",
+        "body": "",
+        "headers": [
+            {
+                "key": "X-UPN",
+                "value": "{{upn}}"
+            }
+        ],
+        "method": "GET",
+        "contentType": "application/json",
+        "parameters": [
+            "id",
+            "upn"
+        ],
+        "createdBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "dateCreated": "2026-02-12T03:43:03.6568757",
+        "dateModified": "2026-02-12T03:43:03.6570417"
+    },
+    {
+        "id": 84,
+        "name": "DeleteDataSource",
+        "url": "https://PLACEHOLDER/api/DataSource/{{id}}",
+        "body": "",
+        "headers": [
+            {
+                "key": "X-UPN",
+                "value": "{{upn}}"
+            },
+            {
+                "key": "X-API-KEY",
+                "value": "testingmode"
+            }
+        ],
+        "method": "GET",
+        "contentType": "application/json",
+        "parameters": [
+            "id",
+            "upn"
+        ],
+        "createdBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "dateCreated": "2026-02-12T03:43:45.2318834",
+        "dateModified": "2026-02-12T03:43:45.2319337"
+    },
+    {
+        "id": 85,
+        "name": "DeleteMetaData",
+        "url": "https://PLACEHOLDER/api/MetaData/Delete/{{meta_data_id}}",
+        "body": "",
+        "headers": [
+            {
+                "key": "X-UPN",
+                "value": "{{upn}}"
+            },
+            {
+                "key": "X-API-KEY",
+                "value": "testingmode"
+            }
+        ],
+        "method": "GET",
+        "contentType": "application/json",
+        "parameters": [
+            "meta_data_id",
+            "upn"
+        ],
+        "createdBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "dateCreated": "2026-02-12T03:44:27.6468585",
+        "dateModified": "2026-02-12T03:44:35.9645916"
+    },
+    {
+        "id": 86,
+        "name": "SyncREDCapData",
+        "url": "https://PLACEHOLDER/api/DataSource/sync-redcap/{{data_source_id}}",
+        "body": "",
+        "headers": [
+            {
+                "key": "X-UPN",
+                "value": "{{upn}}"
+            },
+            {
+                "key": "X-API-Key",
+                "value": "PLACEHOLDER"
+            }
+        ],
+        "method": "GET",
+        "contentType": "application/x-www-form-urlencoded",
+        "parameters": [
+            "data_source_id",
+            "upn"
+        ],
+        "createdBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "modifiedBy": "05f47618-9283-493f-ba8b-301932e43792",
+        "dateCreated": "2026-02-12T03:51:11.6839786",
+        "dateModified": "2026-02-12T03:51:11.6839818"
     }
 ]
