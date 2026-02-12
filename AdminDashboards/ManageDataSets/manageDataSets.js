@@ -832,10 +832,11 @@ async function updateMetaDataTable(dataSource, dataSetID) {
         const found = existingMeta.find(m => String(m.MetaDataID) === String(def.id));
         const value = found ? (found.Value || '') : '';
         const safeValue = escapeHtml(value);
-        const legacyNote = def.legacy ? ' <small class="text-muted">(previously assigned)</small>' : '';
+        const safeLabel = escapeHtml(def.label || `Meta ${def.id}`);
+        const labelClass = def.legacy ? 'text-muted' : '';
         return `
             <tr>
-                <td>${def.label}${legacyNote} <input type="hidden" value="${def.id}"></td>
+                <td><small class="${labelClass}">${safeLabel}</small> <input type="hidden" value="${def.id}"></td>
                 <td width="70%">
                     <input id="${def.inputId}" class="form-control" value="${safeValue}">
                 </td>
