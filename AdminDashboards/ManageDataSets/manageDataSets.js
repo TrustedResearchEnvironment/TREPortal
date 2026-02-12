@@ -1133,22 +1133,6 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             }
         } else if (dataSetId && dataSetId !== 'new') {
             try {
-                console.log(`FETCHING SAVED columns for existing Data Set ID: ${dataSetId}...`);
-
-                // 1. Fetch data for EXISTING set (SAVED data from DB)
-                const fetchedData = await (dataSetId); //NEED TO CHANGE THIS
-
-                const originalData = await fetchSubFoldersWithFiles(subFolderName, currentDataSourceID);
-                console.log("Original NEW Folder Columns Data: ", originalData);
-                // Apply the consistent mapping
-                newColumnsData = originalData.map(mapFolderData);
-
-                console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
-            } catch (error) {
-                console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
-            }
-        } else if (dataSetId && dataSetId !== 'new') {
-            try {
                 // 1. Fetch data for EXISTING set (SAVED data from DB)
                 const fetchedData = await getFromAPI(API_GET_DATASET_FOLDERFILE, { "data_set_id": dataSetId });
 
