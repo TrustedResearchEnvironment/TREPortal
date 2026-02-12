@@ -186,7 +186,7 @@ function getDataSourceFormData(formElement) {
     return formData;
 }
 
-function AddDataSource(typeNamesList, allFields) {
+function AddDataSource(typeNamesList, allFields, allTypesArray) {
     // Get the modal's body element
     const modalBody = document.getElementById('addDatasourceModalBody');
     console.log("IN add data source")
@@ -209,12 +209,12 @@ function AddDataSource(typeNamesList, allFields) {
     // }).join(''); // .join('') concatenates all the strings in the array into one big string.
 
     // EXCLUDE FOLDER TYPE FOR NOW
-    const optionsHtml = typeNamesList
-        .filter(typeName => typeName !== 'Folder')
-        .map((typeName, index) => {
-            // In a real app, you'd likely use an ID from your data source type object
-            // for the value. Using index+1 here preserves a simple numeric value.
-            return `<option value="${index + 1}">${typeName}</option>`;
+     // Use the real DataSourceTypeID from allTypesArray instead of index-based values
+    const optionsHtml = allTypesArray
+        .filter(typeObj => typeObj.TypeName !== 'Folder')
+        .map(typeObj => {
+            // Use the stable backend ID for the option value to keep selectedTypeId checks correct
+            return `<option value="${typeObj.DataSourceTypeID}">${typeObj.TypeName}</option>`;
         }).join(''); // .join('') concatenates all the strings in the array into one big string.
 
     // Populate the modal body with the provided HTML content (your markup)
@@ -1345,7 +1345,7 @@ async function renderPlatformAdminDataSourcePage() {
     const addDataSrcButton = document.querySelector('#addDatasourceBtn');;
     if (addDataSrcButton) {
         addDataSrcButton.addEventListener('click', () => {
-            AddDataSource(typeNamesList, fields);
+            AddDataSource(typeNamesList, fields, allTypesArray);
         });
     }
 
