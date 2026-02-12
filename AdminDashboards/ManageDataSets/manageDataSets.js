@@ -1572,7 +1572,7 @@ function updateTableHeader(dataSourceType) {
 
         const optionsHtml = filterOptions.map(option => {
             const isActive = option.value === currentFilter ? ' aria-current="true"' : '';
-            return `<li data-value="${option.value}"${isActive}>${option.label}</li>`;
+            return `<li data-value="${escapeHtml(String(option.value))}"${isActive}>${escapeHtml(String(option.label))}</li>`;
         }).join('');
 
         return `

@@ -796,6 +796,17 @@ const renderAccordionDetails = (item) => {
     // --- NEW: Logic to build the fields table HTML ---
     let fieldsTableHtml = '';
 
+    // Small helper to escape HTML when building strings
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
 
 
     // Check if item.Fields exists and is not an empty object
@@ -819,9 +830,9 @@ const renderAccordionDetails = (item) => {
                 // Always store the real value in a data-value attribute for accurate update
                 return `
                     <tr>
-                        <td class=\"p-2 border-t\">${displayKey}</td>
-                        <td class=\"p-2 border-t\">
-                            <span id=\"dbConnValue\" data-field-name=\"${displayKey}\" data-value=\"${value}\">${displayValue || ''}</span>
+                        <td class="p-2 border-t">${escapeHtml(displayKey)}</td>
+                        <td class="p-2 border-t">
+                            <span id="dbConnValue" data-field-name="${escapeHtml(displayKey)}" data-value="${escapeHtml(value)}">${escapeHtml(displayValue || '')}</span>
                         </td>
                     </tr>
                 `;
