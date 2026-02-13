@@ -405,69 +405,38 @@ async function rejectRequestFromAPI(requestId) {
 
 // Toast notification functions
 function showToast(message, type = 'info') {
-    console.log(`Showing toast: ${message} (${type})`);
-    
     const toastContainer = document.getElementById('toast-container') || createToastContainer();
     const toast = document.createElement('div');
-    
-    // Add styling based on type
-    let backgroundColor, textColor;
-    switch(type) {
-        case 'success':
-            backgroundColor = '#4caf50';
-            textColor = 'white';
-            break;
-        case 'error':
-            backgroundColor = '#f44336';
-            textColor = 'white';
-            break;
-        case 'info':
-        default:
-            backgroundColor = '#2196F3';
-            textColor = 'white';
+    toast.className = `toast-item toast-${type}`;
+    toast.style.cssText = 'margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
+
+    let bgColor = '#2196F3'; // info
+    if (type === 'success') bgColor = '#1AABA3';
+    if (type === 'error') bgColor = '#f44336';
+    if (type === 'warning') bgColor = '#ff9800';
+    toast.style.backgroundColor = bgColor;
+
+    const textWrap = document.createElement('div');
+    textWrap.style.flex = '1';
+    textWrap.textContent = message;
+    toast.appendChild(textWrap);
+
+    if (type === 'error') {
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
+        closeBtn.onclick = () => { if (toast.parentNode) toast.remove(); };
+        toast.appendChild(closeBtn);
     }
-    
-    // Apply styles directly
-    toast.style.cssText = `
-        margin-bottom: 10px;
-        padding: 15px 20px;
-        border-radius: 4px;
-        color: ${textColor};
-        background-color: ${backgroundColor};
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        display: flex;
-        align-items: center;
-        min-width: 250px;
-        max-width: 350px;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    `;
-    
-    toast.innerHTML = `
-        <div style="flex-grow: 1;">${message}</div>
-    `;
-    
+
     toastContainer.appendChild(toast);
-    
-    // Trigger reflow to ensure transition works
-    void toast.offsetWidth;
-    
-    // Make visible
-    toast.style.opacity = '1';
-    
-    // Auto-hide after 3 seconds for success messages
-    if (type === 'success') {
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
-                }
-            }, 500); //Fade out transition for 500 milliseconds
-        }, 5000); // Display duration of 5 seconds
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+
+    const dismissDuration = 5000;
+    if (type !== 'error') {
+        setTimeout(() => { if (toast.parentNode) { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 250); } }, dismissDuration);
     }
-    
-    console.log('Toast created and appended to container');
+
     return toast;
 }
 
