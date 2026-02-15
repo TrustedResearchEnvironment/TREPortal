@@ -8,6 +8,7 @@ const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
 const API__DATASOURCE_FIELDVALUE_ID = 'GetDataSourceFieldValues';
 const API__DATASOURCE_FOLDER_ID = 'GetFolderConnection';
 const API_ADD_DATASOURCE_ID = 'AddDataSource';
+const API_DELETE_DATASOURCE_ID = 'DeleteDataSource';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -29,46 +30,49 @@ let folderConnectionMap = new Map();
  * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
  */
 function showToast(message, type = 'success', duration = 3000) {
-    // Create the toast element
+    const container = document.getElementById('toast-container') || createToastContainer();
     const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.textContent = message;
+    toast.className = `toast-item toast-${type}`;
+    toast.style.cssText = 'margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
 
-    // Basic styling (add this to your CSS file for better results)
-    const style = document.createElement('style');
-    document.head.appendChild(style);
-    style.sheet.insertRule(`
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: #fff;
-            font-family: sans-serif;
-            z-index: 9999;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(-20px);
-        }
-    `);
-    style.sheet.insertRule('.toast-success { background-color: #28a745; }'); // Green
-    style.sheet.insertRule('.toast-error { background-color: #dc3545; }');   // Red
+    let bgColor = '#2196F3'; // info default
+    if (type === 'success') bgColor = '#1AABA3';
+    if (type === 'error') bgColor = '#f44336';
+    if (type === 'warning') bgColor = '#ff9800';
+    toast.style.backgroundColor = bgColor;
 
-    // Append to body and trigger animation
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-    }, 10); // A tiny delay to allow the CSS transition to work
+    const textWrap = document.createElement('div');
+    textWrap.style.flex = '1';
+    textWrap.textContent = message;
+    toast.appendChild(textWrap);
 
-    // Set a timer to remove the toast
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
-        // Remove the element from the DOM after the fade-out animation
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, duration);
+    // Add close button for error toasts (persistent)
+    if (type === 'error') {
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
+        closeBtn.onclick = () => {
+            if (toast.parentNode) toast.remove();
+        };
+        toast.appendChild(closeBtn);
+    }
+
+    container.appendChild(toast);
+    // Trigger animation
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+
+    // Auto-dismiss for non-error toasts
+    const dismissDuration = (typeof duration === 'number') ? duration : 5000;
+    if (type !== 'error') {
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 250);
+            }
+        }, dismissDuration);
+    }
+
+    return toast;
 }
 
 /**
@@ -152,35 +156,40 @@ function getDataSourceFormData(formElement) {
     const name = formElement.querySelector('#dataSourceName').value;
     const description = formElement.querySelector('#dataSourceDescription').value;
     const isActive = formElement.querySelector('#dataSourceActive').checked;
-    
+
     // For the <select>, we get the value of the selected <option>.
-    const dataSourceTypeID = formElement.querySelector('#dataSourceType').value;
+    // Parse it as an integer to match the type used in comparisons (e.g. === 2)
+    const dataSourceTypeID = parseInt(formElement.querySelector('#dataSourceType').value, 10);
 
     // --- 2. Get values from the DYNAMICALLY generated fields ---
     // Initialize an empty object to hold the key-value pairs.
     const fields = {};
 
-    // Find the input with the class 'dynamic-field'.
-    const dynamicFieldInput = formElement.querySelector('.dynamic-field');
-    const fieldName = dynamicFieldInput.name;
-    const fieldValue = dynamicFieldInput.value;
+    // Find ALL inputs with the class 'dynamic-field'.
+    const dynamicFields = formElement.querySelectorAll('.dynamic-field');
+
+    dynamicFields.forEach(field => {
+        if (field.name) {
+            fields[field.name] = field.value;
+        }
+    });
 
 
     // --- 3. Combine everything into a final payload object ---
     // This structure is designed to match your Pydantic "Create" model.
+    // We now pass a 'fields' dictionary instead of single fieldName/fieldValue properties.
     const formData = {
         "name": name,
         "description": description,
         "isActive": isActive,
-        "dataSourceTypeID": dataSourceTypeID,//parseInt(dataSourceTypeID, 10), // Convert the string value to an integer
-        "fieldName": fieldName,
-        "fieldValue": fieldValue
+        "dataSourceTypeID": dataSourceTypeID,
+        "fields": fields
     };
 
     return formData;
 }
 
-function AddDataSource(typeNamesList, allFields) {
+function AddDataSource(typeNamesList, allFields, allTypesArray) {
     // Get the modal's body element
     const modalBody = document.getElementById('addDatasourceModalBody');
     console.log("IN add data source")
@@ -188,19 +197,28 @@ function AddDataSource(typeNamesList, allFields) {
     // This can now support multiple fields per type if needed.
     const typeIdToFieldIdMap = {
         1: [1], // 3], // Database type -> "Database Connection" and "Table Name"
-        2: [4],// 5], // REDCap API type -> "API URL" and "API Key"
+        2: [4, 5], // REDCap API type -> "API URL" and "API Key"
         3: [2]     // Folder type -> "UNC Path"
     };
 
-    // Generate the HTML string for the <option> elements.
-    // We use map() to transform each name in the list into an <option> tag.
-    // The `index` is used to create a simple value (1, 2, 3, etc.).
-    const optionsHtml = typeNamesList.map((typeName, index) => {
-        // In a real app, you'd likely use an ID from your data source type object
-        // for the value, but index + 1 works for this example.
-        return `<option value="${index + 1}">${typeName}</option>`;
-    }).join(''); // .join('') concatenates all the strings in the array into one big string.
+    // COMMENTING THIS OUT FOR NOW WHILE WE EXCLUDE FOLDER TYPE, BUT THIS IS HOW WE WOULD SCALE TO MULTIPLE FIELDS PER TYPE
+    // // Generate the HTML string for the <option> elements.
+    // // We use map() to transform each name in the list into an <option> tag.
+    // // The `index` is used to create a simple value (1, 2, 3, etc.).
+    // const optionsHtml = typeNamesList.map((typeName, index) => {
+    //     // In a real app, you'd likely use an ID from your data source type object
+    //     // for the value, but index + 1 works for this example.
+    //     return `<option value="${index + 1}">${typeName}</option>`;
+    // }).join(''); // .join('') concatenates all the strings in the array into one big string.
 
+    // EXCLUDE FOLDER TYPE FOR NOW
+     // Use the real DataSourceTypeID from allTypesArray instead of index-based values
+    const optionsHtml = allTypesArray
+        .filter(typeObj => typeObj.Name !== 'Folder')
+        .map(typeObj => {
+            // Use the stable backend ID for the option value to keep selectedTypeId checks correct
+            return `<option value="${typeObj.DataSourceTypeID}">${typeObj.Name}</option>`;
+        }).join(''); // .join('') concatenates all the strings in the array into one big string.
 
     // Populate the modal body with the provided HTML content (your markup)
     modalBody.innerHTML = `
@@ -293,9 +311,9 @@ function AddDataSource(typeNamesList, allFields) {
                             </tbody>
                         </table>
                     `;
-                    
+
                     fieldsContainer.innerHTML = dropdownHtml;
-                    
+
                     // Add change event listener to store the ConnectionId
                     const select = fieldsContainer.querySelector('select');
                     select.addEventListener('change', (e) => {
@@ -312,12 +330,52 @@ function AddDataSource(typeNamesList, allFields) {
             }
             return;
         }
+        // Special handling for RedCap type (ID = 2)
+        else if (selectedTypeId === 2) {
+            const inputHtml = `
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40%;">Name</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>REDCap API URL</td>
+                                    <td>
+                                        <input type="text" 
+                                            class="form-control form-control-sm dynamic-field" 
+                                            data-field-id="4"
+                                            name="REDCap API URL" 
+                                            placeholder="Enter value for REDCap API URL">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>REDCap API Key</td>
+                                    <td>
+                                        <div class="relative position-relative">
+                                            <input type="password" 
+                                                class="form-control form-control-sm dynamic-field pr-10" 
+                                                data-field-id="5"
+                                                name="REDCap API Key" 
+                                                id="field-5"
+                                                placeholder="Enter REDCap API Key"
+                                                style="padding-right: 2.5rem;">
+                                        
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>`;
+            fieldsContainer.innerHTML = inputHtml;
+        }
         // Special handling for Folder type (ID = 3)
         else if (selectedTypeId === 3) {
             try {
                 const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID);
                 const folders = safeParseJson(response);
-                
+
                 if (!folders || folders.length === 0) {
                     fieldsContainer.innerHTML = '<p class="text-muted">No folder connections are available.</p>';
                 } else {
@@ -360,52 +418,118 @@ function AddDataSource(typeNamesList, allFields) {
             }
             return;
         }
-        // Original code for other types
-        const requiredFieldIds = typeIdToFieldIdMap[selectedTypeId] || [];
 
-        if (requiredFieldIds.length > 0) {
-            // Find the full field objects that match the required IDs
-            const fieldsToRender = allFields.filter(field => requiredFieldIds.includes(field.FieldID));
-            
-            // Generate the HTML for the table rows
-            const fieldRowsHtml = fieldsToRender.map(field => `
-                <tr>
-                    <td>${field.Name}</td>
-                    <td>
-                        <input type="text" 
-                               class="form-control form-control-sm dynamic-field" 
-                               data-field-id="${field.FieldID}"
-                               name="${field.Name}" 
-                               placeholder="Enter value for ${field.Name}">
-                    </td>
-                </tr>
-            `).join('');
+        // Generic handling for other types (including RedCap ID=2)
+        // const requiredFieldIds = typeIdToFieldIdMap[selectedTypeId] || [];
 
-            // Inject the full table structure into the container
-            fieldsContainer.innerHTML = `
-                <table class="table table-sm table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 40%;">Name</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${fieldRowsHtml}
-                    </tbody>
-                </table>
-            `;
-        } else {
-            // If no fields are required, show the placeholder text
-            fieldsContainer.innerHTML = '<p class="text-muted">Please select a Data Source Type to see the required fields.</p>';
-        }
+        // if (requiredFieldIds.length > 0) {
+        //     // Find the full field objects that match the required IDs
+        //     const fieldsToRender = allFields.filter(field => requiredFieldIds.includes(field.FieldID));
+
+        //     // Generate the HTML for the table rows
+        //     const fieldRowsHtml = fieldsToRender.map(field => {
+        //         // Check if this field should be a password input (FieldID 5 = API Key)
+        //         if (field.FieldID === 5) {
+        //             return `
+        //                 <tr>
+        //                     <td>${field.Name}</td>
+        //                     <td>
+        //                         <div class="relative position-relative">
+        //                             <input type="password" 
+        //                                    class="form-control form-control-sm dynamic-field pr-10" 
+        //                                    data-field-id="${field.FieldID}"
+        //                                    name="${field.Name}" 
+        //                                    id="field-${field.FieldID}"
+        //                                    placeholder="Enter ${field.Name}"
+        //                                    style="padding-right: 2.5rem;">
+        //                             <button type="button" 
+        //                                     class="toggle-password-btn absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+        //                                     data-target="field-${field.FieldID}"
+        //                                     style="position: absolute; top: 0; right: 0; height: 100%; border: none; background: transparent;">
+        //                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="width: 1rem; height: 1rem;">
+        //                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+        //                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        //                                 </svg>
+        //                             </button>
+        //                         </div>
+        //                     </td>
+        //                 </tr>
+        //             `;
+        //         }
+
+        //         // Default text input
+        //         return `
+        //             <tr>
+        //                 <td>${field.Name}</td>
+        //                 <td>
+        //                     <input type="text" 
+        //                            class="form-control form-control-sm dynamic-field" 
+        //                            data-field-id="${field.FieldID}"
+        //                            name="${field.Name}" 
+        //                            placeholder="Enter value for ${field.Name}">
+        //                 </td>
+        //             </tr>
+        //         `;
+        //     }).join('');
+
+        //     // Inject the full table structure into the container
+        //     fieldsContainer.innerHTML = `
+        //         <table class="table table-sm table-bordered">
+        //             <thead class="table-light">
+        //                 <tr>
+        //                     <th style="width: 40%;">Name</th>
+        //                     <th>Value</th>
+        //                 </tr>
+        //             </thead>
+        //             <tbody>
+        //                 ${fieldRowsHtml}
+        //             </tbody>
+        //         </table>
+        //     `;
+
+        //     // Attach event listeners for any password toggle buttons
+        //     fieldsContainer.querySelectorAll('.toggle-password-btn').forEach(btn => {
+        //         btn.addEventListener('click', (e) => {
+        //             e.preventDefault();
+        //             // Click within the button (e.g. on SVG) shouldn't matter if we bind to btn
+        //             // but finding the button is key
+        //             const button = e.currentTarget;
+        //             const targetId = button.dataset.target;
+        //             const inputs = fieldsContainer.querySelectorAll(`#${targetId}`);
+
+        //             if (inputs.length > 0) {
+        //                 const input = inputs[0];
+        //                 if (input.type === 'password') {
+        //                     input.type = 'text';
+        //                     button.innerHTML = `
+        //                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="width: 1rem; height: 1rem;">
+        //                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+        //                         </svg>
+        //                     `;
+        //                 } else {
+        //                     input.type = 'password';
+        //                     button.innerHTML = `
+        //                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4" style="width: 1rem; height: 1rem;">
+        //                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+        //                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        //                         </svg>
+        //                     `;
+        //                 }
+        //             }
+        //         });
+        //     });
+
+        // } else {
+        //     // If no fields are required, show the placeholder text
+        //     fieldsContainer.innerHTML = '<p class="text-muted">Please select a Data Source Type to see the required fields.</p>';
+        // }
     };
 
     // --- 6. ATTACH the event listener to the dropdown ---
     typeSelect.addEventListener('change', handleTypeChange);
 
-    
-    
+
+
 }
 
 /**
@@ -415,7 +539,7 @@ function AddDataSource(typeNamesList, allFields) {
  * @returns {Promise<Array>} A promise that resolves to an array of all data source types.
  */
 async function getAllDataSourceTypes(pageSize = 100) {
-    
+
     let allResults = []; // Use a local variable to store results
 
     try {
@@ -448,7 +572,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
                 allResults = allResults.concat(parsed.Results);
             }
         }
-        
+
         console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
         return allResults;
 
@@ -495,13 +619,13 @@ async function fetchApiData(apiId, params = {}, context = 'data') {
     try {
         const response = await window.loomeApi.runApiRequest(apiId, params);
         const parsedResponse = safeParseJson(response);
-        
+
         // It's good practice to check if the parsing itself failed
         if (parsedResponse === null) {
             console.error(`Failed to parse JSON response when fetching ${context}.`);
             return null;
         }
-        
+
         return parsedResponse;
     } catch (error) {
         console.error(`An error occurred while fetching ${context}:`, error);
@@ -607,13 +731,14 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         const apiParams = {
             "page": page,
             "pageSize": rowsPerPage,
-            "search": searchTerm
+            "search": searchTerm,
+            "activeStatus": 2 // 2 means "All" (Active + Inactive)
         };
         console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_DATASOURCE_ID, apiParams);
 
-        
+
         const parsedResponse = safeParseJson(response);
         console.log(parsedResponse)
 
@@ -623,28 +748,28 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         currentPage = parsedResponse.CurrentPage;
         rowsPerPage = parsedResponse.PageSize;
         totalPages = Math.ceil(totalItems / rowsPerPage);
-        
+
         // --- 3. Filter using searchTerm ---
         const lowerCaseSearchTerm = searchTerm.trim().toLowerCase();
         const filteredData = lowerCaseSearchTerm
-            ? dataForPage.filter(item => 
+            ? dataForPage.filter(item =>
                 Object.values(item).some(value =>
                     String(value).toLowerCase().includes(lowerCaseSearchTerm)
                 )
             )
-        : dataForPage;
+            : dataForPage;
 
         const processedData = filteredData.map(item => ({
             ...item,
-            displayRefreshedDate: item.isRefreshed === true 
-                ? formatDate(item.RefreshedDate) 
+            displayRefreshedDate: item.isRefreshed === true
+                ? formatDate(item.RefreshedDate)
                 : "Not Refreshed Yet"
         }));
 
         // --- 4. Render the UI Components ---
         // Render the table with only the data for the current page
         renderTable(TABLE_CONTAINER_ID, tableConfig, processedData, {
-            renderAccordionContent: renderAccordionDetails 
+            renderAccordionContent: renderAccordionDetails
         });
 
         // Render pagination using the TOTAL item count from the API
@@ -652,7 +777,7 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
 
         // Update the total count display
         const dataSourceCount = document.getElementById('dataSourceCount');
-        if(dataSourceCount) {
+        if (dataSourceCount) {
             dataSourceCount.textContent = totalItems;
         }
 
@@ -674,44 +799,47 @@ const renderAccordionDetails = (item) => {
     // --- NEW: Logic to build the fields table HTML ---
     let fieldsTableHtml = '';
 
-    
-    
+    // Small helper to escape HTML when building strings
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+
+
     // Check if item.Fields exists and is not an empty object
     if (item.Fields && Object.keys(item.Fields).length > 0) {
         // Use Object.entries to iterate over key-value pairs
-        const fieldRows = Object.entries(item.Fields).map(([key, value]) => {
-            displayValue = value; // Default display value
+        const fieldRows = Object.entries(item.Fields)
+            .filter(([key, _]) => key !== 'REDCap API Key') // Exclude API Key from display
+            .map(([key, value]) => {
+                // Always use the raw value for the payload, but display mapped name for Database Connection
+                let displayValue = value;
+                let displayKey = key;
 
-            // For overriding key display names
-            let displayKey = key;
+                if (key === 'Database Connection') {
+                    // For display, show the mapped name, but keep the real value in a data attribute
+                    displayValue = dbConnectionMap.get(parseInt(value)) || value;
+                } else if (key === 'Folder Connection') {
+                    displayValue = folderConnectionMap.get(parseInt(value)) || value;
+                    displayKey = 'Folder Connection';
+                }
 
-            // Check if the current field is Database Connection
-            if (key === 'Database Connection') {
-                // Look up the name from our map. Use parseInt because the ID might be a string.
-                // If not found, fall back to showing the original value (the ID).
-                displayValue = dbConnectionMap.get(parseInt(value)) || value;
-            } else if (key === 'Folder Connection') {
-                // Look up the name from our map. Use parseInt because the ID might be a string.
-                // If not found, fall back to showing the original value (the ID).
-                
-                displayValue = folderConnectionMap.get(parseInt(value)) || value;
-
-                // instead of Folder Name in the Name column, use 'Folder Connection'
-                displayKey = 'Folder Connection';
-            }
-            
-
-            return `
-                <tr>
-                    <td class="p-2 border-t">${displayKey}</td>
-                    <td class="p-2 border-t">
-                        <span id="dbConnValue" data-field-name="${displayKey}">${displayValue || ''}</span>
-                        
-                    </td>
-                </tr>
-            `;
-        }).join(''); // Join the array of HTML strings into one string
-        //<input type="text" value="${value || ''}" class="edit-state edit-state-field hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" data-field-name="${key}">
+                // Always store the real value in a data-value attribute for accurate update
+                return `
+                    <tr>
+                        <td class="p-2 border-t">${escapeHtml(displayKey)}</td>
+                        <td class="p-2 border-t">
+                            <span class="dbConnValue" data-field-name="${escapeHtml(displayKey)}" data-value="${escapeHtml(value)}">${escapeHtml(displayValue || '')}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join(''); // Join the array of HTML strings into one string
         fieldsTableHtml = `
             <table class="w-full text-sm bg-white rounded shadow-sm">
                 <thead class="bg-gray-100">
@@ -775,8 +903,10 @@ const renderAccordionDetails = (item) => {
             </div>
         </div>
         
-        <!-- Action buttons remain the same -->
-        <div class="mt-6 text-right">
+        <!-- Action buttons: Delete (always visible) and Edit/Save/Cancel (stateful) -->
+        <div class="mt-6 flex justify-end items-center gap-2">
+            <!-- Delete is visible in both view and edit modes; placed to the left of Edit -->
+            <button class="btn-delete inline-flex justify-center rounded-md border border-transparent bg-red-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-red-700">Delete</button>
             <div class="view-state">
                 <button class="btn-edit inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Edit</button>
             </div>
@@ -803,7 +933,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
     container.innerHTML = '';
     const table = document.createElement('table');
     table.className = 'w-full divide-y divide-gray-200';
-    
+
     // ... (thead creation is the same) ...
     const thead = document.createElement('thead');
     thead.className = 'bg-gray-50';
@@ -841,7 +971,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const accordionId = `accordion-content-${item.DataSourceId || index}`;
                 triggerRow.dataset.target = `#${accordionId}`;
             }
-            
+
             // ... (main row creation is the same) ...
             headers.forEach(headerConfig => {
                 const td = document.createElement('td');
@@ -874,12 +1004,12 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const accordionId = `accordion-content-${item.DataSourceId || index}`;
                 contentRow.id = accordionId;
                 contentRow.className = 'accordion-content hidden';
-                
+
                 const contentCell = document.createElement('td');
                 contentCell.colSpan = headers.length;
                 // The render function is called here with the full item, including 'Fields'
                 contentCell.innerHTML = config.renderAccordionContent(item);
-                
+
                 contentRow.appendChild(contentCell);
                 tbody.appendChild(contentRow);
             }
@@ -893,7 +1023,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
         tbody.addEventListener('click', async (event) => {
             const trigger = event.target.closest('.accordion-trigger');
             const accordionBody = event.target.closest('.accordion-body');
-            
+
             // --- Logic for Opening/Closing the Accordion ---
             if (trigger && !accordionBody) {
                 event.preventDefault();
@@ -908,26 +1038,71 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 return;
             }
 
-            // --- Logic for Edit/Save/Cancel Buttons (remains the same) ---
+            // --- Logic for Delete/Edit/Save/Cancel Buttons ---
+            const deleteButton = event.target.closest('.btn-delete');
+            if (deleteButton) {
+                event.preventDefault();
+                event.stopPropagation();
+                const parentAccordion = deleteButton.closest('.accordion-body');
+                const dataSourceId = parentAccordion ? parentAccordion.dataset.id : null;
+                if (!dataSourceId) {
+                    showToast('Unable to determine Data Source ID for deletion.', 'error');
+                    return;
+                }
+                if (!confirm('Are you sure you want to delete this Data Source? This action cannot be undone.')) return;
+                try {
+                    const params = { id: parseInt(dataSourceId, 10) };
+                    const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASOURCE_ID, params);
+                    const parsed = safeParseJson(raw);
+                    if (parsed && parsed.detail) {
+                        showToast(parsed.detail, 'error');
+                        return;
+                    }
+                    showToast('Data Source deleted successfully.', 'success');
+                    // Refresh the table
+                    await fetchAndRenderPage(tableConfig, 1, '');
+                } catch (err) {
+                    let detailMsg = 'Failed to delete Data Source.';
+                    try {
+                        if (err && typeof err === 'object') {
+                            if (err.detail) detailMsg = err.detail;
+                            else if (err.response) {
+                                const parsed = safeParseJson(err.response);
+                                detailMsg = parsed && parsed.detail ? parsed.detail : (err.message || JSON.stringify(err));
+                            } else {
+                                detailMsg = err.message || JSON.stringify(err);
+                            }
+                        } else if (typeof err === 'string') {
+                            detailMsg = err;
+                        }
+                    } catch (e) {
+                        detailMsg = 'Failed to delete Data Source.';
+                    }
+                    showToast(detailMsg, 'error');
+                }
+                return;
+            }
+
             const editButton = event.target.closest('.btn-edit');
             const saveButton = event.target.closest('.btn-save');
             const cancelButton = event.target.closest('.btn-cancel');
-            
+
             if (!editButton && !saveButton && !cancelButton) return;
             event.stopPropagation();
-            
+
             const parentAccordion = event.target.closest('.accordion-body');
             const toggleEditState = (isEditing) => {
                 parentAccordion.querySelectorAll('.view-state').forEach(el => el.classList.toggle('hidden', isEditing));
                 parentAccordion.querySelectorAll('.edit-state').forEach(el => el.classList.toggle('hidden', !isEditing));
             };
-            
+
             if (editButton) toggleEditState(true);
 
             if (saveButton) {
+
                 // Stop the click from propagating and closing the accordion
                 event.stopPropagation();
-                
+
                 // Get the button that was clicked and its parent accordion
                 const saveBtn = saveButton;
                 const accordionBody = saveBtn.closest('.accordion-body');
@@ -938,59 +1113,37 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 saveBtn.disabled = true;
 
                 try {
+
                     // --- 1. Gather Data from the Form ---
-                    // Use document.querySelector to find elements within the accordionBody
                     const updatedName = accordionBody.querySelector('.edit-state-name').value;
                     const updatedDescription = accordionBody.querySelector('.edit-state-description').value;
                     const updatedIsActive = accordionBody.querySelector('.edit-state-isactive').checked;
 
                     // Gather all dynamic field values into a dictionary
-                    //const updatedFields = {};
-                    // const dynamicFieldInput = accordionBody.querySelector('.edit-state-field');
-                    // const fieldName = dynamicFieldInput.dataset.fieldName;
-                    // const fieldValue = dynamicFieldInput.value;
-                    // accordionBody.querySelectorAll('.edit-state-field').forEach(input => {
-                    //     const fieldName = input.dataset.fieldName; // using .dataset
-                    //     const fieldValue = input.value;
-                    //     updatedFields[fieldName] = fieldValue;
-                    // });
-                    // const dbConnSpan = document.getElementById('dbConnValue'); // Replace with the actual I
-                    // let fieldValue = null;
-                    // if (dbConnSpan) {
-                        
-                    //     fieldValue = dbConnSpan.textContent;
-                    //     console.log("The value of 'Database Connection' is:", fieldValue);
-                            
-                    // }
+                    const updatedFields = {};
+                    accordionBody.querySelectorAll('span[id="dbConnValue"]').forEach(span => {
+                        const fieldName = span.dataset.fieldName;
+                        // Try to find an input for this field in edit mode
+                        const input = accordionBody.querySelector(`.edit-state-field[data-field-name="${fieldName}"]`);
+                        if (input) {
+                            updatedFields[fieldName] = input.value;
+                        } else {
+                            // Use the real value from data-value, not the mapped display
+                            updatedFields[fieldName] = span.dataset.value;
+                        }
+                    });
 
                     // --- 2. Send Request to the Endpoint using fetch ---
-                    const dbConnSpan = document.getElementById('dbConnValue');
-                    const connType = dbConnSpan.dataset.fieldName;
-                    
-                    let updateParams = {}
-                    if (connType == 'Database Connection') {
-                        updateParams = {
-                            "data_source_id": dataSourceId ,
-                            "description":  updatedDescription,
-                            "isActive":  updatedIsActive,
-                            "name":  updatedName,
-                            "fieldName": "Database Connection",
-                            "fieldValue": displayValue
-                        };
-                    } else if (connType == 'Folder Connection') {
-                        updateParams = {
-                            "data_source_id": dataSourceId ,
-                            "description":  updatedDescription,
-                            "isActive":  updatedIsActive,
-                            "name":  updatedName,
-                            "fieldName": "Folder Connection",
-                            "fieldValue": displayValue
-                        };
-                    }
-                    
+                    const payload = {
+                        Description : updatedDescription,
+                        IsActive: updatedIsActive,
+                        Name: updatedName,
+                        Fields: updatedFields
+                    };
 
-                    
-                    const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, updateParams);
+                    console.log('Update Params:', payload);
+
+                    const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, {data_source_id: dataSourceId, payload });
 
                     // --- 3. Handle the Server's Response ---
                     if (!updatedDataSource) {
@@ -1005,12 +1158,17 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     accordionBody.querySelector('.view-state-description').textContent = updatedDataSource.Description;
                     accordionBody.querySelector('.view-state-isactive').textContent = updatedDataSource.IsActive ? 'Yes' : 'No';
 
-                    // Update the dynamic fields
-                    for (const [fieldName, fieldValue] of Object.entries(updatedDataSource.Fields)) {
-                        const fieldSpan = accordionBody.querySelector(`.view-state-field[data-field-name="${fieldName}"]`);
-                        if (fieldSpan) {
-                            fieldSpan.textContent = fieldValue;
+                    // Update the dynamic fields (only if Fields exists and is an object)
+                    if (updatedDataSource.Fields && typeof updatedDataSource.Fields === 'object') {
+                        for (const [fieldName, fieldValue] of Object.entries(updatedDataSource.Fields)) {
+                            const fieldSpan = accordionBody.querySelector(`.view-state-field[data-field-name="${fieldName}"]`);
+                            if (fieldSpan) {
+                                fieldSpan.textContent = fieldValue;
+                            }
                         }
+                    } else {
+                        // Optionally, handle the case where Fields is missing or not an object
+                        console.warn('No dynamic fields to update for this Data Source.');
                     }
 
                     // Finally, switch back to view mode by calling your existing function
@@ -1042,23 +1200,23 @@ function formatDate(inputDate) {
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
-        return 'N/A'; 
+        return 'N/A';
     }
 
     const date = new Date(inputDate);
-    
+
     if (isNaN(date.getTime())) {
         // This will be triggered if the date string is invalid, e.g., "hello world"
         console.warn(`Could not parse invalid date:`, inputDate);
         return 'N/A';
     }
-    
+
     const formattingOptions = {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
     };
-    
+
     // The only way this returns undefined is if the function exits before this line.
     return date.toLocaleDateString('en-US', formattingOptions);
 }
@@ -1088,7 +1246,7 @@ function formatDate(inputDate) {
 //     renderTable(tableContainerId, config, paginatedData, {
 //         renderAccordionContent: renderAccordionDetails 
 //     });
-    
+
 //     renderPagination('pagination-controls', filteredData.length, rowsPerPage, currentPage);
 // }
 
@@ -1119,34 +1277,36 @@ async function renderPlatformAdminDataSourcePage() {
     console.log(fields);
 
     const tableConfig = {
-                headers: [
-                    { label: "Type", key: "DataSourceTypeID", className: "break-words", widthClass: "w-1/12", 
-                        render: (value) => dataSourceTypeMap.get(value)
-                        
-                    },
-                    { label: "Name", key: "Name", className: "break-words", widthClass: "w-3/12" },
-                    { label: "Description", key: "Description", className: "break-words", widthClass: "w-6/12" },
-                    // { label: "Refreshed Date", key: "RefreshedDate", render: (value) => formatDate(value) },
-                    { label: "Refreshed Date", key: "displayRefreshedDate"},
-                    // { 
-                    //     label: "Refreshed Date", 
-                    //     key: "RefreshedDate",
-                    //     // Check the 'isRefreshed' property from the entire 'row' object
-                    //     render: (value, row) => row.isRefreshed === 1 ? formatDate(value) : "Not Refreshed Yet"
-                    // },
-                    {
-                        label: "Active",
-                        key: "IsActive",
-                        render: (value) => value ? 'Yes' : 'No'
-                    },
-                    { key: 'Details', label: '', widthClass: 'w-12', 
-                      render: () => `<div class="flex justify-end"><svg class="chevron-icon h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
-                    }
-                    
-                    
-                ]
-            };
-        
+        headers: [
+            {
+                label: "Type", key: "DataSourceTypeID", className: "break-words", widthClass: "w-1/12",
+                render: (value) => dataSourceTypeMap.get(value)
+
+            },
+            { label: "Name", key: "Name", className: "break-words", widthClass: "w-3/12" },
+            { label: "Description", key: "Description", className: "break-words", widthClass: "w-6/12" },
+            // { label: "Refreshed Date", key: "RefreshedDate", render: (value) => formatDate(value) },
+            { label: "Refreshed Date", key: "displayRefreshedDate" },
+            // { 
+            //     label: "Refreshed Date", 
+            //     key: "RefreshedDate",
+            //     // Check the 'isRefreshed' property from the entire 'row' object
+            //     render: (value, row) => row.isRefreshed === 1 ? formatDate(value) : "Not Refreshed Yet"
+            // },
+            {
+                label: "Active",
+                key: "IsActive",
+                render: (value) => value ? 'Yes' : 'No'
+            },
+            {
+                key: 'Details', label: '', widthClass: 'w-12',
+                render: () => `<div class="flex justify-end"><svg class="chevron-icon h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
+            }
+
+
+        ]
+    };
+
 
     // --- 2. Set up Event Listeners ---
     const searchInput = document.getElementById('searchRequests');
@@ -1161,7 +1321,7 @@ async function renderPlatformAdminDataSourcePage() {
     paginationContainer.addEventListener('click', (event) => {
         const button = event.target.closest('button[data-page]');
         if (!button || button.disabled) return;
-        
+
         const newPage = parseInt(button.dataset.page, 10);
         fetchAndRenderPage(tableConfig, newPage, searchInput.value);
     });
@@ -1179,7 +1339,7 @@ async function renderPlatformAdminDataSourcePage() {
             } else {
                 // If invalid, show a message and reset the input to the current page
                 alert(`Please enter a page number between 1 and ${totalPages}.`);
-                inputElement.value = currentPage; 
+                inputElement.value = currentPage;
             }
         }
     });
@@ -1188,10 +1348,10 @@ async function renderPlatformAdminDataSourcePage() {
     const addDataSrcButton = document.querySelector('#addDatasourceBtn');;
     if (addDataSrcButton) {
         addDataSrcButton.addEventListener('click', () => {
-            AddDataSource(typeNamesList, fields);
+            AddDataSource(typeNamesList, fields, allTypesArray);
         });
     }
-    
+
     // --- 7. Listener for Adding a Data Source
     // First, get a reference to the modal and the save button
     const saveButton = document.getElementById('modal-save-add-datasrc-button');
@@ -1200,9 +1360,9 @@ async function renderPlatformAdminDataSourcePage() {
     const handleSaveClick = async () => {
         // Get the modal instance at the time of clicking (not during page load)
         const modalInstance = bootstrap.Modal.getInstance(document.getElementById('addDatasourceModal'));
-        
+
         const form = document.getElementById('addDataSourceForm');
-        
+
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
             console.log("Form is invalid. Aborting save.");
@@ -1211,7 +1371,7 @@ async function renderPlatformAdminDataSourcePage() {
 
         const payload = getDataSourceFormData(form);
         console.log("Data gathered from form:", payload);
-        
+
         saveButton.disabled = true;
         saveButton.innerHTML = `
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -1219,18 +1379,17 @@ async function renderPlatformAdminDataSourcePage() {
         `;
 
         try {
-            
             const response = await window.loomeApi.runApiRequest(API_ADD_DATASOURCE_ID, payload);
             console.log("RESPONSE: ", response)
-            
+
             showToast('Data Source added successfully!\nPlease wait while the data refreshes.', 'success');
-            
+
             // This should now work!
             modalInstance.hide();
-            
+
             // Optional: Refresh the table to show the new item
             await fetchAndRenderPage(tableConfig, 1, '');
-            
+
         } catch (error) {
             console.error("API call failed:", error);
             showToast(`Error: ${error.message || 'Failed to save data.'}`, 'error');
@@ -1244,7 +1403,7 @@ async function renderPlatformAdminDataSourcePage() {
     // This tells the browser: "When a 'click' happens on 'saveButton', run the 'handleSaveClick' function."
     saveButton.addEventListener('click', handleSaveClick);
 
-    
+
 
     // --- 3. Initial Page Load ---
     // Make the first call to fetch page 1 with no search term.
