@@ -72,8 +72,8 @@ function AddMetadata(typeNamesList) {
     const checkboxesHtml = typeNamesList
         .filter(item => {
             if (!item) return false;
-            if (typeof item === 'string') return item !== 'Folder';
-            return (item.name || item.Name) !== 'Folder';
+            //if (typeof item === 'string') return item !== 'Folder';
+            return item.name || item.Name//) !== 'Folder';
         })
         .map((item, index) => {
             const id = item && (item.id || item.DataSourceTypeID) !== undefined ? (item.id || item.DataSourceTypeID) : index;
@@ -254,7 +254,7 @@ const renderAccordionDetails = (item) => {
     }
 
     // Build the checkbox list for the accordion dropdown using the global id/name list
-    const visibleTypes = (dataSourceTypesList || []).filter(t => t.name !== 'Folder');
+    const visibleTypes = dataSourceTypesList || []//).filter(t => t.name !== 'Folder');
     const checkboxesHtml = visibleTypes.length > 0
         ? visibleTypes.map((t, index) => {
             const checkboxId = `meta-${item.MetaDataID}-dataSourceType-checkbox-${index}`;
