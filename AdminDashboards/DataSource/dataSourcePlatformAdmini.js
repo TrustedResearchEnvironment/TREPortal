@@ -201,20 +201,8 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
         3: [2]     // Folder type -> "UNC Path"
     };
 
-    // COMMENTING THIS OUT FOR NOW WHILE WE EXCLUDE FOLDER TYPE, BUT THIS IS HOW WE WOULD SCALE TO MULTIPLE FIELDS PER TYPE
-    // // Generate the HTML string for the <option> elements.
-    // // We use map() to transform each name in the list into an <option> tag.
-    // // The `index` is used to create a simple value (1, 2, 3, etc.).
-    // const optionsHtml = typeNamesList.map((typeName, index) => {
-    //     // In a real app, you'd likely use an ID from your data source type object
-    //     // for the value, but index + 1 works for this example.
-    //     return `<option value="${index + 1}">${typeName}</option>`;
-    // }).join(''); // .join('') concatenates all the strings in the array into one big string.
-
-    // EXCLUDE FOLDER TYPE FOR NOW
      // Use the real DataSourceTypeID from allTypesArray instead of index-based values
     const optionsHtml = allTypesArray
-        .filter(typeObj => typeObj.Name !== 'Folder')
         .map(typeObj => {
             // Use the stable backend ID for the option value to keep selectedTypeId checks correct
             return `<option value="${typeObj.DataSourceTypeID}">${typeObj.Name}</option>`;
