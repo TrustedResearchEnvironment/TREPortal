@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Webcrumbs Plugin</title>
+    <!-- Your head content... -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<body>
+    <div id="webcrumbs">
+        <div class="bg-gray-50 min-h-screen p-6">
+            <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-md flex flex-col h-[90vh] overflow-hidden">
+                <!-- 1. FIXED HEADER: This part will NOT scroll -->
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div>
+                            <h1 id="userRequests" class="text-2xl font-bold">Data Access Requests</h1>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. SCROLLABLE WRAPPER: Added p-6 for padding -->
+                <div class="flex-grow overflow-y-auto p-6">
+
+
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+
+
+                        <div id="status-chips-container" class="chip-container mb-4">
+                            <!-- Using a data-status attribute is the key to linking the chip to the data -->
+                            <button class="chip active" data-status="Pending Approval">
+                                Pending Approval
+                                <span id="count-pending" class="chip-count"></span>
+                            </button>
+                            <button class="chip" data-status="Approved">
+                                Approved
+                                <span id="count-approved" class="chip-count"></span>
+                            </button>
+                            <button class="chip" data-status="Rejected">
+                                Rejected
+                                <span id="count-rejected" class="chip-count"></span>
+                            </button>
+                            <button class="chip" data-status="Finalised">
+                                Finalised
+                                <span id="count-finalised" class="chip-count"></span>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center mt-3 md:mt-0 gap-2">
+                            <div class="relative">
+                                <input id="searchRequests" type="text" placeholder="Search data..."
+                                    class="px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                                <span
+                                    class="material-symbols-outlined absolute right-3 top-2.5 text-gray-400">search</span>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div id="requests-table-area">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Request Name</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Requested By</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Date</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status</th>
+                                    <th scope="col" class="relative px-6 py-3">
+                                        <span class="sr-only">Actions</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Dataset Import -
+                                        Clinical Trials</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Alice Smith</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Oct 24, 2025</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span
+                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Approved</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button
+                                            class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg hover:bg-[#3da59d] transition-colors">View</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Sample Project Import
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Bob Jones</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Jan 25, 2026</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span
+                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending
+                                            Approval</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button
+                                            class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg hover:bg-[#3da59d] transition-colors mr-2">Approve</button>
+                                        <button
+                                            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">Reject</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div id="pagination-controls" class="flex justify-between items-center mt-4 px-2">
+                        <!-- pagination content can go here -->
+                    </div>
+
+                </div> <!-- End of the scrollable wrapper -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Templates -->
+    <div class="modal fade" id="viewRequestModal" tabindex="-1" aria-labelledby="viewRequestModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewRequestModalLabel">Edit Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="viewRequestModalBody">
+                    Dynamic content will be inserted here
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteRequestModal" tabindex="-1" aria-labelledby="deleteRequestModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteRequestModalLabel">Delete Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="deleteRequestModalBody">
+                    <!-- Dynamic content will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Toast container for notifications -->
+    <div id="toast-container" class="toast-top-right"></div>
+</body>
+
+</html>
