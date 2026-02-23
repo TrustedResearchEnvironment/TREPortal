@@ -75,6 +75,15 @@ function showToast(message, type = 'success', duration = 3000) {
     return toast;
 }
 
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-top-right';
+    container.style.cssText = 'position: fixed; top: 12px; right: 12px; z-index: 9999;';
+    document.body.appendChild(container);
+    return container;
+}
+
 /**
  * Fetches all DB connections and creates a lookup map.
  * @returns {Promise<Map<number, string>>} A promise that resolves to a Map where the
