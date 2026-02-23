@@ -1087,22 +1087,50 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
         }
         // --- SCENARIO 2: Creating a NEW Data Set ---
         else if (dataSetId === 'new') {
-            const redCapColumns = await syncREDCapDataSetColumns(currentDataSourceID);
+            const redCapResult= await syncREDCapDataSetColumns(currentDataSourceID);
+            const redCapResultStatus = redCapResult.status;
+            const redCapColumns = redCapResult.metadata || [];
             console.log(redCapColumns);
-            if (redCapColumns.status == "success") {
-                newColumnsData = redCapColumns.columns_detected.map((colName, idx) => ({
-                    ColumnName: colName,
-                    ColumnType: "",
-                    LogicalColumnName: "",
-                    BusinessDescription: "",
-                    ExampleValue: "",
-                    Tokenise: false,
-                    TokenIdentifierType: 0,
-                    Redact: false,
-                    DisplayOrder: idx + 1,
-                    IsFilter: false
-                }));
-            } else {
+
+            // Supports this response shapes:
+            // { status: 'success', metadata: [ { }, { }, ... ] }
+            if (redCapResultStatus === 'success' && Array.isArray(redCapColumns) && redCapColumns.length > 0) {
+                newColumnsData = redCapColumns.map((item, idx) => {
+                    // item might be a string (column name) or an object with various properties
+                    let columnName = '';
+                    let columnType = '';
+                    let logicalName = '';
+                    let businessDesc = '';
+                    let example = '';
+                    let tokenise = false;
+                    let tokenIdentifierType = 0;
+                    let redact = false;
+
+                    columnName = String(item.field_name).trim() || '';
+                    businessDesc = String(item.field_label).trim() || '';
+                    columnType = String(item.field_type).trim() || '';
+                    logicalName =  String(item.field_name).trim() || '';
+                    example = String(item.select_choices_or_calculations).trim() || '';
+                    tokenise = normalizeBooleanFlag(item.Tokenise ?? item.tokenise ?? item.Tokenize ?? false);
+                    tokenIdentifierType = item.TokenIdentifierType || item.token_identifier_type || 0;
+                    redact = normalizeBooleanFlag(item.Redact ?? item.redact ?? false);
+                    
+
+                    return {
+                        ColumnName: columnName,
+                        ColumnType: columnType || "",
+                        LogicalColumnName: logicalName,
+                        BusinessDescription: businessDesc,
+                        ExampleValue: example,
+                        Tokenise: tokenise,
+                        TokenIdentifierType: tokenIdentifierType,
+                        Redact: redact,
+                        DisplayOrder: idx + 1,
+                        IsFilter: false
+                    };
+                });
+
+            }  else {
                 console.log(`Error fetching columns for Data Set ID ${dataSetId}: Pull from REDCap server did not succeed`);
             }
         }
@@ -1518,7 +1546,7 @@ function updateTableHeader(dataSourceType) {
     }
 
     const filterOptions = [
-        { value: 'both', label: 'Both' },
+        { value: 'both', label: 'All Data' },
         { value: 'yes', label: 'Yes' },
         { value: 'no', label: 'No' }
     ];
