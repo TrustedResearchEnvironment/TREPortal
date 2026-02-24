@@ -488,7 +488,7 @@ async function getProjectsMapping() {
         console.log("Projects data fetched:", data);
         // Create a mapping from project ID to project name
         const mapping = {};
-        if (data ) {
+        if (data) {
             data.forEach(project => {
                 mapping[project.AssistProjectID] = {
                     name: project.Name,
