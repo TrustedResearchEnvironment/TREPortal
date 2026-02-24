@@ -29,6 +29,68 @@ const configMap = {
 // =================================================================
 //                      UTILITY & MODAL FUNCTIONS
 // =================================================================
+async function getFromAPI(API_ID, initialParams) {
+    let allResults = [];
+
+    try {
+        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        // Early exit if the response is null, undefined, etc.
+        if (!parsedInitial) {
+            console.log("API returned no data.");
+            return [];
+        }
+
+        let allResults = []; // Initialize as an empty array for a clean state
+
+        // --- DETECTION LOGIC ---
+        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
+
+            // --- PAGINATED PATH ---
+            console.log("Detected a paginated response.");
+
+            allResults = parsedInitial.Results;
+            const totalPages = parsedInitial.PageCount;
+
+            if (totalPages > 1) {
+                for (let page = 2; page <= totalPages; page++) {
+                    console.log(`Fetching page ${page} of ${totalPages}...`);
+
+                    // Construct params for the next page, preserving other initial params
+                    const params = { ...initialParams, "page": page };
+                    console.log(params)
+                    const response = await window.loomeApi.runApiRequest(API_ID, params);
+                    const parsed = safeParseJson(response);
+
+                    if (parsed && parsed.Results) {
+                        allResults = allResults.concat(parsed.Results);
+                    }
+
+                } // end for loop
+            }
+
+        } else {
+            // --- NON-PAGINATED PATH ---
+            console.log("Detected a non-paginated response.");
+
+            if (Array.isArray(parsedInitial)) {
+                allResults = parsedInitial;
+            } else {
+                allResults = [parsedInitial];
+            }
+        }
+
+        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        return allResults;
+
+    } catch (error) {
+        console.error("An error occurred while fetching data source types:", error);
+        return [];
+    }
+}
+
+
 function ViewRequest(request) {
     // Get the modal's body element
     const modalBody = document.getElementById('viewRequestModalBody');
@@ -412,10 +474,6 @@ async function fetchDatasetDetails(datasetID) {
 // Global variable to store project data
 let projectsCache = null;
 
-/**
- * Fetches all projects and caches them
- * @returns {Promise<Object>} A mapping from project ID to project name
- */
 async function getProjectsMapping() {
     // Return cache if already loaded
     if (projectsCache) {
@@ -425,20 +483,20 @@ async function getProjectsMapping() {
     try {
         
         // Fetch projects data
-        const response = await window.loomeApi.runApiRequest(API_GET_ASSIST_PROJECTS);
-        const data = safeParseJson(response);
-        
+        const initialParams = { "page": 1, "page_size": 100, "search": '' };
+        const data = await getFromAPI(API_GET_ASSIST_PROJECTS, initialParams);
+        console.log("Projects data fetched:", data);
         // Create a mapping from project ID to project name
         const mapping = {};
-        if (data && data.Results && Array.isArray(data.Results)) {
-            data.Results.forEach(project => {
+        if (data) {
+            data.forEach(project => {
                 mapping[project.AssistProjectID] = {
                     name: project.Name,
                     description: project.Description
                 };
             });
         }
-        
+        console.log("Projects mapping created:", mapping);
         // Cache the mapping
         projectsCache = mapping;
         return mapping;
