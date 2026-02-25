@@ -278,8 +278,15 @@ function ApproveRequest(request) {
                 Please confirm the approval of the request:<br>
                 <strong>${request.Name}</strong>
             </div>
+
+            <div class="form-group mt-3">
+                <label for="approveReason" class="form-label">Approval Note <span class="text-danger">*</span></label>
+                <textarea id="approveReason" class="form-control" rows="3" placeholder="Enter a short note for approval" required maxlength="255"></textarea>
+                <div id="approveReasonValidation" class="validation-message text-danger small d-none">Approval note is required.</div>
+            </div>
+
             <div class="form-group mt-3 d-flex justify-content-center">
-                <button id="confirmApprovalBtn" class="btn btn-success px-3 py-1">
+                <button id="confirmApprovalBtn" class="btn btn-success px-3 py-1" disabled>
                     <i class="fa fa-thumbs-up mr-2"></i>
                     Approve
                 </button>
@@ -288,30 +295,56 @@ function ApproveRequest(request) {
     `;
 
 
-    // Add event listener for the confirm approval button
+    // Add event listener for the confirm approval button with validation
     const confirmBtn = document.getElementById('confirmApprovalBtn');
+    const approveReasonEl = document.getElementById('approveReason');
+    const approveReasonValidation = document.getElementById('approveReasonValidation');
+
+    // Enable/disable the confirm button based on input
+    if (approveReasonEl) {
+        approveReasonEl.addEventListener('input', () => {
+            const val = (approveReasonEl.value || '').trim();
+            if (confirmBtn) confirmBtn.disabled = !val;
+            if (approveReasonValidation) {
+                if (val) {
+                    approveReasonValidation.classList.add('d-none');
+                } else {
+                    approveReasonValidation.classList.remove('d-none');
+                }
+            }
+        });
+    }
+
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
             console.log('Approve button clicked for request:', request.RequestID);
-            // Call the API to approve the request
-            approveRequestFromAPI(request.RequestID);
+            const note = approveReasonEl ? (approveReasonEl.value || '').trim() : '';
+            if (!note) {
+                if (approveReasonValidation) approveReasonValidation.classList.remove('d-none');
+                showToast('Please provide an approval note.', 'error');
+                if (approveReasonEl) approveReasonEl.focus();
+                return;
+            }
+            // Call the API to approve the request and include note
+            approveRequestFromAPI(request.RequestID, note);
         });
     }
 }
 
-async function approveRequestFromAPI(requestId) {
+async function approveRequestFromAPI(requestId, reason) {
     let loadingToast = null;
     
     try {
-        console.log('Approving request ID:', requestId);
+        console.log('Approving request ID:', requestId, 'note:', reason);
         
         // Show loading state
         loadingToast = showToast('Approving request...', 'info');
         console.log('Loading toast shown:', loadingToast);
         
-        const response = await window.loomeApi.runApiRequest(API_APPROVE_REQUEST, {
-            "id": requestId,
-        });
+        const params = { "id": requestId, "reason": reason };
+        if (reason !== undefined && reason !== null) params.reason = String(reason);
+
+        const response = await window.loomeApi.runApiRequest(API_APPROVE_REQUEST, params);
         
         // Log the response to console
         console.log('Approve request API response:', response);
@@ -379,7 +412,7 @@ function RejectRequest(request) {
     const modalTitle = document.getElementById('rejectRequestModalLabel');
     
     // Update the modal title dynamically based on requestID
-    modalTitle.textContent = `Reject Request: ${request.name}`;
+    modalTitle.textContent = `Reject Request: ${request.Name}`;
     
     // Populate the modal body with the dynamic content
     modalBody.innerHTML = `
@@ -389,8 +422,15 @@ function RejectRequest(request) {
                 Please confirm the Rejection of the request:<br>
                 <strong>${request.Name}</strong>
             </div>
+
+            <div class="form-group mt-3">
+                <label for="rejectReason" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
+                <textarea id="rejectReason" class="form-control" rows="3" placeholder="Enter reason for rejection" required maxlength="255"></textarea>
+                <div id="rejectReasonValidation" class="validation-message text-danger small d-none">Reason is required.</div>
+            </div>
+
             <div class="form-group mt-3 d-flex justify-content-center">
-                <button id="confirmRejectBtn" class="btn btn-danger px-3 py-1">
+                <button id="confirmRejectBtn" class="btn btn-danger px-3 py-1" disabled>
                     <i class="fa fa-thumbs-down mr-2"></i>
                     Reject
                 </button>
@@ -398,29 +438,55 @@ function RejectRequest(request) {
         </div>
     `;
 
-    // Add event listener for the confirm reject button
+    // Add event listener for the confirm reject button with validation
     const confirmBtn = document.getElementById('confirmRejectBtn');
+    const reasonEl = document.getElementById('rejectReason');
+    const reasonValidation = document.getElementById('rejectReasonValidation');
+
+    // Enable/disable the confirm button based on input
+    if (reasonEl) {
+        reasonEl.addEventListener('input', () => {
+            const val = (reasonEl.value || '').trim();
+            if (confirmBtn) confirmBtn.disabled = !val;
+            if (reasonValidation) {
+                if (val) {
+                    reasonValidation.classList.add('d-none');
+                } else {
+                    reasonValidation.classList.remove('d-none');
+                }
+            }
+        });
+    }
+
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
             console.log('Reject button clicked for request:', request.RequestID);
-            // Call the API to reject the request
-            rejectRequestFromAPI(request.RequestID);
+            const reason = reasonEl ? (reasonEl.value || '').trim() : '';
+            if (!reason) {
+                if (reasonValidation) reasonValidation.classList.remove('d-none');
+                showToast('Please provide a reason for rejection.', 'error');
+                if (reasonEl) reasonEl.focus();
+                return;
+            }
+            // Call the API to reject the request and include reason
+            rejectRequestFromAPI(request.RequestID, reason);
         });
     }
 }
 
-async function rejectRequestFromAPI(requestId) {
+async function rejectRequestFromAPI(requestId, reason) {
     let loadingToast = null;
     
     try {
-        console.log('Rejecting request ID:', requestId);
+        console.log('Rejecting request ID:', requestId, 'reason:', reason);
         
         // Show loading state
         loadingToast = showToast('Rejecting request...', 'info');
         
-        const response = await window.loomeApi.runApiRequest(API_REJECT_REQUEST, {
-            "id": requestId,
-        });
+        const params = { "id": requestId, "reason": reason };
+        if (reason !== undefined && reason !== null) params.reason = String(reason);
+
+        const response = await window.loomeApi.runApiRequest(API_REJECT_REQUEST, params);
         
         // Hide loading toast
         if (loadingToast) {
@@ -632,12 +698,9 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
         
         // Start building HTML
         let html = `
-            <div class="grid grid-cols-1 gap-5">
-                <!-- Request Information -->
+            <div class="grid grid-cols-2 gap-5">
                 <div>
                     <div class="space-y-3">
-                       
-                        <!-- Dataset Information -->
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Requested Dataset</span>
                             <span class="text-sm text-gray-500">${datasetDetails.Name || 'N/A'}</span>
@@ -654,18 +717,31 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
                             <span class="text-sm text-gray-500">${datasetDetails.DataSource || datasetDetails.DataSourceID || 'N/A'}</span>
                         </div>
 
-                        <!-- Project Information -->
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Target Project Name</span>
                             <span class="text-sm text-gray-500">${projectInfo.name}</span>
                         </div>
-                        
-                        ${projectInfo.description ? `
+                    </div>
+                </div>
+                <div>
+                    <div class="space-y-3">
+                        ${requestDetails.Purpose ? `
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Project Description</span>
-                            <span class="text-sm text-gray-500">${projectInfo.description}</span>
+                            <span class="font-medium">Purpose</span>
+                            <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
                         </div>` : ''}
 
+                        ${requestDetails.ApprovalMessage ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approval Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectionMessage ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejection Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectionMessage}</span>
+                        </div>` : ''}
                     </div>
                 </div>
             </div>
