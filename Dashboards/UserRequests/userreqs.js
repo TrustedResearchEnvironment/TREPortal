@@ -667,7 +667,7 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
         
         // Start building HTML
         let html = `
-            <div class="grid grid-cols-1 gap-5">
+            <div class="grid grid-cols-2 gap-5">
                 <!-- Request Information -->
                 <div>
                     <div class="space-y-3">
@@ -703,6 +703,28 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
 
                     </div>
                 </div>
+
+                <div>
+                    <div class="space-y-3">
+                        ${requestDetails.Purpose ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Purpose</span>
+                            <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.ApprovalMessage ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approval Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectionMessage ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejection Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectionMessage}</span>
+                        </div>` : ''}
+                    </div>
+                </div
             </div>
         `;
         
