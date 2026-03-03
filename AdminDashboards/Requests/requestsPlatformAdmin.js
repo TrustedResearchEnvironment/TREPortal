@@ -465,18 +465,7 @@ function renderTable(containerId, data, config, selectedStatus) {
                 <td colspan="${headers.length + 1}" class="p-0"> <!-- +1 for chevron column -->
                     <div class="bg-gray-50 p-4 m-2 rounded">
                         <div class="grid grid-cols-1 gap-4">
-                            <div class="flex justify-end mb-1">
-                                <div class="btn-group">                                  
-                                    <button class="btn btn-success action-approve px-3 py-1 mr-2" data-bs-toggle="modal" data-bs-target="#approveRequestModal">
-                                        <i class="fa fa-thumbs-up mr-2"></i>
-                                        Approve
-                                    </button>
-                                    <button class="btn btn-danger action-reject px-3 py-1" data-bs-toggle="modal" data-bs-target="#rejectRequestModal">
-                                        <i class="fa fa-thumbs-down mr-2"></i>
-                                        Reject
-                                    </button>
-                                </div>
-                            </div>
+                            
                             
                             <!-- Combined Information Card -->
                             <div class="bg-white p-5 rounded-md shadow-sm">

@@ -32,6 +32,11 @@ let columnNameDropdownSearchTerm = '';
 let currentDataSourceTypeID = 0;
 let currentDataSourceID = 0;
 
+// When set to true, programmatic changes to `selectionDropdown` should not
+// trigger the normal change handler (which fetches DB values and would
+// overwrite values supplied from an uploaded sheet).
+let suppressSelectionChange = false;
+
 /**
  * Displays a temporary "toast" notification on the screen.
  * @param {string} message - The message to display.
@@ -110,7 +115,7 @@ async function syncREDCapDataSetColumns(data_source_id) {
  * Populates the column table's tbody with data from a paginated response.
  * @param {Object|null} paginatedResponse - The full response object from the API.
  */
-function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to display. Select a Data Source and Table.') {
+function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to display. Select a Data Source or existing Data Set.') {
     const tableBody = document.getElementById('dataSetColsBody');
 
     if (!data || data.length === 0) {
@@ -373,6 +378,126 @@ function normalizeBooleanFlag(value) {
 }
 
 /**
+ * Validate that uploaded DataSetColumns exactly match the expected columns.
+ * - parsedCols: array of rows from DataSetColumns sheet (objects with ColumnName)
+ * - metaRow: single metadata object parsed from DataSetMetadata sheet
+ *
+ * Returns: Promise<{ valid: boolean, message?: string, missing?: string[], extra?: string[], expected?: string[], actual?: string[] }>
+ */
+async function validateDataSetColumns(parsedCols, metaRow) {
+    const actual = Array.isArray(parsedCols) ? parsedCols.map(c => String(c.ColumnName || '').trim()) : [];
+    const dataSetId = metaRow && metaRow.DataSetID ? String(metaRow.DataSetID) : 'new';
+    const dsType = Number(metaRow && metaRow.DataSourceTypeID  || 0);
+    console.log("DataSourceTypeID for validation:", dsType);
+    let expected = [];
+
+    try {
+        if (dsType === 2) { // REDCap - crosscheck with REDCap source
+            if (dataSetId === 'new') {
+                if (!metaRow.DataSourceID) {
+                    return { valid: false, message: 'DataSourceID required for REDCap crosscheck.' };
+                }
+
+                console.log("REDCap New")
+
+                // For NEW REDCap: call the REDCap sync endpoint to get expected columns
+                // using existing helper; adapt if your endpoint differs.
+                const rc = await syncREDCapDataSetColumns(parseInt(metaRow.DataSourceID, 10));
+                console.log("syncREDCapDataSetColumns returned:", rc);
+                // syncREDCapDataSetColumns may return an object like { status, metadata }
+                // where `metadata` is an array of fields with properties such as
+                // 'field_name', 'field_label', 'field_type', 'select_choices_or_calculations'.
+                // Accept either an array or the {metadata: []} shape and map robustly.
+                let rcList = [];
+                if (Array.isArray(rc)) {
+                    rcList = rc;
+                } else if (rc && Array.isArray(rc.metadata)) {
+                    rcList = rc.metadata;
+                }
+
+                console.log("REDCap sync returned metadata:", rcList);
+
+                expected = Array.isArray(rcList)
+                    ? rcList.map(r => String(
+                        (r && r.field_name ) || ''
+                      ).trim()).filter(Boolean)
+                    : [];
+                
+                console.log("Expected columns from REDCap sync:", expected);
+            } else {
+                // For EXISTING REDCap dataset: fetch expected columns via REDCap dataset endpoint
+                console.log("REDCap Existing - fetching columns for dataset ID:", dataSetId);
+                const rcList = await fetchSQLorREDCAPDataSetColumns(dataSetId);
+                console.log("Fetched columns for existing REDCap dataset (raw response):", rcList);
+                
+                expected = Array.isArray(rcList)
+                    ? rcList.map(r => String((r && r.ColumnName) || '').trim()).filter(Boolean)
+                    : [];
+                console.log("Expected columns for existing REDCap dataset:", expected);
+            }
+        } else if (dsType === 1) { // Database
+            if (dataSetId === 'new') {
+                // NEW-Database: source of truth is dbo.LoomeDataSourceTables.Columns
+                // Fetch the table list for this DataSource and extract ColumnList by using the DataSetFieldValues which refers to the Table 
+               
+                const validJsonString = metaRow.DataSetFieldValues.replace(/'/g, '"');
+                const tableId = JSON.parse(validJsonString)[0]?.Value;
+                
+                console.log("Extracted Table ID from DataSetFieldValues:", tableId);
+                const tables = await fetchSqlTables(metaRow.DataSourceID) || [];
+                
+                const dataSetTable = tables.find(obj => obj.Id == tableId);
+                const columnListStr = (dataSetTable && (dataSetTable.ColumnList || '')) || '';
+                
+                console.log('dataSetTable:', dataSetTable);
+                console.log('columnListStr:', columnListStr);
+                expected = columnListStr.split(',').map(s => String(s || '').trim()).filter(Boolean);
+                console.log('expected (from ColumnList):', expected);
+            } else {
+                // EXISTING-Database: source of truth is dbo.DataSetColumns (API)
+                const colsList = await fetchSQLorREDCAPDataSetColumns(dataSetId) || [];
+                console.log('fetchSQLorREDCAPDataSetColumns returned for existing Database dataset ID', dataSetId);
+                console.log('Fetched columns for existing Database dataset:', colsList);
+                expected = Array.isArray(colsList)
+                    ? colsList.map(r => String((r && r.ColumnName) || '').trim()).filter(Boolean)
+                    : [];
+                console.log('expected (from DataSetColumns):', expected);
+            }
+        } else {
+            return { valid: false, message: 'Unknown DataSourceTypeID; cannot validate columns.' };
+        }
+    } catch (err) {
+        return { valid: false, message: 'Failed to fetch expected columns: ' + (err && err.message ? err.message : String(err)) };
+    }
+
+    // Normalize and compare sets (case-insensitive, trimmed)
+    const normalize = arr => Array.from(new Set((arr || []).map(s => String(s || '').trim().toLowerCase())));
+    const actualNorm = normalize(actual);
+    const expectedNorm = normalize(expected);
+    console.log('Normalized Actual Columns:', actualNorm);
+    console.log('Normalized Expected Columns:', expectedNorm);
+
+    const missing = expectedNorm.filter(x => !actualNorm.includes(x));
+    const extra = actualNorm.filter(x => !expectedNorm.includes(x));
+
+    console.log('Missing Columns:', missing);
+    console.log('Extra Columns:', extra);
+
+    if (missing.length || extra.length) {
+        return {
+            valid: false,
+            message: 'Uploaded columns do not match expected columns.',
+            missing,
+            extra,
+            expected,
+            actual
+        };
+    }
+
+    return { valid: true };
+}
+
+/**
  * A central function to handle page changes.
  */
 function handlePageChange(newPage) {
@@ -604,8 +729,8 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
 
         const fetchedData = await fetchDataSetFieldValue(dataSetID);
         console.log("Fetched DataSet Field Value 2:", fetchedData);
-        let tableId = fetchedData.id;;
-        let tableName = fetchedData.name;;
+        let tableId = fetchedData.id;
+        let tableName = fetchedData.name;
 
         let rowHtml = '';
 
@@ -791,28 +916,16 @@ async function updateMetaDataTable(dataSource, dataSetID) {
             const mid = String(mv.MetaDataID);
             if (!baseIds.has(mid)) {
                 const metaDef = allDefsById[mid];
-                if (metaDef) {
-                    extraDefs.push({
-                        id: metaDef.MetaDataID,
-                        label: `${metaDef.Name || `Meta ${metaDef.MetaDataID}`} (legacy)`,
-                        inputId: `meta_${metaDef.MetaDataID}`,
-                        type: 'text',
-                        description: metaDef.Description || '',
-                        legacy: true
-                    });
-                    baseIds.add(mid);
-                } else {
-                    // Metadata definition removed entirely; still render a fallback so value is preserved
-                    extraDefs.push({
-                        id: parseInt(mid, 10),
-                        label: `Meta ${mid} (legacy)`,
-                        inputId: `meta_${mid}`,
-                        type: 'text',
-                        description: '',
-                        legacy: true
-                    });
-                    baseIds.add(mid);
-                }
+                // Even if not currently associated or active, show as legacy
+                extraDefs.push({
+                    id: metaDef ? metaDef.MetaDataID : parseInt(mid, 10),
+                    label: `${metaDef ? metaDef.Name : `Meta ${mid}`} (legacy)`,
+                    inputId: `meta_${mid}`,
+                    type: 'text',
+                    description: metaDef ? metaDef.Description : '',
+                    legacy: true
+                });
+                baseIds.add(mid);
             }
         });
     }
@@ -1219,7 +1332,7 @@ function renderTablePage(dataSetTypeId) {
 
     const emptyMessage = columnSearchTerm.trim() && totalItems === 0
         ? 'No columns match your search term. Clear the search to view all columns.'
-        : 'No columns to display. Select a Data Source and Table.';
+        : 'No columns to display. Select a Data Source or existing Data Set.';
 
     displayColumnsTable(pageData, dataSetTypeId, emptyMessage);
 
@@ -1262,6 +1375,11 @@ function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
 
     currentPage = 1;
     renderTablePage(dataSetTypeId);
+    
+    // Ensure export button state is refreshed whenever the table data changes
+    if (typeof updateExportButtonState === 'function') {
+        updateExportButtonState();
+    }
 }
 
 /**
@@ -1470,6 +1588,7 @@ async function updateDataSet(data_set_id, data) {
             const selectionDropdown = document.getElementById('dataSetSelection');
             const dataSourceDrpDwn = document.getElementById('dataSource');
             const optgroup = selectionDropdown ? selectionDropdown.querySelector('optgroup') : null;
+            
             // Force a fresh fetch by adding a cache-busting param (if supported)
             let allDataSets = await getAllDataSets();
             let allDataSources = await getAllDataSources();
@@ -1539,11 +1658,8 @@ function updateTableHeader(dataSourceType) {
         return;
     }
 
-    const definitions = headerDefinitions[dataSourceType];
-    if (!definitions) {
-        headerRow.innerHTML = '<th>Please select a data source type first.</th>';
-        return;
-    }
+    // Default to the Database header (key 1) when no valid dataSourceType is provided
+    const definitions = headerDefinitions[dataSourceType] || headerDefinitions[1];
 
     const filterOptions = [
         { value: 'both', label: 'All Data' },
@@ -1724,6 +1840,8 @@ async function renderManageDataSetPage() {
     // Export button logic (now positioned after form elements)
     const exportBtn = document.getElementById('export-ds-cols-btn');
     const exportLoading = document.getElementById('export-ds-cols-loading');
+    const uploadBtn = document.getElementById('upload-ds-cols-btn');
+    const uploadInput = document.getElementById('upload-ds-cols-input');
 
     if (exportBtn) {
         
@@ -1747,12 +1865,14 @@ async function renderManageDataSetPage() {
 
             const payload = {
                 ...formData, // Spread all properties from the original object
+                DataSetID: (selectionDropdown && selectionDropdown.value) ? selectionDropdown.value : 'new',
                 OptOutMessage: null,
                 OptOutList: null,
                 OptOutColumn: "-1",
                 DataSourceTypeID: currentDataSourceTypeID
             };
-
+            
+            console.log("Export Payload:", payload);
 
             exportLoading.style.display = 'inline-block';
             exportBtn.disabled = true;
@@ -1760,7 +1880,8 @@ async function renderManageDataSetPage() {
             try {
                 const dataSourceName = getCurrentDataSourceName() || 'DataSource';
                 const timestamp = getTimestampString();
-                const filename = `DataSetColumns_${dataSourceName}_${timestamp}.zip`;
+                // XLSX files are ZIP archives internally; use .xlsx extension so Excel opens it.
+                const filename = `DataSetColumns_${dataSourceName}_${timestamp}.xlsx`;
 
                 // 1. Get the response (which is the Blob)
                 const response = await window.loomeApi.runApiRequest(API_EXPORT_DATASET_COLUMNS_EXCEL, {
@@ -1811,17 +1932,495 @@ async function renderManageDataSetPage() {
 
 
         function updateExportButtonState() {
-            const dsSelected = dataSourceDrpDwn?.value && dataSourceDrpDwn.value !== '';
-            const tableHasRows = document.querySelectorAll('#dataSetColsBody tr').length > 0;
-            exportBtn.style.display = dsSelected ? '' : 'none';
+            const dsSelected = !!(selectionDropdown?.value && selectionDropdown.value !== '' && selectionDropdown.value !== 'new');
+            const dataSourceSelected = !!(dataSourceDrpDwn?.value && dataSourceDrpDwn.value !== '');
+            
+            // For export visibility, we check for presence of data in either the table or the global array
+            // since there might be race conditions between the state update and DOM rendering
+            const tableRowsCount = document.querySelectorAll('#dataSetColsBody tr[data-column-name]').length;
+            const stateRowsCount = (allColumnsData && allColumnsData.length) || 0;
+            const tableHasRows = tableRowsCount > 0 || stateRowsCount > 0;
+
+            console.log("Checking export button state:", { dsSelected, dataSourceSelected, tableRowsCount, stateRowsCount });
+
+            // Export: existing dataset OR a new dataset with imported/loaded columns
+            const showExport = (dsSelected || dataSourceSelected) && tableHasRows;
+            exportBtn.style.display = showExport ? '' : 'none';
             exportBtn.disabled = !tableHasRows;
+
+            // Titles/help text
             exportBtn.title = tableHasRows ? 'Export columns and dataset info to Excel.' : 'Select a Data Source and ensure columns are loaded to enable export.';
+            uploadBtn.title = dataSourceSelected ? 'Upload columns from an Excel file to create a new Data Set.' : 'Select a Data Source first to upload columns.';
         }
 
         dataSourceDrpDwn?.addEventListener('change', updateExportButtonState);
+        // Also update when the top-level Data Set selection changes
+        selectionDropdown?.addEventListener('change', updateExportButtonState);
         document.getElementById('dataSetColsBody').addEventListener('DOMSubtreeModified', updateExportButtonState);
         updateExportButtonState();
         exportBtn.addEventListener('click', createAndDownloadExcelFile);
+        
+        // Upload handling
+        if (uploadBtn && uploadInput) {
+            // Trigger file picker
+            uploadBtn.addEventListener('click', () => uploadInput.click());
+
+            uploadInput.addEventListener('change', async (event) => {
+                const file = event.target.files && event.target.files[0];
+                if (!file) return;
+
+                // 1) Validate extension (basic client-side check)
+                const name = (file.name || '').toLowerCase();
+                if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+                    showToast('Please choose an Excel file (.xls or .xlsx).', 'warning');
+                    uploadInput.value = '';
+                    return;
+                }
+
+                // 2) Ensure SheetJS is available
+                if (typeof XLSX === 'undefined') {
+                    showToast('Spreadsheet parser not available. Ensure xlsx library is loaded.', 'error');
+                    uploadInput.value = '';
+                    return;
+                }
+
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+                    // 3) Validate sheet names
+                    const requiredSheets = ['DataSetColumns', 'DataSetMetadata'];
+                    const names = workbook.SheetNames || [];
+                    const missing = requiredSheets.filter(s => !names.includes(s));
+                    if (missing.length) {
+                        showToast(`Missing required sheets: ${missing.join(', ')}`, 'warning');
+                        uploadInput.value = '';
+                        return;
+                    }
+
+                    // 4) Validate headers exactly as specified
+                    const colsSheet = workbook.Sheets['DataSetColumns'];
+                    const metaSheet = workbook.Sheets['DataSetMetadata'];
+                    const colsRows = XLSX.utils.sheet_to_json(colsSheet, { header: 1, defval: '' });
+                    const metaRows = XLSX.utils.sheet_to_json(metaSheet, { header: 1, defval: '' });
+
+                    const expectedColsHeader = ['ColumnName','ColumnType','LogicalColumnName','BusinessDescription','ExampleValue','Tokenise','TokenIdentifierType','Redact','DisplayOrder','IsFilter'];
+                    const expectedMetaHeader = ['Name','Description','DataSourceID','IsActive','Approvers','OptOutMessage','OptOutList','Owner','OptOutColumn','DataSetFieldValues','DataSetMetaDataValues','DataSetFolders','DataSetFolderFiles','DataSourceTypeID','DataSetID'];
+
+                    const actualColsHeader = (colsRows[0] || []).map(c => String(c).trim());
+                    const actualMetaHeader = (metaRows[0] || []).map(c => String(c).trim());
+
+                    const arrayEquals = (a, b) => {
+                        if (!Array.isArray(a) || !Array.isArray(b)) return false;
+                        if (a.length !== b.length) return false;
+                        for (let i = 0; i < a.length; i++) {
+                            if (String(a[i]) !== String(b[i])) return false;
+                        }
+                        return true;
+                    };
+
+                    if (!arrayEquals(actualColsHeader, expectedColsHeader)) {
+                        showToast('Invalid header in DataSetColumns sheet. Ensure columns match the required header and order.', 'warning');
+                        uploadInput.value = '';
+                        return;
+                    }
+
+                    if (!arrayEquals(actualMetaHeader, expectedMetaHeader)) {
+                        showToast('Invalid header in DataSetMetadata sheet. Ensure columns match the required header and order.', 'warning');
+                        uploadInput.value = '';
+                        return;
+                    }
+
+                    // Success - parse and import rows into UI
+                    const parsedCols = XLSX.utils.sheet_to_json(colsSheet, { header: expectedColsHeader, range: 1, defval: '' });
+                    const parsedMeta = XLSX.utils.sheet_to_json(metaSheet, { header: expectedMetaHeader, range: 1, defval: '' });
+
+                    // Enforce exactly one metadata row
+                    if (!Array.isArray(parsedMeta) || parsedMeta.length !== 1) {
+                        showToast('DataSetMetadata must contain exactly one data row.', 'warning');
+                        uploadInput.value = '';
+                        return;
+                    }
+                    
+                    // Validate column data against expected types and required fields before importing
+                    const metaRow = (Array.isArray(parsedMeta) && parsedMeta.length) ? parsedMeta[0] : null;
+                    const validation = await validateDataSetColumns(parsedCols, metaRow);
+                    if (!validation.valid) {
+                        console.warn('Upload validation failed:', validation);
+                        // show detailed feedback to the user
+                        showToast(validation.message || 'Column validation failed.', 'error');
+                        // Optionally surface missing/extra in console or UI
+                        console.log('Column validation details:', validation);
+                        uploadInput.value = '';
+                        return; // abort import
+                    }
+
+                    // Map and normalize column rows to the internal shape
+                    const importedColumns = parsedCols.map((r, idx) => ({
+                        DataSetColumnID: r.DataSetColumnID || null,
+                        ColumnName: String(r.ColumnName || '').trim(),
+                        ColumnType: r.ColumnType || '',
+                        LogicalColumnName: r.LogicalColumnName || '',
+                        BusinessDescription: r.BusinessDescription || '',
+                        ExampleValue: r.ExampleValue || '',
+                        Tokenise: normalizeBooleanFlag(r.Tokenise),
+                        TokenIdentifierType: Number(r.TokenIdentifierType) || 0,
+                        Redact: normalizeBooleanFlag(r.Redact),
+                        DisplayOrder: Number(r.DisplayOrder) || (idx + 1),
+                        IsFilter: normalizeBooleanFlag(r.IsFilter)
+                    }));
+
+                    // If metadata contains DataSourceTypeID/DataSourceID, set globals so header and behavior match
+                    if (Array.isArray(parsedMeta) && parsedMeta.length > 0) {
+                        const meta0 = parsedMeta[0];
+                        const dsType = parseInt(meta0.DataSourceTypeID, 10);
+                        const dsId = parseInt(meta0.DataSourceID, 10);
+                        if (!Number.isNaN(dsType)) currentDataSourceTypeID = dsType;
+                        if (!Number.isNaN(dsId)) currentDataSourceID = dsId;
+                    }
+
+                    // Update master state and refresh UI
+                    allColumnsData = importedColumns;
+                    refreshColumnVisibilityMap();
+                    columnNameDropdownInitialized = false;
+                    
+                    // Populate form fields from metadata sheet
+                    try {
+                        const metaRow = (Array.isArray(parsedMeta) && parsedMeta.length) ? parsedMeta[0] : null;
+                        if (metaRow) {
+                            if (Object.prototype.hasOwnProperty.call(metaRow, 'Name')) nameInput.value = metaRow.Name || '';
+                            if (Object.prototype.hasOwnProperty.call(metaRow, 'Description')) descriptionInput.value = metaRow.Description || '';
+                            if (Object.prototype.hasOwnProperty.call(metaRow, 'Owner')) owner.value = metaRow.Owner || '';
+                            if (Object.prototype.hasOwnProperty.call(metaRow, 'Approvers')) approver.value = metaRow.Approvers || '';
+                            if (Object.prototype.hasOwnProperty.call(metaRow, 'IsActive')) {
+                                activeCheckbox.checked = normalizeBooleanFlag(metaRow.IsActive);
+                            }
+
+                            // 1. Data Source Handling
+                            if (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceID')) {
+                                const dsIdFromSheet = metaRow.DataSourceID ? String(metaRow.DataSourceID) : '';
+                                if (dsIdFromSheet) {
+                                    let opt = Array.from(dataSourceDrpDwn.options).find(o => o.value === dsIdFromSheet);
+                                    if (!opt) {
+                                        opt = document.createElement('option');
+                                        opt.value = dsIdFromSheet;
+                                        opt.textContent = `Imported DataSource ${dsIdFromSheet}`;
+                                        dataSourceDrpDwn.appendChild(opt);
+                                    }
+                                    dataSourceDrpDwn.value = dsIdFromSheet;
+                                }
+                            }
+
+                            // 2. Data Set Selection handling (NO dispatchEvent here to prevent clearForm)
+                            const dsIdFromMeta = metaRow.DataSetID ? String(metaRow.DataSetID) : 'new';
+                            let selOpt = Array.from(selectionDropdown.options).find(o => o.value === dsIdFromMeta);
+                            if (!selOpt) {
+                                selOpt = document.createElement('option');
+                                selOpt.value = dsIdFromMeta;
+                                selOpt.textContent = metaRow.Name ? metaRow.Name : `Imported DataSet ${dsIdFromMeta}`;
+                                const selOptGroup = selectionDropdown.querySelector('optgroup');
+                                if (selOptGroup) selOptGroup.appendChild(selOpt); else selectionDropdown.appendChild(selOpt);
+                            }
+                            selectionDropdown.value = dsIdFromMeta;
+
+                            // 3. Render Field/Meta tables and populate JSON values
+                            const dsIdToUse = (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceID') && metaRow.DataSourceID) ? parseInt(metaRow.DataSourceID, 10) : currentDataSourceID;
+                            const dsTypeToUse = (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceTypeID') && metaRow.DataSourceTypeID) ? parseInt(metaRow.DataSourceTypeID, 10) : currentDataSourceTypeID;
+                            const tmpDataSource = { 
+                                DataSourceID: dsIdToUse, 
+                                DataSourceTypeID: dsTypeToUse 
+                            };
+
+                            try {
+                                suppressSelectionChange = true; // Guard against recursive logic
+                                await updateDataSetFieldsTable(tmpDataSource, dsIdFromMeta);
+                                await updateMetaDataTable(tmpDataSource, dsIdFromMeta);
+
+                                // Helper to handle your single-quoted strings from Excel
+                                const parseSheetJson = (val) => {
+                                    if (typeof val !== 'string' || !val.trim()) return val;
+                                    try {
+                                        const validJson = val.replace(/'/g, '"');
+                                        return JSON.parse(validJson);
+                                    } catch (e) { return val; }
+                                };
+
+                                // Populate Metadata values
+                                let metaVals = parseSheetJson(metaRow.DataSetMetaDataValues);
+                                if (Array.isArray(metaVals)) {
+                                    const metaTbody = document.getElementById('metaDataTable').querySelector('tbody');
+                                    const metaTable = document.getElementById('metaDataTable');
+                                    const metaPlaceholder = document.getElementById('metaDataPlaceholder');
+
+                                    // Ensure table is visible if we have values to show
+                                    if (metaVals.length > 0) {
+                                        metaTable.style.display = 'table';
+                                        metaPlaceholder.style.display = 'none';
+                                    }
+
+                                    const existingTableIds = new Set(Array.from(metaTbody.querySelectorAll('input[type="hidden"]')).map(i => String(i.value)));
+                                    
+                                    // We need to fetch the metadata list to show names for extra/legacy items
+                                    const allMetaDefs = await getFromAPI(API_GET_METADATA, { "page": 1, "pageSize": 100, "search": '' }) || [];
+                                    const defMap = allMetaDefs.reduce((acc, r) => {
+                                        if (r && r.MetaDataID !== undefined) acc[String(r.MetaDataID)] = r;
+                                        return acc;
+                                    }, {});
+
+                                    metaVals.forEach(mv => {
+                                        const mid = String(mv.MetaDataID);
+                                        if (!existingTableIds.has(mid)) {
+                                            const metaDef = defMap[mid];
+                                            const row = document.createElement('tr');
+                                            row.innerHTML = `
+                                                <td><small class="text-muted">${escapeHtml(metaDef ? metaDef.Name : `Meta ${mid}`)} (legacy)</small> <input type="hidden" value="${mid}"></td>
+                                                <td width="70%">
+                                                    <input id="meta_${mid}" class="form-control" value="${escapeHtml(mv.Value || '')}">
+                                                </td>
+                                            `;
+                                            metaTbody.appendChild(row);
+                                            existingTableIds.add(mid);
+                                        } else {
+                                            const input = document.getElementById(`meta_${mid}`);
+                                            if (input) {
+                                                input.value = mv.Value || '';
+                                                // If it's present in the table, make sure the row isn't hidden by "no metadata for type"
+                                            }
+                                        }
+                                    });
+                                }
+
+                                // Populate DataSetFieldValues (e.g. Table Name selection)
+                                let fieldVals = parseSheetJson(metaRow.DataSetFieldValues);
+                                if (Array.isArray(fieldVals)) {
+                                    fieldVals.forEach(fv => {
+                                        if (fv.FieldID === 3 || fv.FieldID === 6) {
+                                            const selector = document.getElementById('tableNameSelector');
+                                            if (selector && fv.Value) {
+                                                if (!Array.from(selector.options).some(o => o.value === String(fv.Value))) {
+                                                    const opt = document.createElement('option');
+                                                    opt.value = String(fv.Value); opt.textContent = String(fv.Value);
+                                                    selector.appendChild(opt);
+                                                }
+                                                selector.value = String(fv.Value);
+                                                selector.dispatchEvent(new Event('change'));
+                                            }
+                                        }
+                                    });
+                                }
+                            } finally {
+                                suppressSelectionChange = false;
+                                
+                                // Final UI Refresh: apply filter (which renders table) and update header
+                                // We do this at the very end of the import to ensure all states (DataSourceID, etc)
+                                // are fully applied so updateExportButtonState has correct context.
+                                applyColumnSearchFilter();
+                                if (typeof updateExportButtonState === 'function') {
+                                    updateExportButtonState();
+                                }
+                                try { updateTableHeader(currentDataSourceTypeID); } catch (e) { /* ignore */ }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to populate form from metadata sheet:', e);
+                    }
+
+                    // // Populate form fields from metadata sheet (if present)
+                    // try {
+                    //     const metaRow = (Array.isArray(parsedMeta) && parsedMeta.length) ? parsedMeta[0] : null;
+                    //     if (metaRow) {
+                    //         if (Object.prototype.hasOwnProperty.call(metaRow, 'Name')) nameInput.value = metaRow.Name || '';
+                    //         if (Object.prototype.hasOwnProperty.call(metaRow, 'Description')) descriptionInput.value = metaRow.Description || '';
+                    //         if (Object.prototype.hasOwnProperty.call(metaRow, 'Owner')) owner.value = metaRow.Owner || '';
+                    //         if (Object.prototype.hasOwnProperty.call(metaRow, 'Approvers')) approver.value = metaRow.Approvers || '';
+                    //         if (Object.prototype.hasOwnProperty.call(metaRow, 'IsActive')) {
+                    //         activeCheckbox.checked = normalizeBooleanFlag(metaRow.IsActive);
+                    //         }
+
+                    //         // DataSource handling: set or clear dropdown based on sheet value
+                    //         if (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceID')) {
+                    //             const dsIdFromSheet = metaRow.DataSourceID ? String(metaRow.DataSourceID) : '';
+                    //             if (dsIdFromSheet) {
+                    //                 let opt = Array.from(dataSourceDrpDwn.options).find(o => o.value === dsIdFromSheet);
+                    //                 if (!opt) {
+                    //                     opt = document.createElement('option');
+                    //                     opt.value = dsIdFromSheet;
+                    //                     opt.textContent = `Imported DataSource ${dsIdFromSheet}`;
+                    //                     dataSourceDrpDwn.appendChild(opt);
+                    //                 }
+                    //                 dataSourceDrpDwn.value = dsIdFromSheet;
+                    //             } else {
+                    //                 dataSourceDrpDwn.value = '';
+                    //             }
+                    //         }
+
+                    //         // Update selection dropdown from DataSetID in sheet (if provided)
+                    //         if (Object.prototype.hasOwnProperty.call(metaRow, 'DataSetID')) {
+                    //             const dsIdFromMeta = metaRow.DataSetID ? String(metaRow.DataSetID) : '';
+                    //             const selectionOptGroup = selectionDropdown.querySelector('optgroup') || selectionDropdown;
+                    //             if (dsIdFromMeta) {
+                    //                 let opt = Array.from(selectionDropdown.options).find(o => o.value === dsIdFromMeta);
+                    //                 if (!opt) {
+                    //                     opt = document.createElement('option');
+                    //                     opt.value = dsIdFromMeta;
+                    //                     opt.textContent = metaRow.Name ? metaRow.Name : `Imported DataSet ${dsIdFromMeta}`;
+                    //                     // append into optgroup when present so it appears under the list
+                    //                     if (selectionOptGroup && selectionOptGroup.tagName.toLowerCase() === 'optgroup') selectionOptGroup.appendChild(opt);
+                    //                     else selectionDropdown.appendChild(opt);
+                    //                 }
+                    //                 selectionDropdown.value = dsIdFromMeta;
+                    //             } else {
+                    //                 // explicit empty or 'new' -> set to 'new'
+                    //                 selectionDropdown.value = 'new';
+                    //             }
+                    //             // trigger change so UI/state updates (loads columns/metadata)
+                    //             selectionDropdown.dispatchEvent(new Event('change', { bubbles: true }));
+                    //         }
+
+                    //         // Prepare a minimal dataSource object for rendering dependent tables
+                    //         const tmpDataSource = { DataSourceID: currentDataSourceID || (metaRow.DataSourceID ? parseInt(metaRow.DataSourceID, 10) : null), DataSourceTypeID: currentDataSourceTypeID || (metaRow.DataSourceTypeID ? parseInt(metaRow.DataSourceTypeID, 10) : null) };
+
+                    //         // Update fields/meta tables so inputs exist, then populate values into them
+                    //         try {
+                    //             // If the sheet supplies a DataSetID, set the selectionDropdown WITHOUT
+                    //             // triggering its change handler so uploaded values take precedence.
+                    //             if (Object.prototype.hasOwnProperty.call(metaRow, 'DataSetID')) {
+                    //                 const dsIdFromMeta = metaRow.DataSetID ? String(metaRow.DataSetID) : 'new';
+                    //                 let selOpt = Array.from(selectionDropdown.options).find(o => o.value === dsIdFromMeta);
+                    //                 if (!selOpt) {
+                    //                     selOpt = document.createElement('option');
+                    //                     selOpt.value = dsIdFromMeta;
+                    //                     selOpt.textContent = metaRow.Name ? metaRow.Name : `Imported DataSet ${dsIdFromMeta}`;
+                    //                     const selOptGroup = selectionDropdown.querySelector('optgroup');
+                    //                     if (selOptGroup) selOptGroup.appendChild(selOpt); else selectionDropdown.appendChild(selOpt);
+                    //                 }
+                    //                 suppressSelectionChange = true;
+                    //                 selectionDropdown.value = dsIdFromMeta;
+                    //             }
+
+                    //             // Render dependent tables using the tmpDataSource and the uploaded DataSetID (or 'new')
+                    //             const targetDataSetId = (metaRow && metaRow.DataSetID) ? String(metaRow.DataSetID) : 'new';
+                    //             await updateDataSetFieldsTable(tmpDataSource, targetDataSetId);
+                    //             await updateMetaDataTable(tmpDataSource, targetDataSetId);
+                    //         } catch (e) {
+                    //             console.warn('Failed to render dependent tables before populating metadata:', e);
+                    //         } finally {
+                    //             suppressSelectionChange = false;
+                    //         }
+
+                    //         // 1. Populate DataSetMetaDataValues into meta inputs (Metadata sheet)
+                    //         let metaVals = metaRow.DataSetMetaDataValues;
+                    //         if (typeof metaVals === 'string' && metaVals.trim()) {
+                    //             try {
+                    //                 // Handle single quotes often found in Excel templates by replacing them with double quotes
+                    //                 const validJson = metaVals.replace(/'/g, '"');
+                    //                 metaVals = JSON.parse(validJson);
+                    //             } catch (e) { 
+                    //                 console.warn('Failed to parse DataSetMetaDataValues JSON:', e); 
+                    //             }
+                    //         }
+                    //         if (Array.isArray(metaVals)) {
+                    //             metaVals.forEach(mv => {
+                    //                 try {
+                    //                     const input = document.getElementById(`meta_${mv.MetaDataID}`);
+                    //                     if (input) input.value = mv.Value || '';
+                    //                 } catch (e) { /* ignore individual failures */ }
+                    //             });
+                    //         }
+
+                    //         // 2. Populate DataSetFieldValues (e.g., Table Name or Folder selection)
+                    //         let fieldVals = metaRow.DataSetFieldValues;
+                    //         if (typeof fieldVals === 'string' && fieldVals.trim()) {
+                    //             try {
+                    //                 // Handle single quotes often found in Excel templates by replacing them with double quotes
+                    //                 const validJson = fieldVals.replace(/'/g, '"');
+                    //                 fieldVals = JSON.parse(validJson);
+                    //             } catch (e) { 
+                    //                 console.warn('Failed to parse DataSetFieldValues JSON:', e); 
+                    //             }
+                    //         }
+                    //         if (Array.isArray(fieldVals)) {
+                    //             fieldVals.forEach(fv => {
+                    //                 try {
+                    //                     // FieldID 3 = SQL Table Name selection
+                    //                     // FieldID 6 = Folder Name selection
+                    //                     if (fv.FieldID === 3 || fv.FieldID === 6) {
+                    //                         const selector = document.getElementById('tableNameSelector');
+                    //                         if (selector && fv.Value) {
+                    //                             // If the specific option isn't in the dropdown yet, append it so we can select it
+                    //                             if (!Array.from(selector.options).some(o => o.value === String(fv.Value))) {
+                    //                                 const opt = document.createElement('option');
+                    //                                 opt.value = String(fv.Value);
+                    //                                 opt.textContent = String(fv.Value);
+                    //                                 selector.appendChild(opt);
+                    //                             }
+                    //                             selector.value = String(fv.Value);
+                    //                             // Trigger 'change' to ensure dependent logic (like column loading) runs
+                    //                             selector.dispatchEvent(new Event('change'));
+                    //                         }
+                    //                     }
+                    //                 } catch (e) { /* ignore individual failures */ }
+                    //             });
+                    //         }
+
+
+                    //         // // Populate DataSetMetaDataValues into meta inputs if provided (expecting JSON array)
+                    //         // let metaVals = metaRow.DataSetMetaDataValues;
+                    //         // if (typeof metaVals === 'string' && metaVals.trim()) {
+                    //         //     try { metaVals = JSON.parse(metaVals); } catch (e) { /* keep as string */ }
+                    //         // }
+                    //         // if (Array.isArray(metaVals)) {
+                    //         //     metaVals.forEach(mv => {
+                    //         //         try {
+                    //         //             const input = document.getElementById(`meta_${mv.MetaDataID}`);
+                    //         //             if (input) input.value = mv.Value || '';
+                    //         //         } catch (e) { /* ignore individual failures */ }
+                    //         //     });
+                    //         // }
+
+                    //         // // Populate DataSetFieldValues (e.g., table selector) if provided
+                    //         // let fieldVals = metaRow.DataSetFieldValues;
+                    //         // if (typeof fieldVals === 'string' && fieldVals.trim()) {
+                    //         //     try { fieldVals = JSON.parse(fieldVals); } catch (e) { /* keep as string */ }
+                    //         // }
+                    //         // if (Array.isArray(fieldVals)) {
+                    //         //     fieldVals.forEach(fv => {
+                    //         //         try {
+                    //         //             if (fv.FieldID === 3) {
+                    //         //                 const selector = document.getElementById('tableNameSelector');
+                    //         //                 if (selector && fv.Value) {
+                    //         //                     // If option not present, try to append
+                    //         //                     if (!Array.from(selector.options).some(o => o.value === String(fv.Value))) {
+                    //         //                         const opt = document.createElement('option');
+                    //         //                         opt.value = String(fv.Value);
+                    //         //                         opt.textContent = String(fv.Value);
+                    //         //                         selector.appendChild(opt);
+                    //         //                     }
+                    //         //                     selector.value = String(fv.Value);
+                    //         //                     // Trigger change to allow any dependent logic to run
+                    //         //                     selector.dispatchEvent(new Event('change'));
+                    //         //                 }
+                    //         //             }
+                    //         //         } catch (e) { /* ignore */ }
+                    //         //     });
+                    //         // }
+                    //     }
+                    // } catch (e) {
+                    //     console.warn('Failed to populate form from metadata sheet:', e);
+                    // }
+
+                    showToast('Upload validated and imported successfully.', 'success');
+                    console.log('Imported columns:', importedColumns);
+                    console.log('Imported metadata rows:', parsedMeta);
+
+                } catch (err) {
+                    console.error('Failed to parse uploaded workbook:', err);
+                    showToast('Failed to parse the Excel file. Ensure it is a valid workbook.', 'error');
+                } finally {
+                    uploadInput.value = '';
+                }
+            });
+        }
     }
 
     // Delete button handler: call delete API and show API detail on error
@@ -1919,6 +2518,14 @@ async function renderManageDataSetPage() {
 
 
             clearForm();
+            // Clear global state so we don't reload previous columns when switching to 'new'
+            currentDataSourceTypeID = null;
+            currentDataSourceID = null;
+            allColumnsData = [];
+            filteredColumnsData = [];
+            refreshColumnVisibilityMap();
+            // Reset table header and pagination
+            try { updateTableHeader(currentDataSourceTypeID); } catch (e) { /* ignore */ }
             updateDataSetFieldsTable(null, null);
             updateMetaDataTable(null, null);
             // When creating a new set, there are no columns to show. Clear the table.
@@ -2005,6 +2612,8 @@ async function renderManageDataSetPage() {
             await updateFormForSelection(allDataSets, allDataSources);
             // Ensure delete button visibility is correct after initial selection population
             try { updateDeleteButtonState(); } catch (e) { /* ignore */ }
+            // Ensure export button is recalculated after initial population
+            try { if (typeof updateExportButtonState === 'function') updateExportButtonState(); } catch (e) { /* ignore */ }
 
 
             // // Listener for DATA SOURCE dropdown
@@ -2028,18 +2637,22 @@ async function renderManageDataSetPage() {
 
                 await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
                 updateTableHeader(selectedDataSource.DataSourceTypeID)
+                try { if (typeof updateExportButtonState === 'function') updateExportButtonState(); } catch (e) { /* ignore */ }
 
 
             });
 
             // Listener for TOP-LEVEL data set selection
             selectionDropdown.addEventListener('change', async () => {
+                if (suppressSelectionChange) return;
+
                 // Always fetch fresh data on selection
                 allDataSets = await getAllDataSets();
                 allDataSources = await getAllDataSources();
                 await updateFormForSelection(allDataSets, allDataSources);
                 await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
                 try { updateDeleteButtonState(); } catch (e) { /* ignore */ }
+                try { if (typeof updateExportButtonState === 'function') updateExportButtonState(); } catch (e) { /* ignore */ }
             });
 
             // Listener for TABLE NAME dropdown
@@ -2049,6 +2662,7 @@ async function renderManageDataSetPage() {
                     //await updateColumnsForTable(1);
                     console.log("Table Name Selector Changed");
                     await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
+                    try { if (typeof updateExportButtonState === 'function') updateExportButtonState(); } catch (e) { /* ignore */ }
 
                 }
             });

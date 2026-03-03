@@ -64,7 +64,7 @@
             border: 1px solid #d8dbe0;
             border-radius: 0.35rem;
             box-shadow: 0 6px 15px rgba(15, 23, 42, 0.15);
-            width: 100%;
+            width: 125%;
             box-sizing: border-box;
             display: none;
             z-index: 4000;
@@ -100,6 +100,16 @@
         }
         .column-name-dropdown-list li input[type="checkbox"] {
             margin: 0;
+            /* Ensure a consistent, visible size across zoom levels */
+            width: 16px;
+            height: 16px;
+            -webkit-appearance: checkbox;
+            appearance: checkbox;
+            flex: 0 0 16px;
+        }
+        /* Add a small left padding so checkboxes are not clipped at tight widths/zoom */
+        .column-name-dropdown-list li {
+            padding-left: 0.5rem;
         }
         .column-name-sort {
             font-size: 0.9rem;
@@ -172,6 +182,8 @@
             min-height: 160px;
         }
     </style>
+    <!-- SheetJS for client-side Excel parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="container mt-4">
@@ -301,6 +313,12 @@
             <button type="button" class="btn btn-outline-secondary me-2" id="export-ds-cols-btn" style="display:none;" disabled data-bs-toggle="tooltip" data-bs-placement="top" title="Select a Data Source and ensure columns are loaded to enable export.">
                 Export Data Source Columns
                 <span id="export-ds-cols-loading" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
+            </button>
+
+            <!-- Upload button + hidden file input -->
+            <input id="upload-ds-cols-input" type="file" accept=".xlsx,.xls" style="display:none" />
+            <button type="button" class="btn btn-outline-primary me-2" id="upload-ds-cols-btn" title="Upload Data Source Columns">
+                Upload Data Source Columns
             </button>
             
             <button type="button" class="btn btn-danger me-2" id="delete-button" title="Delete this Data Set" style="display:none;">Delete</button>
