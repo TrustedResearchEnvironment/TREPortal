@@ -210,6 +210,67 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+async function getFromAPI(API_ID, initialParams) {
+    let allResults = [];
+
+    try {
+        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        // Early exit if the response is null, undefined, etc.
+        if (!parsedInitial) {
+            console.log("API returned no data.");
+            return [];
+        }
+
+        let allResults = []; // Initialize as an empty array for a clean state
+
+        // --- DETECTION LOGIC ---
+        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
+
+            // --- PAGINATED PATH ---
+            console.log("Detected a paginated response.");
+
+            allResults = parsedInitial.Results;
+            const totalPages = parsedInitial.PageCount;
+
+            if (totalPages > 1) {
+                for (let page = 2; page <= totalPages; page++) {
+                    console.log(`Fetching page ${page} of ${totalPages}...`);
+
+                    // Construct params for the next page, preserving other initial params
+                    const params = { ...initialParams, "page": page };
+                    console.log(params)
+                    const response = await window.loomeApi.runApiRequest(API_ID, params);
+                    const parsed = safeParseJson(response);
+
+                    if (parsed && parsed.Results) {
+                        allResults = allResults.concat(parsed.Results);
+                    }
+
+                } // end for loop
+            }
+
+        } else {
+            // --- NON-PAGINATED PATH ---
+            console.log("Detected a non-paginated response.");
+
+            if (Array.isArray(parsedInitial)) {
+                allResults = parsedInitial;
+            } else {
+                allResults = [parsedInitial];
+            }
+        }
+
+        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        return allResults;
+
+    } catch (error) {
+        console.error("An error occurred while fetching data source types:", error);
+        return [];
+    }
+}
+
 /**
 * Renders a compact and functional set of pagination controls.
 * Includes First, Previous, Next, Last buttons and a page input field.
@@ -308,6 +369,130 @@ function formatDate(inputDate) {
     
     // The only way this returns undefined is if the function exits before this line.
     return date.toLocaleDateString('en-US', formattingOptions);
+}
+
+function RejectRequest(request) {
+    // Get the modal elements
+    const modalBody = document.getElementById('rejectRequestModalBody');
+    const modalTitle = document.getElementById('rejectRequestModalLabel');
+    
+    // Update the modal title dynamically based on requestID
+    modalTitle.textContent = `Reject Request: ${request.Name}`;
+    
+    // Populate the modal body with the dynamic content
+    modalBody.innerHTML = `
+        <div class="col-md-12">
+            <div class="alert alert-warning">
+                <i class="fa fa-exclamation-triangle"></i> 
+                Please confirm the Rejection of the request:<br>
+                <strong>${request.Name}</strong>
+            </div>
+
+            <div class="form-group mt-3">
+                <label for="rejectReason" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
+                <textarea id="rejectReason" class="form-control" rows="3" placeholder="Enter reason for rejection" required maxlength="255"></textarea>
+                <div id="rejectReasonValidation" class="validation-message text-danger small d-none">Reason is required.</div>
+            </div>
+
+            <div class="form-group mt-3 d-flex justify-content-center">
+                <button id="confirmRejectBtn" class="btn btn-danger px-3 py-1" disabled>
+                    <i class="fa fa-thumbs-down mr-2"></i>
+                    Reject
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Add event listener for the confirm reject button with validation
+    const confirmBtn = document.getElementById('confirmRejectBtn');
+    const reasonEl = document.getElementById('rejectReason');
+    const reasonValidation = document.getElementById('rejectReasonValidation');
+
+    // Enable/disable the confirm button based on input
+    if (reasonEl) {
+        reasonEl.addEventListener('input', () => {
+            const val = (reasonEl.value || '').trim();
+            if (confirmBtn) confirmBtn.disabled = !val;
+            if (reasonValidation) {
+                if (val) {
+                    reasonValidation.classList.add('d-none');
+                } else {
+                    reasonValidation.classList.remove('d-none');
+                }
+            }
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            console.log('Reject button clicked for request:', request.RequestID);
+            const reason = reasonEl ? (reasonEl.value || '').trim() : '';
+            if (!reason) {
+                if (reasonValidation) reasonValidation.classList.remove('d-none');
+                showToast('Please provide a reason for rejection.', 'error');
+                if (reasonEl) reasonEl.focus();
+                return;
+            }
+            // Call the API to reject the request and include reason
+            rejectRequestFromAPI(request.RequestID, reason);
+        });
+    }
+}
+
+async function rejectRequestFromAPI(requestId, reason) {
+    let loadingToast = null;
+    
+    try {
+        console.log('Rejecting request ID:', requestId, 'reason:', reason);
+        
+        // Show loading state
+        loadingToast = showToast('Rejecting request...', 'info');
+        
+        const params = { "id": requestId, "reason": reason };
+        if (reason !== undefined && reason !== null) params.reason = String(reason);
+
+        const response = await window.loomeApi.runApiRequest(API_REJECT_REQUEST, params);
+        
+        // Hide loading toast
+        if (loadingToast) {
+            hideToast(loadingToast);
+        }
+        
+        // Hide the modal
+        try {
+            const rejectModal = bootstrap.Modal.getInstance(document.getElementById('rejectRequestModal'));
+            if (rejectModal) {
+                rejectModal.hide();
+                console.log('Reject modal hidden');
+            } else {
+                console.log('Reject modal not found or already hidden');
+            }
+        } catch (modalError) {
+            console.error('Error hiding modal:', modalError);
+        }
+        
+        // Show success message
+        const successToast = showToast('Request Rejected', 'success');
+        
+        // Update chip counts
+        await refreshAllChipCounts();
+        
+        // Refresh the UI
+        setTimeout(() => {
+            renderUI();
+        }, 100);
+        
+    } catch (error) {
+        console.error("Error rejecting request:", error);
+        
+        // Hide loading toast
+        if (loadingToast) {
+            hideToast(loadingToast);
+        }
+        
+        // Show error message
+        const errorToast = showToast('Please try again.', 'error');
+    }
 }
 
 
@@ -466,7 +651,16 @@ function renderTable(containerId, data, config, selectedStatus) {
                     <div class="bg-gray-50 p-4 m-2 rounded">
                         <div class="grid grid-cols-1 gap-4">
                             
-                            
+                            <div class="flex justify-end mb-1">
+                                <div class="btn-group">                                  
+
+                                    <button class="btn btn-danger action-reject px-3 py-1" data-bs-toggle="modal" data-bs-target="#rejectRequestModal">
+                                        <i class="fa fa-thumbs-down mr-2"></i>
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+
                             <!-- Combined Information Card -->
                             <div class="bg-white p-5 rounded-md shadow-sm">
                                 <div id="combined-details-${item.RequestID}" class="combined-content">
@@ -693,6 +887,79 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
         `;
     }
 }
+
+
+
+// Toast notification functions
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toast-container') || createToastContainer();
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    toast.style.cssText = 'margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
+
+    let bgColor = '#2196F3'; // info
+    if (type === 'success') bgColor = '#1AABA3';
+    if (type === 'error') bgColor = '#f44336';
+    if (type === 'warning') bgColor = '#ff9800';
+    toast.style.backgroundColor = bgColor;
+
+    const textWrap = document.createElement('div');
+    textWrap.style.flex = '1';
+    textWrap.textContent = message;
+    toast.appendChild(textWrap);
+
+    if (type === 'error') {
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
+        closeBtn.onclick = () => { if (toast.parentNode) toast.remove(); };
+        toast.appendChild(closeBtn);
+    }
+
+    toastContainer.appendChild(toast);
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+
+    const dismissDuration = 5000;
+    if (type !== 'error') {
+        setTimeout(() => { if (toast.parentNode) { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 250); } }, dismissDuration);
+    }
+
+    return toast;
+}
+
+function hideToast(toast) {
+    if (toast && toast.parentNode) {
+        console.log('Hiding toast');
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            if (toast && toast.parentNode) {
+                toast.remove();
+                console.log('Toast removed');
+            }
+        }, 300); // Wait for fade out
+    } else {
+        console.log('Toast not found or already removed');
+    }
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-top-right';
+    container.style.cssText = 'position: fixed; top: 12px; right: 12px; z-index: 9999;';
+    document.body.appendChild(container);
+    return container;
+}
+
+async function refreshAllChipCounts() {
+    const chipsContainer = document.getElementById('status-chips-container');
+    for (const chip of chipsContainer.querySelectorAll('.chip')) {
+        const status = chip.dataset.status;
+        const count = await getCounts(status);
+        chip.querySelector('.chip-count').textContent = count;
+    }
+}
+
 
 
 // =================================================================
