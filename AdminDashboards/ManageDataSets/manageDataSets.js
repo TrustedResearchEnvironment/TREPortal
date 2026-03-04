@@ -17,6 +17,7 @@ const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
 const API_GET_REDCAP_DATA = 'SyncREDCapData';
 const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
 const API_GET_METADATA = 'GetMetadata';
+const API_VERIFY_UPLOAD_SHEET = 'VerifyUploadedSheet';
 
 const pageSize = 10;
 let currentPage = 1;
@@ -1617,8 +1618,6 @@ async function updateDataSet(data_set_id, data) {
 
         if (!response) throw new Error("Failed to update dataset - no response from server");
 
-        showToast('Dataset updated successfully!');
-
         // --- ALWAYS REFRESH DATASETS AND UI ---
         if (typeof getAllDataSets === 'function' && typeof getAllDataSources === 'function') {
             const selectionDropdown = document.getElementById('dataSetSelection');
@@ -2022,11 +2021,59 @@ async function renderManageDataSetPage() {
 
                 showColumnsLoader('Uploading and validating sheet...');
 
+                // Read file as ArrayBuffer first so verification and local parsing
+                // use the same bytes and we avoid a FileReader race condition.
+                let arrayBuffer;
                 try {
-                    const arrayBuffer = await file.arrayBuffer();
+                    arrayBuffer = await file.arrayBuffer();
+                } catch (err) {
+                    console.error('Failed to read file as ArrayBuffer:', err);
+                    showToast('Failed to read the file. Please try again.', 'error');
+                    hideColumnsLoader();
+                    uploadInput.value = '';
+                    return;
+                }
+
+                // Convert ArrayBuffer to base64 for sending to verification API
+                const arrayBufferToBase64 = (buffer) => {
+                    const bytes = new Uint8Array(buffer);
+                    const chunkSize = 0x8000;
+                    let binary = '';
+                    for (let i = 0; i < bytes.length; i += chunkSize) {
+                        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+                    }
+                    return btoa(binary);
+                };
+
+                const base64String = arrayBufferToBase64(arrayBuffer);
+                const payload = { fileData: base64String };
+
+                // Wait for verification to complete before proceeding
+                try {
+                    const response = await window.loomeApi.runApiRequest(API_VERIFY_UPLOAD_SHEET, { "payload": payload });
+                    console.log('Verification response:', response);
+                    const result = response;
+                    if (!result || result.valid !== true) {
+                        console.error('Tampering Detected:', result && result.message ? result.message : 'Unknown verification failure');
+                        showToast((result && result.message) || 'Column validation failed.', 'error');
+                        hideColumnsLoader();
+                        uploadInput.value = '';
+                        return;
+                    }
+                    console.log('Verification successful:', result.message);
+                } catch (error) {
+                    console.error('Network or Parsing Error during verification:', error);
+                    showToast('Could not verify file integrity. Please try again.', 'error');
+                    hideColumnsLoader();
+                    uploadInput.value = '';
+                    return;
+                }
+
+                // Now parse the workbook using the same arrayBuffer we sent for verification
+                try {
                     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
-                    // 3) Validate sheet names
+                    // 4) Validate sheet names
                     const requiredSheets = ['DataSetColumns', 'DataSetMetadata'];
                     const names = workbook.SheetNames || [];
                     const missing = requiredSheets.filter(s => !names.includes(s));
@@ -2037,14 +2084,14 @@ async function renderManageDataSetPage() {
                         return;
                     }
 
-                    // 4) Validate headers exactly as specified
+                    // 5) Validate headers exactly as specified
                     const colsSheet = workbook.Sheets['DataSetColumns'];
                     const metaSheet = workbook.Sheets['DataSetMetadata'];
                     const colsRows = XLSX.utils.sheet_to_json(colsSheet, { header: 1, defval: '' });
                     const metaRows = XLSX.utils.sheet_to_json(metaSheet, { header: 1, defval: '' });
 
                     const expectedColsHeader = ['ColumnName','ColumnType','LogicalColumnName','BusinessDescription','ExampleValue','Tokenise','Redact',]; //,'TokenIdentifierType', 'DisplayOrder','IsFilter'
-                    const expectedMetaHeader = ['Name','Description','DataSourceID','IsActive','Approvers','OptOutMessage','OptOutList','Owner','OptOutColumn','DataSetFieldValues','DataSetMetaDataValues','DataSetFolders','DataSetFolderFiles','DataSourceTypeID','DataSetID'];
+                    const expectedMetaHeader = ['Name','Description','DataSourceID','IsActive','Approvers','OptOutMessage','OptOutList','Owner','OptOutColumn','DataSetFieldValues','DataSetMetaDataValues','DataSetFolders','DataSetFolderFiles','DataSourceTypeID','DataSetID', '_VerificationHash'];
 
                     const actualColsHeader = (colsRows[0] || []).map(c => String(c).trim());
                     const actualMetaHeader = (metaRows[0] || []).map(c => String(c).trim());
@@ -2737,7 +2784,7 @@ async function renderManageDataSetPage() {
                         // Update the main data set record;
                         await updateDataSet(dataSetId, formData);
 
-                        showToast('Data Set updated successfully!');
+                        showToast('Dataset updated successfully!');
                     }
 
                     // Clear the forms
