@@ -1571,8 +1571,17 @@ async function createDataSet(data) {
         // Send the new 'payload' object to the API instead of the original 'data'
         const response = await window.loomeApi.runApiRequest(API_CREATE_DATASET, { "payload": payload });
         if (!response) throw new Error("Failed to add dataset - no response from server");
-        showToast('Dataset added successfully!');
-        return response;
+        
+        // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
+        const parsed = safeParseJson(response);
+        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
+            const error = new Error(parsed.detail || parsed.message || 'Server error');
+            error.detail = parsed.detail;
+            error.response = response;
+            throw error;
+        }
+
+        return parsed;
     } catch (error) {
         console.error("Error creating dataset:", error);
         throw error;
@@ -1657,6 +1666,15 @@ async function updateDataSet(data_set_id, data) {
         );
 
         if (!response) throw new Error("Failed to update dataset - no response from server");
+
+        // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
+        const parsed = safeParseJson(response);
+        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
+            const error = new Error(parsed.detail || parsed.message || 'Server error');
+            error.detail = parsed.detail;
+            error.response = response;
+            throw error;
+        }
 
         // --- ALWAYS REFRESH DATASETS AND UI ---
         if (typeof getAllDataSets === 'function' && typeof getAllDataSources === 'function') {
@@ -2839,7 +2857,24 @@ async function renderManageDataSetPage() {
 
                 } catch (error) {
                     console.error('An error occurred during submission:', error);
-                    showToast('Failed to save the Data Set. Please check the console for details.', 'error');
+                    // Derive a user-friendly message from various possible error shapes
+                    let detailMsg = 'Failed to save the Data Set.';
+                    try {
+                        if (error && typeof error === 'object') {
+                            if (error.detail) detailMsg = error.detail;
+                            else if (error.response) {
+                                const parsed = safeParseJson(error.response);
+                                detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
+                            } else {
+                                detailMsg = error.message || JSON.stringify(error);
+                            }
+                        } else if (typeof error === 'string') {
+                            detailMsg = error;
+                        }
+                    } catch (e) {
+                        detailMsg = 'Failed to save the Data Set.';
+                    }
+                    showToast(detailMsg, 'error');
                 } finally {
                     // 5. ALWAYS re-enable the button and restore its text
                     submitButton.disabled = false;
