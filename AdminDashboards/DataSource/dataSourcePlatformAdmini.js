@@ -1142,6 +1142,15 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                     const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, {data_source_id: dataSourceId, payload });
 
+                    // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
+                    const parsed = safeParseJson(updatedDataSource);
+                    if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
+                        const error = new Error(parsed.detail || parsed.message || 'Server error');
+                        error.detail = parsed.detail;
+                        error.response = updatedDataSource;
+                        throw error;
+                    }
+
                     // --- 3. Handle the Server's Response ---
                     if (!updatedDataSource) {
                         // Handle cases where the API might return an empty or null response on success
@@ -1378,6 +1387,15 @@ async function renderPlatformAdminDataSourcePage() {
         try {
             const response = await window.loomeApi.runApiRequest(API_ADD_DATASOURCE_ID, payload);
             console.log("RESPONSE: ", response)
+
+            // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
+            const parsed = safeParseJson(response);
+            if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
+                const error = new Error(parsed.detail || parsed.message || 'Server error');
+                error.detail = parsed.detail;
+                error.response = response;
+                throw error;
+            }
 
             showToast('Data Source added successfully!\nPlease wait while the data refreshes.', 'success');
 
