@@ -116,6 +116,44 @@ async function syncREDCapDataSetColumns(data_source_id) {
  * Populates the column table's tbody with data from a paginated response.
  * @param {Object|null} paginatedResponse - The full response object from the API.
  */
+// Convert raw DB column types into a friendly label for display only.
+// This does NOT mutate the original `ColumnType` value stored in objects.
+//
+// Unit comment (UI-only clarity):
+// - `getDisplayColumnType(rawType)` returns a user-friendly label used only
+//   for rendering in the table. It deliberately does NOT modify `rawType` or
+//   any column object.
+// - All persistence and DB/export operations read the canonical
+//   `ColumnType` from the in-memory model (for example `allColumnsData`), so
+//   changing the display label here will not affect database behavior.
+function getDisplayColumnType(rawType) {
+    if (!rawType && rawType !== 0) return '';
+    const t = String(rawType).trim().toLowerCase();
+    if (!t) return '';
+
+    // Common mappings - adjust as needed
+    const textTypes = ['varchar', 'nvarchar', 'char', 'text', 'nchar', 'longtext'];
+    const intTypes = ['int', 'bigint', 'smallint', 'tinyint', 'integer'];
+    const numTypes = ['float', 'double', 'decimal', 'numeric', 'real'];
+    const dateTypes = ['date', 'datetime', 'timestamp', 'time'];
+    const boolTypes = ['bit', 'boolean', 'bool'];
+
+    // If the raw type contains a keyword (e.g. varchar(255)), check startsWith
+    const base = t.split(/\s|\(|,|;/)[0];
+
+    if (textTypes.includes(base)) return 'text';
+    // Treat integer and numeric types the same for display purposes
+    // so consumers see aa single 'number' label for all numeric columns.
+    if (intTypes.includes(base) || numTypes.includes(base)) return 'number';
+    if (dateTypes.includes(base)) return 'date/time';
+    // Use a user-friendly literal label for boolean columns in the UI.
+    // Display 'True/False' (capitalized) to match the sheet and validation text.
+    if (boolTypes.includes(base)) return 'True/False';
+
+    // Fallback: return the original raw string but normalized
+    return rawType;
+}
+
 function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to display. Select a Data Source or existing Data Set.') {
     const tableBody = document.getElementById('dataSetColsBody');
 
@@ -139,6 +177,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
         rowsHtml = data.map((col, index) => `
             <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
                 <td>${col.ColumnName || ''}</td>
+                <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
                 <td class="editable-cell" data-field="LogicalColumnName">${col.LogicalColumnName || ''}</td>
                 <td class="editable-cell" data-field="BusinessDescription">${col.BusinessDescription || ''}</td>
                 <td class="editable-cell" data-field="ExampleValue">${col.ExampleValue || ''}</td>
@@ -159,6 +198,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
             return `
                 <tr data-id="${row.ColumnName}" data-column-name="${row.ColumnName}">
                     <td>${row.ColumnName || ''}</td>
+                    <td>${escapeHtml(getDisplayColumnType(row.ColumnType) || row.ColumnType || '')}</td>
                     <td class="editable-cell" data-field="LogicalColumnName">${row.LogicalColumnName || ''}</td>
                     <td class="editable-cell" data-field="BusinessDescription">${row.BusinessDescription || ''}</td>
                     <td class="editable-cell" data-field="ExampleValue">${row.ExampleValue || ''}</td>
@@ -1531,8 +1571,17 @@ async function createDataSet(data) {
         // Send the new 'payload' object to the API instead of the original 'data'
         const response = await window.loomeApi.runApiRequest(API_CREATE_DATASET, { "payload": payload });
         if (!response) throw new Error("Failed to add dataset - no response from server");
-        showToast('Dataset added successfully!');
-        return response;
+        
+        // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
+        const parsed = safeParseJson(response);
+        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
+            const error = new Error(parsed.detail || parsed.message || 'Server error');
+            error.detail = parsed.detail;
+            error.response = response;
+            throw error;
+        }
+
+        return parsed;
     } catch (error) {
         console.error("Error creating dataset:", error);
         throw error;
@@ -1618,6 +1667,15 @@ async function updateDataSet(data_set_id, data) {
 
         if (!response) throw new Error("Failed to update dataset - no response from server");
 
+        // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
+        const parsed = safeParseJson(response);
+        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
+            const error = new Error(parsed.detail || parsed.message || 'Server error');
+            error.detail = parsed.detail;
+            error.response = response;
+            throw error;
+        }
+
         // --- ALWAYS REFRESH DATASETS AND UI ---
         if (typeof getAllDataSets === 'function' && typeof getAllDataSources === 'function') {
             const selectionDropdown = document.getElementById('dataSetSelection');
@@ -1664,6 +1722,7 @@ function updateTableHeader(dataSourceType) {
     const headerDefinitions = {
         1: [
             { label: 'Column Name', sortKey: 'column-name' },
+            { label: 'Column Type' },
             { label: 'Logical Name' },
             { label: 'Business Description' },
             { label: 'Example Value' },
@@ -1672,6 +1731,7 @@ function updateTableHeader(dataSourceType) {
         ],
         2: [
             { label: 'Column Name', sortKey: 'column-name' },
+            { label: 'Column Type' },
             { label: 'Logical Name' },
             { label: 'Business Description' },
             { label: 'Example Value' },
@@ -2797,7 +2857,24 @@ async function renderManageDataSetPage() {
 
                 } catch (error) {
                     console.error('An error occurred during submission:', error);
-                    showToast('Failed to save the Data Set. Please check the console for details.', 'error');
+                    // Derive a user-friendly message from various possible error shapes
+                    let detailMsg = 'Failed to save the Data Set.';
+                    try {
+                        if (error && typeof error === 'object') {
+                            if (error.detail) detailMsg = error.detail;
+                            else if (error.response) {
+                                const parsed = safeParseJson(error.response);
+                                detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
+                            } else {
+                                detailMsg = error.message || JSON.stringify(error);
+                            }
+                        } else if (typeof error === 'string') {
+                            detailMsg = error;
+                        }
+                    } catch (e) {
+                        detailMsg = 'Failed to save the Data Set.';
+                    }
+                    showToast(detailMsg, 'error');
                 } finally {
                     // 5. ALWAYS re-enable the button and restore its text
                     submitButton.disabled = false;
