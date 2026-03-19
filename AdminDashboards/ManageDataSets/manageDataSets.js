@@ -1954,7 +1954,7 @@ async function renderManageDataSetPage() {
         async function createAndDownloadExcelFile() {
             const formData = gatherFormData(allColumnsData);
             if (!formData.Name || !formData.Owner || !formData.Approvers) {
-                showToast('Please fill in Name, Owner, and Approver before exporting.', 'warning');
+                showToast('Please fill in Name, Owner, and Approver before exporting.', 'error');
                 return;
             }
 
@@ -2018,7 +2018,7 @@ async function renderManageDataSetPage() {
 
             } catch (error) {
                 console.error("Export Error:", error);
-                showToast(error.message || 'Failed to export. Please try again.', 'warning');
+                showToast(error.message || 'Failed to export. Please try again.', 'error');
             } finally {
                 exportLoading.style.display = 'none';
                 updateExportButtonState();
@@ -2067,7 +2067,7 @@ async function renderManageDataSetPage() {
                 // 1) Validate extension (basic client-side check)
                 const name = (file.name || '').toLowerCase();
                 if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
-                    showToast('Please choose an Excel file (.xls or .xlsx).', 'warning');
+                    showToast('Please choose an Excel file (.xls or .xlsx).', 'error');
                     uploadInput.value = '';
                     return;
                 }
@@ -2138,7 +2138,7 @@ async function renderManageDataSetPage() {
                     const names = workbook.SheetNames || [];
                     const missing = requiredSheets.filter(s => !names.includes(s));
                     if (missing.length) {
-                        showToast(`Missing required sheets: ${missing.join(', ')}`, 'warning');
+                        showToast(`Missing required sheets: ${missing.join(', ')}`, 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
@@ -2166,14 +2166,14 @@ async function renderManageDataSetPage() {
                     };
 
                     if (!arrayEquals(actualColsHeader, expectedColsHeader)) {
-                        showToast('Invalid header in DataSetColumns sheet. Ensure columns match the required header and order.', 'warning');
+                        showToast('Invalid header in DataSetColumns sheet. Ensure columns match the required header and order.', 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
                     }
 
                     if (!arrayEquals(actualMetaHeader, expectedMetaHeader)) {
-                        showToast('Invalid header in DataSetMetadata sheet. Ensure columns match the required header and order.', 'warning');
+                        showToast('Invalid header in DataSetMetadata sheet. Ensure columns match the required header and order.', 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
@@ -2185,7 +2185,7 @@ async function renderManageDataSetPage() {
 
                     // Enforce exactly one metadata row
                     if (!Array.isArray(parsedMeta) || parsedMeta.length !== 1) {
-                        showToast('DataSetMetadata must contain exactly one data row.', 'warning');
+                        showToast('DataSetMetadata must contain exactly one data row.', 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
@@ -2523,7 +2523,7 @@ async function renderManageDataSetPage() {
 
                 submitButton.disabled = true;
                 submitButton.textContent = 'Saving Disabled';
-                showToast('This dataset is based on an inactive data source. It is not available for requests or edits. Please contact the platform administrator for assistance.', 'warning');
+                showToast('This dataset is based on an inactive data source. It is not available for requests or edits. Please contact the platform administrator for assistance.', 'error');
             }
 
             // The data source might still be missing if the API call failed or if the ID is invalid. In that case, we should log a warning and avoid trying to populate the form with undefined data.
@@ -2820,7 +2820,7 @@ async function renderManageDataSetPage() {
                     console.log("Form Data to Submit:", formData);
                     // --- Client-side validation (optional but recommended) ---
                     if (!formData.Name) {
-                        showToast('Data Set Name is required.', 'warning');
+                        showToast('Data Set Name is required.', 'error');
                         throw new Error('Validation failed: Name is required.');
                     }
 
