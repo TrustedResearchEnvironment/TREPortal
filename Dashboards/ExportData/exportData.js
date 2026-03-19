@@ -251,7 +251,14 @@ async function initializePage() {
         if (totalJobs > 0) {
             const allDataResponse = await window.loomeApi.runApiRequest(API_REQUEST_ID, { page: 1, pageSize: totalJobs });
             const allData = safeParseJson(allDataResponse);
-            allJobs = allData.Results;
+            // allJobs = allData.Results;
+            // Populate allJobs and sort by `dateCreated` descending (most recent first)
+            allJobs = (allData.Results || []).slice();
+            allJobs.sort((a, b) => {
+                const ta = a && a.dateCreated ? new Date(a.dateCreated).getTime() : 0;
+                const tb = b && b.dateCreated ? new Date(b.dateCreated).getTime() : 0;
+                return tb - ta; // newest first
+            });
         }
         
         renderUI();
