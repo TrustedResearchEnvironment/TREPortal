@@ -76,14 +76,14 @@ function AddMetadata(typeNamesList) {
             return item.name || item.Name//) !== 'Folder';
         })
         .map((item, index) => {
-            const id = item && (item.id || item.DataSourceTypeID) !== undefined ? (item.id || item.DataSourceTypeID) : index;
-            const name = typeof item === 'string' ? item : (item.name || item.Name || String(item));
+            const id = (item && (item.DataSourceTypeID !== undefined || item.id !== undefined)) ? (item.DataSourceTypeID ?? item.id) : index;
+            const name = typeof item === 'string' ? item : (item.Name || item.name || String(item));
             const checkboxId = `dataSourceType-checkbox-${index}`;
             return `
                 <li>
                     <a class="dropdown-item" href="#">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="${id}" id="${checkboxId}" onclick="event.stopPropagation()">
+                            <input class="form-check-input data-source-type-checkbox" type="checkbox" value="${id}" id="${checkboxId}" onclick="event.stopPropagation()">
                             <label class="form-check-label" for="${checkboxId}">
                                 ${name}
                             </label>
@@ -99,7 +99,7 @@ function AddMetadata(typeNamesList) {
             <!-- Name, Description, Active fields... -->
             <div class="mb-3">
                 <label for="metaDataName" class="form-label">Name</label>
-                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control">
+                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control" required>
             </div>
             <div class="mb-3">
                 <label for="metaDataDescription" class="form-label">Description</label>
@@ -209,13 +209,17 @@ function getMetaDataFormData(formElement) {
     const description = sanitizeStringForJson(formElement.querySelector('#metaDataDescription').value);
     const isActive = !!formElement.querySelector('#metaDataActive').checked;
     // Capture multiple selected Data Source Type IDs (if any)
-    const dataSourceTypeSelectCheckedBoxes = document.querySelectorAll('#dataSourceTypeMenu .form-check-input:checked');
+    // Target only the data source type checkboxes using specific class
+    const dataSourceTypeSelectCheckedBoxes = formElement.querySelectorAll('.data-source-type-checkbox:checked');
     
     let dataSourceTypeIDs = [];
     dataSourceTypeSelectCheckedBoxes.forEach(box => {
         const v = parseInt(box.value, 10);
-        if (!Number.isNaN(v)) dataSourceTypeIDs.push(v);
+        if (!Number.isNaN(v)) {
+            dataSourceTypeIDs.push(v);
+        }
     });
+    
 
     // --- 3. Combine everything into a final payload object ---
     // This structure is designed to match your Pydantic "Create" model.
@@ -610,7 +614,48 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             event.stopPropagation();
             
             const parentAccordion = event.target.closest('.accordion-body');
-            const toggleEditState = (isEditing) => {
+            
+            // const toggleEditState = (isEditing) => {
+            //     parentAccordion.querySelectorAll('.view-state').forEach(el => el.classList.toggle('hidden', isEditing));
+            //     parentAccordion.querySelectorAll('.edit-state').forEach(el => el.classList.toggle('hidden', !isEditing));
+
+            //     // Enable/disable the accordion dropdown and its checkboxes based on editing state
+            //     const menuButton = parentAccordion.querySelector('.accordion-dataSourceTypeDropdown');
+            //     const inputs = parentAccordion.querySelectorAll('.accordion-dataSourceTypeMenu input[type="checkbox"]');
+            //     if (isEditing) {
+            //         if (menuButton) menuButton.removeAttribute('disabled');
+            //         inputs.forEach(i => i.removeAttribute('disabled'));
+            //     } else {
+            //         if (menuButton) menuButton.setAttribute('disabled', '');
+            //         inputs.forEach(i => i.setAttribute('disabled', ''));
+            //     }
+            // };
+            
+            // toggleEditState now accepts an optional `isCancel` flag. When entering edit mode
+// we store original values on the accordion element; when cancelling we restore them.
+            const toggleEditState = (isEditing, isCancel = false) => {
+                // If entering edit mode, persist current view values so Cancel can restore them
+                if (isEditing) {
+                    const nameSpan = parentAccordion.querySelector('.view-state-name');
+                    const descSpan = parentAccordion.querySelector('.view-state-description');
+                    const isActiveSpan = parentAccordion.querySelector('.view-state-isactive');
+                    parentAccordion.dataset.origName = nameSpan ? nameSpan.textContent : '';
+                    parentAccordion.dataset.origDescription = descSpan ? descSpan.textContent : '';
+                    parentAccordion.dataset.origIsActive = isActiveSpan ? isActiveSpan.textContent : '';
+
+                    const menu = parentAccordion.querySelector('.accordion-dataSourceTypeMenu');
+                    if (menu) {
+                        const selected = Array.from(menu.querySelectorAll('input[type="checkbox"]'))
+                            .filter(cb => cb.checked)
+                            .map(cb => cb.value)
+                            .join(',');
+                        parentAccordion.dataset.origSelectedTypes = selected;
+                    } else {
+                        parentAccordion.dataset.origSelectedTypes = '';
+                    }
+                }
+
+                // Toggle view/edit UI
                 parentAccordion.querySelectorAll('.view-state').forEach(el => el.classList.toggle('hidden', isEditing));
                 parentAccordion.querySelectorAll('.edit-state').forEach(el => el.classList.toggle('hidden', !isEditing));
 
@@ -621,11 +666,52 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     if (menuButton) menuButton.removeAttribute('disabled');
                     inputs.forEach(i => i.removeAttribute('disabled'));
                 } else {
+                    // If this transition is due to Cancel, restore original values
+                    if (isCancel) {
+                        const origName = parentAccordion.dataset.origName || '';
+                        const origDescription = parentAccordion.dataset.origDescription || '';
+                        const origIsActive = parentAccordion.dataset.origIsActive || 'No';
+                        const origSelectedTypes = parentAccordion.dataset.origSelectedTypes || '';
+
+                        // Restore view-state text
+                        const nameSpan = parentAccordion.querySelector('.view-state-name');
+                        if (nameSpan) nameSpan.textContent = origName;
+                        const descSpan = parentAccordion.querySelector('.view-state-description');
+                        if (descSpan) descSpan.textContent = origDescription;
+                        const isActiveSpan = parentAccordion.querySelector('.view-state-isactive');
+                        if (isActiveSpan) isActiveSpan.textContent = origIsActive;
+
+                        // Restore edit inputs values
+                        const nameInput = parentAccordion.querySelector('.edit-state-name');
+                        if (nameInput) nameInput.value = origName;
+                        const descInput = parentAccordion.querySelector('.edit-state-description');
+                        if (descInput) descInput.value = origDescription;
+                        const isActiveInput = parentAccordion.querySelector('.edit-state-isactive');
+                        if (isActiveInput) isActiveInput.checked = (origIsActive === 'Yes');
+
+                        // Restore types checkboxes
+                        if (inputs && inputs.length) {
+                            const selectedSet = new Set(origSelectedTypes.split(',').filter(Boolean));
+                            inputs.forEach(cb => { cb.checked = selectedSet.has(cb.value); });
+                            // Trigger change so button text updates
+                            const menu = parentAccordion.querySelector('.accordion-dataSourceTypeMenu');
+                            if (menu) menu.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+
                     if (menuButton) menuButton.setAttribute('disabled', '');
                     inputs.forEach(i => i.setAttribute('disabled', ''));
+
+                    // Clear saved originals when leaving edit mode after a Save (not Cancel)
+                    if (!isCancel) {
+                        delete parentAccordion.dataset.origName;
+                        delete parentAccordion.dataset.origDescription;
+                        delete parentAccordion.dataset.origIsActive;
+                        delete parentAccordion.dataset.origSelectedTypes;
+                    }
                 }
             };
-            
+
             if (editButton) toggleEditState(true);
 
             if (saveButton) {
@@ -653,6 +739,11 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     // Collect selected types from the accordion dropdown (if any)
                     const selectedTypes = Array.from(accordionBody.querySelectorAll('.accordion-dataSourceTypeMenu input[type="checkbox"]:checked'))
                         .map(cb => parseInt(cb.value, 10)).filter(v => !Number.isNaN(v));
+
+                    // Validate required fields before sending
+                    if (!updatedName || String(updatedName).trim() === '') {
+                        throw new Error('Name is required.');
+                    }
 
                     const updateParams = {
                         "meta_data_id": parseInt(metaDataId, 10),
@@ -695,7 +786,8 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 }
             }
 
-            if (cancelButton) toggleEditState(false);
+            // if (cancelButton) toggleEditState(false);
+            if (cancelButton) toggleEditState(false, true);
 
             if (deleteButton) {
                 // Implement delete functionality here, similar to save but with a confirmation step
@@ -984,6 +1076,12 @@ async function renderPlatformAdminMetaDataPage() {
         }
 
         const payload = getMetaDataFormData(form);
+        
+        // Validate required fields: Name and at least one Data Source Type
+        if (!payload || !payload.name || String(payload.name).trim() === '') {
+            showToast('Name is required.', 'error');
+            return;
+        }
         console.log("Data gathered from form:", payload);
         
         saveButton.disabled = true;
