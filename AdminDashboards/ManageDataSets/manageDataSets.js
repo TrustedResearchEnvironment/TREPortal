@@ -589,7 +589,8 @@ function handlePageChange(newPage) {
         if (pageInput) {
             pageInput.value = currentPage;
         }
-        console.warn(`Invalid page number entered: ${newPage}`);
+        showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
+                
     }
 }
 

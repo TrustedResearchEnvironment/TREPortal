@@ -12,6 +12,7 @@ const API_GET_ALL_ASSIST_PROJECTS = 'GetAllAssistProjects';
 // We will store all fetched data here
 let allRequests = []; 
 let currentPage = 1;
+let totalPages = 1;
 const rowsPerPage = 5; // You can control page size here
 const searchInput = document.getElementById('searchRequests');
 
@@ -783,7 +784,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
         return;
     }
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    totalPages = Math.ceil(totalItems / itemsPerPage); // Up
     container.innerHTML = ''; // Clear old controls
 
     if (totalPages <= 1) {
@@ -1224,9 +1225,12 @@ async function renderApproversPage() {
             // Only act if the user pressed Enter and the target is our input
             if (event.key === 'Enter' && event.target.id === 'page-input') {
                 const newPage = parseInt(event.target.value, 10);
-                if (!isNaN(newPage) && newPage > 0) {
+                if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
                     currentPage = newPage;
                     renderUI();
+                } else {
+                    // If invalid, show a message and reset the input to the current page
+                    showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
                 }
             }
         });

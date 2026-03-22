@@ -12,6 +12,7 @@ const API_GET_ASSIST_PROJECTS = 'GetAssistProjectsFilteredByUpn';
 // We will store all fetched data here
 let allRequests = []; 
 let currentPage = 1;
+let totalPages = 1; // Add global totalPages variable
 const rowsPerPage = 5; // You can control page size here
 const searchInput = document.getElementById('searchRequests');
 
@@ -763,7 +764,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
         return;
     }
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    totalPages = Math.ceil(totalItems / itemsPerPage); // Update global totalPages
     container.innerHTML = ''; // Clear old controls
 
     if (totalPages <= 1) {
@@ -1216,14 +1217,20 @@ async function renderMyRequestsPage() {
         paginationContainer.addEventListener('keydown', (event) => {
             // Only act if the user pressed Enter and the target is our input
             if (event.key === 'Enter' && event.target.id === 'page-input') {
-                const newPage = parseInt(event.target.value, 10);
-                if (!isNaN(newPage) && newPage > 0) {
+                const inputElement = event.target;
+                const newPage = parseInt(inputElement.value, 10);
+
+                // Validate the input
+                if (newPage >= 1 && newPage <= totalPages) {
                     currentPage = newPage;
                     renderUI();
+                } else {
+                    // If invalid, show a message and reset the input to the current page
+                    showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
+                    inputElement.value = currentPage;
                 }
             }
         });
-
         // --- 5. INITIAL PAGE RENDER ---
         // Programmatically click the first chip to trigger the initial render.
         document.querySelector('.chip[data-status="Pending Approval"]').click();
