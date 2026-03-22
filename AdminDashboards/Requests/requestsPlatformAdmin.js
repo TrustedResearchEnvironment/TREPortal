@@ -581,7 +581,7 @@ async function fetchDatasetDetails(datasetID) {
 /**
  * Renders a data table with dynamic headers and actions.
  */
-function renderTable(containerId, data, config, selectedStatus) {
+function renderTable(containerId, data, config, selectedStatus, searchTerm = '') {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     const table = document.createElement('table');
@@ -615,7 +615,10 @@ function renderTable(containerId, data, config, selectedStatus) {
     
     if (data.length === 0) {
         const colSpan = headers.length + 1; // +1 for chevron column
-        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-6 py-4 text-center text-sm text-gray-500">No requests found.</td></tr>`;
+        const message = searchTerm.trim() ? 
+            'No requests found. Please review your search term.' : 
+            'No requests found.';
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-6 py-4 text-center text-sm text-gray-500">${message}</td></tr>`;
     } else {
         data.forEach(item => {
             const row = document.createElement('tr');
@@ -1020,7 +1023,7 @@ async function renderUI() {
 
     // --- Render the components ---
     const configForTable = configMap[selectedStatus];
-    renderTable(TABLE_CONTAINER_ID, allRequests, configForTable, selectedStatus);
+    renderTable(TABLE_CONTAINER_ID, allRequests, configForTable, selectedStatus, searchTerm);
     renderPagination('pagination-controls', totalItems, rowsPerPage, currentPage);
 }
 
