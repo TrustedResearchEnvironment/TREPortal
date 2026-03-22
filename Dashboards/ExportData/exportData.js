@@ -26,6 +26,67 @@ let isDropdownPopulated = false;
 // =================================================================
 //                      UTILITY FUNCTIONS
 // =================================================================
+/**
+ * Displays a temporary "toast" notification on the screen.
+ * @param {string} message - The message to display.
+ * @param {string} [type='success'] - The type of toast ('success', 'error', 'info').
+ * @param {number} [duration=3000] - How long the toast should be visible in milliseconds.
+ */
+function showToast(message, type = 'success', duration = 3000) {
+    const container = document.getElementById('toast-container') || createToastContainer();
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    toast.style.cssText = 'margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
+
+    let bgColor = '#2196F3'; // info default
+    if (type === 'success') bgColor = '#1AABA3';
+    if (type === 'error') bgColor = '#f44336';
+    if (type === 'warning') bgColor = '#ff9800';
+    toast.style.backgroundColor = bgColor;
+
+    const textWrap = document.createElement('div');
+    textWrap.style.flex = '1';
+    textWrap.textContent = message;
+    toast.appendChild(textWrap);
+
+    // Add close button for error toasts (persistent)
+    if (type === 'error') {
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
+        closeBtn.onclick = () => {
+            if (toast.parentNode) toast.remove();
+        };
+        toast.appendChild(closeBtn);
+    }
+
+    container.appendChild(toast);
+    // Trigger animation
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+
+    // Auto-dismiss for non-error toasts
+    const dismissDuration = (typeof duration === 'number') ? duration : 5000;
+    if (type !== 'error') {
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 250);
+            }
+        }, dismissDuration);
+    }
+
+    return toast;
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-top-right';
+    container.style.cssText = 'position: fixed; top: 12px; right: 12px; z-index: 9999;';
+    document.body.appendChild(container);
+    return container;
+}
+
 
 function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
@@ -251,7 +312,14 @@ async function initializePage() {
         if (totalJobs > 0) {
             const allDataResponse = await window.loomeApi.runApiRequest(API_REQUEST_ID, { page: 1, pageSize: totalJobs });
             const allData = safeParseJson(allDataResponse);
-            allJobs = allData.Results;
+            // allJobs = allData.Results;
+            // Populate allJobs and sort by `dateCreated` descending (most recent first)
+            allJobs = (allData.Results || []).slice();
+            allJobs.sort((a, b) => {
+                const ta = a && a.dateCreated ? new Date(a.dateCreated).getTime() : 0;
+                const tb = b && b.dateCreated ? new Date(b.dateCreated).getTime() : 0;
+                return tb - ta; // newest first
+            });
         }
         
         renderUI();
@@ -286,7 +354,7 @@ function setupEventListeners() {
                 currentPage = newPage;
                 renderUI();
             } else {
-                alert(`Please enter a page number between 1 and ${totalPages}.`);
+                showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
                 inputElement.value = currentPage;
             }
         }
@@ -325,7 +393,7 @@ function setupEventListeners() {
             
             // Check if a valid option is selected
             if (!selectedOption || !selectedOption.value) {
-                alert('Please select an Assist Project.');
+                showToast('Please select an Assist Project.');
                 return;
             }
 
@@ -348,12 +416,12 @@ function setupEventListeners() {
 
                 console.log('Submitting export request with params:', params);
                 await window.loomeApi.runApiRequest(SUBMIT_EXPORT_API_ID, params);
-                alert('Export request submitted successfully!');
+                showToast('Export request submitted successfully!', "success");
                 closeModal();
                 await initializePage(); 
             } catch (error) {
                 console.error('Failed to submit export request:', error);
-                alert('An error occurred while submitting the request. Please try again.');
+                showToast('An error occurred while submitting the request. Please try again.', "error");
             } finally {
                 submitButton.disabled = false;
                 submitButton.textContent = 'Submit Request';

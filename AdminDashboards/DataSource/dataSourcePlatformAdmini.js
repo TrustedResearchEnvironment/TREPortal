@@ -1344,7 +1344,7 @@ async function renderPlatformAdminDataSourcePage() {
                 fetchAndRenderPage(tableConfig, newPage, searchInput.value);
             } else {
                 // If invalid, show a message and reset the input to the current page
-                alert(`Please enter a page number between 1 and ${totalPages}.`);
+                showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
                 inputElement.value = currentPage;
             }
         }
