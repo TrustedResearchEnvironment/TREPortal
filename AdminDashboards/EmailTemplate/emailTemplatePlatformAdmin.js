@@ -6,6 +6,7 @@ const API_UPDATE_EMAIL_TEMPLATE = 'UpdateEmailTemplate';
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
 let currentPage = 1;
+let totalPages = 1; // Add global totalPages variable
 let rowsPerPage = 5; // Default, will be updated by API response
 let tableConfig = {}; // Will hold your headers configuration
 const searchInput = document.getElementById('searchRequests');
@@ -270,7 +271,7 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         const totalItems = parsedResponse.RowCount; // The TOTAL count from the server!
         currentPage = parsedResponse.CurrentPage;
         rowsPerPage = parsedResponse.PageSize;
-        totalPages = Math.ceil(totalItems / rowsPerPage);
+        totalPages = Math.ceil(totalItems / rowsPerPage); // Update global totalPages
         
         // --- 3. Filter using searchTerm ---
         const lowerCaseSearchTerm = searchTerm.trim().toLowerCase();
@@ -536,32 +537,6 @@ function formatDate(inputDate) {
     return date.toLocaleDateString('en-US', formattingOptions);
 }
 
-/**
- * Updates the UI and renders the correct table, optionally filtering the data.
- */
-// function updateTable(config, data, tableContainerId, currentPage, rowsPerPage, searchTerm = '') {
-
-//     const lowerCaseSearchTerm = searchTerm.trim().toLowerCase();
-//     const filteredData = lowerCaseSearchTerm
-//         ? data.filter(item => 
-//             Object.values(item).some(value =>
-//                 String(value).toLowerCase().includes(lowerCaseSearchTerm)
-//             )
-//         )
-//         : data;
-
-//     // --- 3. PAGINATION LOGIC (NEW!) ---
-//     // Calculate the slice of data for the current page
-//     const startIndex = (currentPage - 1) * rowsPerPage;
-//     const endIndex = startIndex + rowsPerPage;
-//     const paginatedData = filteredData.slice(startIndex, endIndex);
-
-//     // --- 4. RENDER TABLE AND PAGINATION ---
-//     // Render the table with ONLY the data for the current page
-//     renderTable(tableContainerId, config.headers, paginatedData);
-    
-//     //renderPagination('pagination-controls', filteredData.length, rowsPerPage, currentPage);
-// }
 
 /**
  * Safely parses a response that might be a JSON string or an object.
@@ -574,47 +549,7 @@ function safeParseJson(response) {
 
 async function renderPlatformAdminEmailTemplatesPage() {
     
-    try {
-        
-        // const emailTemplates = [
-        //   {
-        //     "EmailTemplateID": 1,
-        //     "EmailTemplateType": "RequestApproval",
-        //     "EmailTemplateSubject": "TRE – Data Access Request pending approval",
-        //     "EmailTemplateText": "<p>Hi,</p><p>You are listed as one of the approvers for a data set that is available on the <a href='https://test-app.loomesoftware.com/icl---uat-tenant'>TRE Platform</a>.</p><p>A request is pending on your approval.</p><p>The request includes this information:</p>",
-        //     "ModifiedDate": "2022-07-04 02:38:30.697"
-        //   },
-        //   {
-        //     "EmailTemplateID": 2,
-        //     "EmailTemplateType": "RequestApproved",
-        //     "EmailTemplateSubject": "TRE – Your Data Access Request has been approved",
-        //     "EmailTemplateText": "<p>Hi,</p><p>Your data access request has been successfully approved!</p>",
-        //     "ModifiedDate": "2022-07-04 02:38:30.700"
-        //   },
-        //   {
-        //     "EmailTemplateID": 3,
-        //     "EmailTemplateType": "RequestRejected",
-        //     "EmailTemplateSubject": "TRE – Your Data Access Request has not been approved",
-        //     "EmailTemplateText": "<p>Hi,</p><p>Your data access request was not approved. Please review the following information and reach out to the Data Custodian of the data set or to the TRE Data Manager with any questions.</p>",
-        //     "ModifiedDate": "2022-07-04 02:38:30.703"
-        //   },
-        //   {
-        //     "EmailTemplateID": 4,
-        //     "EmailTemplateType": "RequestEscalated",
-        //     "EmailTemplateSubject": "TRE - Escalated Data Access Request pending approval",
-        //     "EmailTemplateText": "<p>Hi,</p><p>The following data access request is escalated as it has been pending for over 48 hours.</p><p>The pending request includes this information:</p>",
-        //     "ModifiedDate": "2022-07-29 05:53:11.687"
-        //   }
-        // ];
-        
-        // // const response = await window.loomeApi.runApiRequest(10);
-        // // const parsedResponse = safeParseJson(response);
-        // // const dataSet = parsedResponse.Results;
-        // let currentPage = 1; //parsedResponse.CurrentPage;
-        // const rowsPerPage = 5;//parsedResponse.PageSize; 
-        // // console.log(dataSet)
-        
-        
+    try {  
         
         // Place this inside renderPlatformAdminPage, replacing your old 'headers' object.
         const tableConfig =  {
@@ -630,14 +565,6 @@ async function renderPlatformAdminEmailTemplatesPage() {
             };
         
         
-        // --- SEARCH EVENT LISTENER ---
-        // searchInput.addEventListener('input', () => {
-        //     console.log('Typing event detected!');
-        //     currentPage = 1;
-        //     const searchTerm = searchInput.value;
-
-        //     updateTable(tableConfig, data, TABLE_CONTAINER_ID, currentPage, rowsPerPage, searchTerm);
-        // });
         searchInput.addEventListener('input', () => {
             // When a new search is performed, always go back to page 1
             fetchAndRenderPage(tableConfig, 1, searchInput.value);
@@ -662,6 +589,24 @@ async function renderPlatformAdminEmailTemplatesPage() {
 
             // Re-render the table with the new page and existing search term
             updateTable(tableConfig, data, TABLE_CONTAINER_ID, currentPage, rowsPerPage, searchTerm);
+        });
+
+        // Add keydown listener for page input
+        paginationContainer.addEventListener('keydown', (event) => {
+            // Only act if the user pressed Enter and the target is our input
+            if (event.key === 'Enter' && event.target.id === 'page-input') {
+                const inputElement = event.target;
+                const newPage = parseInt(inputElement.value, 10);
+
+                // Validate the input
+                if (newPage >= 1 && newPage <= totalPages) {
+                    fetchAndRenderPage(tableConfig, newPage, searchInput.value);
+                } else {
+                    // If invalid, show a message and reset the input to the current page
+                    showToast(`Please enter a page number between 1 and ${totalPages}.`, 'error');
+                    inputElement.value = currentPage; 
+                }
+            }
         });
 
 

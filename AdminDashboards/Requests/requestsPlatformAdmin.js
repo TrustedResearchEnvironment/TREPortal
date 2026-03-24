@@ -12,6 +12,7 @@ const API_GET_ALL_ASSIST_PROJECTS = 'GetAllAssistProjects';
 // We will store all fetched data here
 let allRequests = []; 
 let currentPage = 1;
+let totalPages = 1; // Add global totalPages variable
 const rowsPerPage = 5; // You can control page size here
 const searchInput = document.getElementById('searchRequests');
 
@@ -282,7 +283,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
         return;
     }
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    totalPages = Math.ceil(totalItems / itemsPerPage); // Update global totalPages
     container.innerHTML = ''; // Clear old controls
 
     if (totalPages <= 1) {
@@ -580,7 +581,7 @@ async function fetchDatasetDetails(datasetID) {
 /**
  * Renders a data table with dynamic headers and actions.
  */
-function renderTable(containerId, data, config, selectedStatus) {
+function renderTable(containerId, data, config, selectedStatus, searchTerm = '') {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     const table = document.createElement('table');
@@ -614,7 +615,10 @@ function renderTable(containerId, data, config, selectedStatus) {
     
     if (data.length === 0) {
         const colSpan = headers.length + 1; // +1 for chevron column
-        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-6 py-4 text-center text-sm text-gray-500">No requests found.</td></tr>`;
+        const message = searchTerm.trim() ? 
+            'No requests found. Please review your search term.' : 
+            'No requests found.';
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-6 py-4 text-center text-sm text-gray-500">${message}</td></tr>`;
     } else {
         data.forEach(item => {
             const row = document.createElement('tr');
@@ -1019,7 +1023,7 @@ async function renderUI() {
 
     // --- Render the components ---
     const configForTable = configMap[selectedStatus];
-    renderTable(TABLE_CONTAINER_ID, allRequests, configForTable, selectedStatus);
+    renderTable(TABLE_CONTAINER_ID, allRequests, configForTable, selectedStatus, searchTerm);
     renderPagination('pagination-controls', totalItems, rowsPerPage, currentPage);
 }
 
@@ -1087,9 +1091,12 @@ async function renderMyRequestsPage() {
             // Only act if the user pressed Enter and the target is our input
             if (event.key === 'Enter' && event.target.id === 'page-input') {
                 const newPage = parseInt(event.target.value, 10);
-                if (!isNaN(newPage) && newPage > 0) {
+                if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
                     currentPage = newPage;
                     renderUI();
+                } else {
+                    // If invalid, show a message and reset the input to the current page
+                    showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
                 }
             }
         });
