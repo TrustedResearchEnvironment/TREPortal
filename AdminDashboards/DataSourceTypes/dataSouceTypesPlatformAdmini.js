@@ -141,7 +141,8 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const totalPages = Math.ceil(totalItems / itemsPerPage); 
+    
     container.innerHTML = ''; // Clear old controls
 
     if (totalPages <= 1) {
@@ -568,7 +569,7 @@ async function renderPlatformAdminDataSourceTypesPage() {
                     fetchAndRenderPage(newPage, searchInput.value);
                 } else {
                     // If invalid, show a message and reset the input to the current page
-                    alert(`Please enter a page number between 1 and ${totalPages}.`);
+                    showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
                     inputElement.value = currentPage; 
                 }
             }
