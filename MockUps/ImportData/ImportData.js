@@ -3,9 +3,11 @@
 // =================================================================
 
 const TABLE_CONTAINER_ID = 'import-jobs-table-area';
-const API_REQUEST_ID = 'GetDataImport';
+const GET_DATAIMPORT_FROM_INTEGRATE = 'GetDataImport';
+const GET_DATAIMPORT_FROM_DB = 'GetDataImportFromDBbyUpn';
 const IMPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
 const SUBMIT_IMPORT_API_ID = 'RequestDataImportByAssistProjectID';
+const UPDATE_IMPORT_REQUEST = 'UpdateDataImportRequest';
 
 // Modal Element IDs
 const MODAL_ID = 'import-modal';
@@ -13,15 +15,40 @@ const OPEN_MODAL_BTN_ID = 'request-import-btn';
 const CLOSE_MODAL_BTN_ID = 'modal-close-btn';
 const IMPORT_FORM_ID = 'import-form';
 const DROPDOWN_ID = 'import-type';
-const SUBMIT_MODAL_BTN_ID = 'modal-submit-btn'; // ADDED: ID for submit button
+const SUBMIT_MODAL_BTN_ID = 'modal-submit-btn';
 
 // State for pagination
 let currentPage = 1;
+let totalPages = 1;
 const rowsPerPage = 5;
 
 // This will store all the jobs after the initial fetch
 let allJobs = [];
-let isDropdownPopulated = false; 
+let isDropdownPopulated = false;
+
+// Mapping from Status to Status display (used for filtering)
+const statusIdToNameMap = {};
+statusIdToNameMap[-2] = 'Failed';
+statusIdToNameMap[-1] = 'Working';
+statusIdToNameMap[0] = 'Awaiting Submission';
+statusIdToNameMap[1] = 'Pending Approval';
+statusIdToNameMap[2] = 'Approved';
+statusIdToNameMap[3] = 'Rejected';
+statusIdToNameMap[4] = 'Finalised';
+
+// Configuration for each status tab
+const configMap = {
+    'Failed': { showActions: false },
+    'Working': { showActions: false },
+    'Awaiting Submission': { showActions: true },
+    'Pending Approval': { showActions: false },
+    'Approved': { showActions: false },
+    'Rejected': { showActions: false },
+    'Finalised': { showActions: false },
+};
+
+// Search input
+const searchInput = document.getElementById('searchImports'); 
 
 // =================================================================
 //                      UTILITY FUNCTIONS
@@ -103,6 +130,68 @@ function formatDate(inputDate) {
     });
 }
 
+/**
+ * Returns appropriate CSS classes for status chips based on status
+ */
+function getStatusChipColor(status) {
+    const statusLower = (status || '').toLowerCase();
+    switch (statusLower) {
+        case 'failed':
+            return 'bg-red-100 text-red-800';
+        case 'working':
+            return 'bg-purple-100 text-purple-800';
+        case 'awaiting submission':
+            return 'bg-yellow-100 text-yellow-800';
+        case 'pending approval':
+            return 'bg-blue-100 text-blue-800';
+        case 'approved':
+        case 'finalised':
+            return 'bg-green-100 text-green-800';
+        case 'rejected':
+            return 'bg-red-100 text-red-800';
+        default:
+            return 'bg-gray-100 text-gray-800';
+    }
+}
+
+/**
+ * Handles the submit action for import jobs
+ */
+async function submitImportJob(jobId, jobName) {
+    try {
+        const confirmed = confirm(`Are you sure you want to submit the import job "${jobName}"?`);
+        if (!confirmed) return;
+
+        showToast('Submitting import job...', 'info');
+        
+        // API call to submit the job
+        const params = { jobId: jobId };
+        const response = await window.loomeApi.runApiRequest(UPDATE_IMPORT_REQUEST, params);
+        
+        // Parse and validate the response
+        const parsedResponse = safeParseJson(response);
+        console.log('Submit import job response:', parsedResponse);
+        
+        // Check if the submission was successful
+        if (parsedResponse && (parsedResponse.success || parsedResponse.Success || parsedResponse.status === 'success')) {
+            showToast(`Import job "${jobName}" submitted successfully!`, 'success');
+            
+            // Refresh the data after a short delay
+            setTimeout(() => {
+                initializePage();
+            }, 1000);
+        } else {
+            // Handle cases where the API call succeeded but the operation failed
+            const errorMessage = parsedResponse?.message || parsedResponse?.Message || 'Submission failed';
+            showToast(`Failed to submit import job: ${errorMessage}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error submitting import job:', error);
+        showToast('Failed to submit import job. Please try again.', 'error');
+    }
+}
+
 // =================================================================
 //                      MODAL & FORM FUNCTIONS
 // =================================================================
@@ -176,55 +265,137 @@ function closeModal() {
 //                      RENDERING FUNCTIONS
 // =================================================================
 
-function renderTable(containerId, data) {
+function renderTable(containerId, data, config, selectedStatus, searchTerm = '') {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     container.innerHTML = '';
     
     if (!data || data.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500">No import requests found.</p>';
+        const message = searchTerm.trim() ? 
+            'No import jobs found. Please review your search term.' : 
+            'No import jobs found.';
+        container.innerHTML = `<p class="text-center text-gray-500">${message}</p>`;
         return;
     }
 
     const table = document.createElement('table');
-    table.className = 'min-w-full divide-y divide-gray-200';
+    table.className = 'w-full divide-y divide-gray-200';
     const thead = document.createElement('thead');
     thead.className = 'bg-gray-50';
     const headerRow = document.createElement('tr');
-    // const headers = ['Job Name', 'Created By', 'Date Created', 'Status'];
-    const headers = ['Job Name', 'Date Created', 'Status'];
+    
+    // Add a column for the chevron
+    const chevronTh = document.createElement('th');
+    chevronTh.className = 'w-10 px-6 py-3';
+    chevronTh.innerHTML = '';
+    headerRow.appendChild(chevronTh);
+    
+    // Define headers - only include Status for Awaiting Submission filter
+    const headers = ['Import Request Name', 'Date Created'];
+    if (selectedStatus === 'Awaiting Submission') {
+        headers.push('Status');
+    }
     headers.forEach(headerText => {
         const th = document.createElement('th');
-        th.scope = 'col';
         th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
         th.textContent = headerText;
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
-
+    
     const tbody = document.createElement('tbody');
     tbody.className = 'bg-white divide-y divide-gray-200';
     
-    data.forEach(item => {
+    data.forEach((item, index) => {
+        const statusId = item.StatusID ?? 0;
+        const itemStatus = statusIdToNameMap[statusId] !== undefined ? statusIdToNameMap[statusId] : (statusIdToNameMap[String(statusId)] || 'Awaiting Submission');
+        
+        // Main row
         const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 cursor-pointer';
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.jobName || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(item.dateCreated)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.lastExecution.status ?? 'In progress'}</td>
+            <td class="w-10 px-6 py-4">
+                <button class="toggle-details flex items-center justify-center w-6 h-6 text-gray-400 hover:text-gray-600" data-item-index="${index}">
+                    <svg class="w-4 h-4 transition-transform duration-200 transform chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.ImportRequestName || 'N/A'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(item.CreateDate)}</td>
+            ${selectedStatus === 'Awaiting Submission' ? `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
+                        ${itemStatus}
+                    </span>
+                </td>
+            ` : ''}
         `;
         tbody.appendChild(row);
+
+        // Accordion details row (initially hidden)
+        const detailRow = document.createElement('tr');
+        detailRow.className = 'details-row hidden';
+        detailRow.innerHTML = `
+            <td colspan="4" class="px-6 py-0">
+                <div class="border-l-4 border-blue-200 bg-gray-50 p-4">
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="font-medium text-gray-600">Job Name:</span>
+                                <span class="ml-2 text-gray-800">${item.JobName || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${itemStatus === 'Awaiting Submission'  && config.showActions ? `
+                        <div class="mt-4 flex justify-end">
+                            <button onclick="submitImportJob('${item.ImportRequestID}', '${item.ImportRequestName}')" 
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Submit Import
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(detailRow);
     });
+    
     table.appendChild(tbody);
     container.appendChild(table);
+
+    // Add click event listeners for accordion toggles
+    const toggleButtons = container.querySelectorAll('.toggle-details');
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const row = this.closest('tr');
+            const detailRow = row.nextElementSibling;
+            const chevronIcon = this.querySelector('.chevron-icon');
+            
+            // Toggle visibility
+            if (detailRow.classList.contains('hidden')) {
+                detailRow.classList.remove('hidden');
+                chevronIcon.style.transform = 'rotate(90deg)';
+            } else {
+                detailRow.classList.add('hidden');
+                chevronIcon.style.transform = 'rotate(0deg)';
+            }
+        });
+    });
 }
 
 function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    totalPages = Math.ceil(totalItems / itemsPerPage);
     container.innerHTML = '';
 
     if (totalPages <= 1) return;
@@ -285,12 +456,62 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
 }
 
 function renderUI() {
+    const activeChip = document.querySelector('.chip.active');
+    const selectedStatus = activeChip ? activeChip.dataset.status : 'Awaiting Submission';
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const config = configMap[selectedStatus];
+
+    // Filter allJobs by selected status
+    let filteredJobs = allJobs.filter(job => {
+        const statusId = job.lastExecution?.statusId ?? 0;
+        const jobStatus = statusIdToNameMap[statusId] || 'Awaiting Submission';
+        
+        if (selectedStatus === 'Awaiting Submission') {
+            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Awaiting Submission';
+        }
+        return jobStatus === selectedStatus;
+    });
+
+    // Apply pagination
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    const jobsForCurrentPage = allJobs.slice(startIndex, endIndex);
+    const jobsForCurrentPage = filteredJobs.slice(startIndex, endIndex);
 
-    renderTable(TABLE_CONTAINER_ID, jobsForCurrentPage);
-    renderPagination('pagination-controls', allJobs.length, rowsPerPage, currentPage);
+    renderTable(TABLE_CONTAINER_ID, jobsForCurrentPage, config, selectedStatus, searchTerm);
+    renderPagination('pagination-controls', filteredJobs.length, rowsPerPage, currentPage);
+}
+
+// =================================================================
+//                      API & COUNTING FUNCTIONS
+// =================================================================
+
+async function getCounts(status) {
+    // Count jobs by status from the full allJobs array
+    // "Awaiting Submission" includes Working (-1), Failed (-2), and Awaiting Submission (0)
+    const count = allJobs.filter(job => {
+        const statusId = job.lastExecution?.statusId ?? 0;
+        const jobStatus = statusIdToNameMap[statusId] || 'Awaiting Submission';
+        
+        if (status === 'Awaiting Submission') {
+            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Awaiting Submission';
+        }
+        return jobStatus === status;
+    }).length;
+    return count;
+}
+
+async function refreshAllChipCounts() {
+    const chipsContainer = document.getElementById('status-chips-container');
+    if (!chipsContainer) return;
+    
+    for (const chip of chipsContainer.querySelectorAll('.chip')) {
+        const status = chip.dataset.status;
+        const count = await getCounts(status);
+        const countSpan = chip.querySelector('.chip-count');
+        if (countSpan) {
+            countSpan.textContent = count;
+        }
+    }
 }
 
 // =================================================================
@@ -301,19 +522,18 @@ async function initializePage() {
     const container = document.getElementById(TABLE_CONTAINER_ID);
     if (!container) return;
 
-    container.innerHTML = '<p class="text-center text-gray-500">Loading Requests...</p>';
+    container.innerHTML = '<p class="text-center text-gray-500">Loading Import Jobs...</p>';
 
     try {
-        const initialResponse = await window.loomeApi.runApiRequest(API_REQUEST_ID, { page: 1, pageSize: 1 });
+        const initialResponse = await window.loomeApi.runApiRequest(GET_DATAIMPORT_FROM_DB, { page: 1, pageSize: 1, search: '' });
         const initialData = safeParseJson(initialResponse);
         const totalJobs = initialData.RowCount;
         allJobs = []; // Clear previous data
 
         if (totalJobs > 0) {
-            const allDataResponse = await window.loomeApi.runApiRequest(API_REQUEST_ID, { page: 1, pageSize: totalJobs });
+            const allDataResponse = await window.loomeApi.runApiRequest(GET_DATAIMPORT_FROM_DB, { page: 1, pageSize: totalJobs, search: ''   });
             const allData = safeParseJson(allDataResponse);
-            // allJobs = allData.Results;
-            // Populate allJobs and sort by `dateCreated` descending (most recent first)
+            // Populate allJobs and sort by dateCreated descending (most recent first)
             allJobs = (allData.Results || []).slice();
             allJobs.sort((a, b) => {
                 const ta = a && a.dateCreated ? new Date(a.dateCreated).getTime() : 0;
@@ -322,6 +542,10 @@ async function initializePage() {
             });
         }
         
+        // Update chip counts
+        await refreshAllChipCounts();
+        
+        // Render initial UI
         renderUI();
 
     } catch (error) {
@@ -335,6 +559,32 @@ async function initializePage() {
 // =================================================================
 
 function setupEventListeners() {
+    // Status chip filtering
+    const chipsContainer = document.getElementById('status-chips-container');
+    if (chipsContainer) {
+        chipsContainer.addEventListener('click', (event) => {
+            const clickedChip = event.target.closest('.chip');
+            if (!clickedChip) return;
+
+            // Remove active class from all chips and add to clicked chip
+            chipsContainer.querySelectorAll('.chip').forEach(chip => chip.classList.remove('active'));
+            clickedChip.classList.add('active');
+            
+            // Reset to first page and render
+            currentPage = 1;
+            renderUI();
+        });
+    }
+
+    // Search functionality
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            currentPage = 1; // Reset to first page on search
+            renderUI();
+        });
+    }
+
+    // Pagination button clicks
     document.getElementById('pagination-controls').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-page]');
         if (!button || button.disabled) return;
@@ -343,11 +593,10 @@ function setupEventListeners() {
         renderUI();
     });
 
-    // NEW: Add listener for page input field
+    // Pagination page input
     document.getElementById('pagination-controls').addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && event.target.id === 'page-input') {
             const inputElement = event.target;
-            const totalPages = Math.ceil(allJobs.length / rowsPerPage);
             const newPage = parseInt(inputElement.value, 10);
 
             if (newPage >= 1 && newPage <= totalPages) {
@@ -360,17 +609,17 @@ function setupEventListeners() {
         }
     });
 
+    // Modal event listeners
     const openBtn = document.getElementById(OPEN_MODAL_BTN_ID);
     const closeBtn = document.getElementById(CLOSE_MODAL_BTN_ID);
     const modal = document.getElementById(MODAL_ID);
     const form = document.getElementById(IMPORT_FORM_ID);
-    const dropdown = document.getElementById(DROPDOWN_ID); // ADDED
-    const submitButton = document.getElementById(SUBMIT_MODAL_BTN_ID); // ADDED
+    const dropdown = document.getElementById(DROPDOWN_ID);
+    const submitButton = document.getElementById(SUBMIT_MODAL_BTN_ID);
 
     if (openBtn) openBtn.addEventListener('click', openModal);
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
 
-    // ADDED: Event listener for the dropdown to enable/disable the submit button
     if (dropdown && submitButton) {
         dropdown.addEventListener('change', () => {
             submitButton.disabled = !dropdown.value;
@@ -386,12 +635,17 @@ function setupEventListeners() {
     if (form) {
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
-            // const selectedAssistProjectID = dropdown.value;
 
-            // Get the full selected option element to access its data attributes
+            const importNameInput = document.getElementById('import-request-name');
+            const importName = importNameInput ? importNameInput.value.trim() : '';
+            
+            if (!importName) {
+                showToast('Please enter an Import Request Name.');
+                return;
+            }
+
             const selectedOption = dropdown.options[dropdown.selectedIndex];
             
-            // Check if a valid option is selected
             if (!selectedOption || !selectedOption.value) {
                 showToast('Please select an Assist Project.');
                 return;
@@ -401,23 +655,23 @@ function setupEventListeners() {
             const selectedName = selectedOption.dataset.name;
             const selectedTenantsID = selectedOption.dataset.tenantsId;
 
-            
             submitButton.disabled = true;
             submitButton.textContent = 'Submitting...';
 
             try {
-                // const params = { "LoomeAssistProjectID": parseInt(selectedAssistProjectID, 10) };
-
                 const params = { 
-                "LoomeAssistProjectID": parseInt(selectedAssistProjectID, 10),
-                "LoomeAssistName": selectedName,
-                "LoomeAssistTenantsID": selectedTenantsID
+                    "ImportRequestName": importName,
+                    "LoomeAssistProjectID": parseInt(selectedAssistProjectID, 10),
+                    "LoomeAssistName": selectedName,
+                    "LoomeAssistTenantsID": selectedTenantsID
                 };
 
                 console.log('Submitting import request with params:', params);
                 await window.loomeApi.runApiRequest(SUBMIT_IMPORT_API_ID, params);
-                showToast('Import request submitted successfully!', "success");
+                showToast('Import request submitted successfully! Refreshing page in 5 seconds...', "success");
                 closeModal();
+                // Wait a moment before refreshing to allow backend processing to start
+                await new Promise(resolve => setTimeout(resolve, 5000));
                 await initializePage(); 
             } catch (error) {
                 console.error('Failed to submit import request:', error);
@@ -430,7 +684,7 @@ function setupEventListeners() {
     }
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
             closeModal();
         }
     });
