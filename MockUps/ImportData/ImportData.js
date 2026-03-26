@@ -8,6 +8,7 @@ const GET_DATAIMPORT_FROM_DB = 'GetDataImportFromDBbyUpn';
 const IMPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
 const SUBMIT_IMPORT_API_ID = 'RequestDataImportByAssistProjectID';
 const UPDATE_IMPORT_REQUEST = 'UpdateDataImportRequest';
+const DELETE_IMPORT_REQUEST = 'DeleteImportRequest';
 
 // Modal Element IDs
 const MODAL_ID = 'import-modal';
@@ -192,6 +193,44 @@ async function submitImportJob(jobId, jobName) {
     }
 }
 
+/**
+ * Handles the delete action for import jobs
+ */
+async function deleteImportJob(jobId, jobName, importRequestID) {
+    try {
+        const confirmed = confirm(`Are you sure you want to delete the import job "${jobName}"? This action cannot be undone.`);
+        if (!confirmed) return;
+
+        showToast('Deleting import job...', 'info');
+        
+        // API call to delete the job
+        const params = { ImportRequestID: importRequestID };
+        const response = await window.loomeApi.runApiRequest(DELETE_IMPORT_REQUEST, params);
+        
+        // Parse and validate the response
+        const parsedResponse = safeParseJson(response);
+        console.log('Delete import job response:', parsedResponse);
+        
+        // Check if the deletion was successful
+        if (parsedResponse && (parsedResponse.success || parsedResponse.Success || parsedResponse.status === 'success')) {
+            showToast(`Import job "${jobName}" deleted successfully!`, 'success');
+            
+            // Refresh the data after a short delay
+            setTimeout(() => {
+                initializePage();
+            }, 1000);
+        } else {
+            // Handle cases where the API call succeeded but the operation failed
+            const errorMessage = parsedResponse?.message || parsedResponse?.Message || 'Deletion failed';
+            showToast(`Failed to delete import job: ${errorMessage}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting import job:', error);
+        showToast('Failed to delete import job. Please try again.', 'error');
+    }
+}
+
 // =================================================================
 //                      MODAL & FORM FUNCTIONS
 // =================================================================
@@ -350,8 +389,15 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         </div>
                     </div>
                     
-                    ${itemStatus === 'Awaiting Submission'  && config.showActions ? `
-                        <div class="mt-4 flex justify-end">
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button onclick="deleteImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
+                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            Delete
+                        </button>
+                        ${itemStatus === 'Awaiting Submission'  && config.showActions ? `
                             <button onclick="submitImportJob('${item.ImportRequestID}', '${item.ImportRequestName}')" 
                                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,8 +405,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                                 </svg>
                                 Submit Import
                             </button>
-                        </div>
-                    ` : ''}
+                        ` : ''}
+                    </div>
                 </div>
             </td>
         `;
