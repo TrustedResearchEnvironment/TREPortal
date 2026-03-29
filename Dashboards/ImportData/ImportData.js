@@ -7,7 +7,7 @@ const GET_DATAIMPORT_FROM_INTEGRATE = 'GetDataImport';
 const GET_DATAIMPORT_FROM_DB = 'GetDataImportFromDBbyUpn';
 const IMPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
 const SUBMIT_IMPORT_API_ID = 'RequestDataImportByAssistProjectID';
-const UPDATE_IMPORT_REQUEST = 'UpdateDataImportRequest';
+const UPDATE_IMPORT_REQUEST = 'UpdateDataImportRequestStatus';
 const DELETE_IMPORT_REQUEST = 'DeleteImportRequest';
 
 // Modal Element IDs
@@ -158,7 +158,7 @@ function getStatusChipColor(status) {
 /**
  * Handles the submit action for import jobs
  */
-async function submitImportJob(jobId, jobName) {
+async function submitImportJob(jobId, jobName, importRequestID) {
     try {
         const confirmed = confirm(`Are you sure you want to submit the import job "${jobName}"?`);
         if (!confirmed) return;
@@ -166,15 +166,18 @@ async function submitImportJob(jobId, jobName) {
         showToast('Submitting import job...', 'info');
         
         // API call to submit the job
-        const params = { jobId: jobId };
+        const params = { 
+            ImportRequestID: parseInt(importRequestID, 10), 
+            statusID: 1 
+        };
         const response = await window.loomeApi.runApiRequest(UPDATE_IMPORT_REQUEST, params);
         
         // Parse and validate the response
         const parsedResponse = safeParseJson(response);
         console.log('Submit import job response:', parsedResponse);
         
-        // Check if the submission was successful
-        if (parsedResponse && (parsedResponse.success || parsedResponse.Success || parsedResponse.status === 'success')) {
+        // Check if the submission was successful and the StatusID was successfully changed
+        if (parsedResponse && ( parsedResponse.StatusID === 1)) {
             showToast(`Import job "${jobName}" submitted successfully!`, 'success');
             
             // Refresh the data after a short delay
@@ -390,15 +393,17 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     </div>
                     
                     <div class="mt-4 flex justify-end gap-2">
-                        <button onclick="deleteImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
-                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                            Delete
-                        </button>
+                        ${itemStatus === 'Awaiting Submission' || itemStatus === 'Working' ? `
+                            <button onclick="deleteImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                                Delete
+                            </button>
+                        ` : ''}
                         ${itemStatus === 'Awaiting Submission'  && config.showActions ? `
-                            <button onclick="submitImportJob('${item.ImportRequestID}', '${item.ImportRequestName}')" 
+                            <button onclick="submitImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
                                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -509,7 +514,7 @@ function renderUI() {
 
     // Filter allJobs by selected status
     let filteredJobs = allJobs.filter(job => {
-        const statusId = job.lastExecution?.statusId ?? 0;
+        const statusId = job.StatusID ?? 0;
         const jobStatus = statusIdToNameMap[statusId] || 'Awaiting Submission';
         
         if (selectedStatus === 'Awaiting Submission') {
@@ -535,7 +540,7 @@ async function getCounts(status) {
     // Count jobs by status from the full allJobs array
     // "Awaiting Submission" includes Working (-1), Failed (-2), and Awaiting Submission (0)
     const count = allJobs.filter(job => {
-        const statusId = job.lastExecution?.statusId ?? 0;
+        const statusId = job.StatusID ?? 0;
         const jobStatus = statusIdToNameMap[statusId] || 'Awaiting Submission';
         
         if (status === 'Awaiting Submission') {
