@@ -1185,6 +1185,11 @@ async function renderMyRequestsPage() {
         }
 
         // --- 4. SETUP EVENT LISTENERS ---
+        // Add refresh button event listener
+        const refreshBtn = document.getElementById('refresh-data-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', refreshPageData);
+        }
         
         // Listener for status chip clicks
         chipsContainer.addEventListener('click', (event) => {
@@ -1241,6 +1246,34 @@ async function renderMyRequestsPage() {
     } catch (error) {
         console.error("Error setting up the page:", error);
         // ... your error handling ...
+    }
+}
+
+// =================================================================
+//                      REFRESH FUNCTION
+// =================================================================
+
+async function refreshPageData() {
+    let loadingToast = null;
+    
+    try {
+        loadingToast = showToast('Refreshing data...', 'info');
+        await renderUI();
+        await refreshAllChipCounts();
+        
+        if (loadingToast) {
+            hideToast(loadingToast);
+        }
+        
+        showToast('Data refreshed', 'success');
+    } catch (error) {
+        console.error('Error refreshing page data:', error);
+        
+        if (loadingToast) {
+            hideToast(loadingToast);
+        }
+        
+        showToast('Failed to refresh data. Please try again.', 'error');
     }
 }
 
