@@ -78,3 +78,74 @@
   /* This is crucial: it allows the user to click "through" the arrow to the select box */
   pointer-events: none;
 }
+
+#dataSetColsTable {
+    table-layout: auto;
+    width: 100%;
+}
+
+/* Column Name - auto-sizes to fit content */
+#dataSetColsTable th:nth-child(1),
+#dataSetColsTable td:nth-child(1) {
+    white-space: nowrap;
+    width: 1%; /* Shrink-wraps to content width */
+}
+
+/* Column Type */
+#dataSetColsTable th:nth-child(2),
+#dataSetColsTable td:nth-child(2) {
+    width: 90px;
+    max-width: 90px;
+    overflow: hidden;
+}
+
+/* Logical Name, Business Description, Example Value - fixed widths */
+#dataSetColsTable th:nth-child(3),
+#dataSetColsTable td:nth-child(3),
+#dataSetColsTable th:nth-child(4),
+#dataSetColsTable td:nth-child(4),
+#dataSetColsTable th:nth-child(5),
+#dataSetColsTable td:nth-child(5) {
+    width: 160px;
+    max-width: 160px;
+    overflow: hidden;
+}
+
+/* Redact and Deidentify - smaller checkbox columns */
+#dataSetColsTable th:nth-child(6),
+#dataSetColsTable td:nth-child(6),
+#dataSetColsTable th:nth-child(7),
+#dataSetColsTable td:nth-child(7) {
+    width: 80px;
+    max-width: 80px;
+    text-align: center;
+}
+
+/* VIEW MODE: fixed height with ellipsis */
+#dataSetColsTable .editable-cell div {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;  /* ← missing */
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: normal;
+  height: 28px;
+  line-height: 28px;
+}
+
+/* EDIT MODE: textarea expands freely */
+#dataSetColsTable .editable-cell textarea {
+  width: 100%;
+  min-height: 28px;
+  max-height: 300px;
+  box-sizing: border-box;
+  resize: vertical;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  display: block;
+  /* Breaks out of the fixed row height */
+  position: relative;
+  z-index: 10;
+}

@@ -178,9 +178,9 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
             <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
                 <td>${col.ColumnName || ''}</td>
                 <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
-                <td class="editable-cell" data-field="LogicalColumnName">${col.LogicalColumnName || ''}</td>
-                <td class="editable-cell" data-field="BusinessDescription">${col.BusinessDescription || ''}</td>
-                <td class="editable-cell" data-field="ExampleValue">${col.ExampleValue || ''}</td>
+                <td class="editable-cell" data-field="LogicalColumnName"><div title="${escapeHtml(col.LogicalColumnName || '')}">${col.LogicalColumnName || ''}</div></td>
+                <td class="editable-cell" data-field="BusinessDescription"><div title="${escapeHtml(col.BusinessDescription || '')}">${col.BusinessDescription || ''}</div></td>
+                <td class="editable-cell" data-field="ExampleValue"><div title="${escapeHtml(col.ExampleValue || '')}">${col.ExampleValue || ''}</div></td>
                 <td class="checkbox-cell">
                     <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
                 </td>
@@ -199,9 +199,9 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                 <tr data-id="${row.ColumnName}" data-column-name="${row.ColumnName}">
                     <td>${row.ColumnName || ''}</td>
                     <td>${escapeHtml(getDisplayColumnType(row.ColumnType) || row.ColumnType || '')}</td>
-                    <td class="editable-cell" data-field="LogicalColumnName">${row.LogicalColumnName || ''}</td>
-                    <td class="editable-cell" data-field="BusinessDescription">${row.BusinessDescription || ''}</td>
-                    <td class="editable-cell" data-field="ExampleValue">${row.ExampleValue || ''}</td>
+                    <td class="editable-cell" data-field="LogicalColumnName"><div title="${escapeHtml(row.LogicalColumnName || '')}">${row.LogicalColumnName || ''}</div></td>
+                    <td class="editable-cell" data-field="BusinessDescription"><div title="${escapeHtml(row.BusinessDescription || '')}">${row.BusinessDescription || ''}</div></td>
+                    <td class="editable-cell" data-field="ExampleValue"><div title="${escapeHtml(row.ExampleValue || '')}">${row.ExampleValue || ''}</div></td>
                     <td class="checkbox-cell">
                         <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
                     </td>
@@ -239,7 +239,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                         <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
                             <td rowspan="${rowspan}">${folderName}</td>
                             <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
+                            <td class="editable-cell" data-field="FileDescription"><div title="${escapeHtml(fileDescription)}">${fileDescription}</div></td>
                             <td class="checkbox-cell">
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
@@ -252,7 +252,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                     rowsHtml += `
                         <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
                             <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
+                            <td class="editable-cell" data-field="FileDescription"><div title="${escapeHtml(fileDescription)}">${fileDescription}</div></td>
                             <td class="checkbox-cell">
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
@@ -2715,34 +2715,74 @@ async function renderManageDataSetPage() {
             // Get a reference to the body of the columns table.
             const dataSetColsBody = document.getElementById('dataSetColsBody');
 
-            // --- 1. The dblclick listener is now ONLY for creating the input ---
+            // // --- 1. The dblclick listener is now ONLY for creating the input ---
+            // dataSetColsBody.addEventListener('dblclick', (event) => {
+            //     const cell = event.target.closest('td.editable-cell');
+            //     if (!cell || cell.querySelector('input')) return;
+
+            //     const originalText = cell.textContent.trim();
+            //     cell.innerHTML = '';
+            //     const input = document.createElement('input');
+            //     input.type = 'text';
+            //     input.className = 'form-control form-control-sm';
+            //     input.value = originalText;
+            //     cell.appendChild(input);
+            //     input.focus();
+
+            //     // The 'blur' event on the input will fire a 'change' event,
+            //     // which is handled by the main listener below.
+            //     input.addEventListener('blur', () => {
+            //         // Find the object and update it
+            //         const newValue = input.value.trim();
+            //         const field = cell.dataset.field;
+            //         updateInMemoryData(cell.closest('tr'), field, newValue);
+            //         // Revert the cell to plain text
+            //         cell.innerHTML = newValue;
+            //     });
+
+            //     input.addEventListener('keydown', (e) => {
+            //         if (e.key === 'Enter') input.blur();
+            //         else if (e.key === 'Escape') cell.innerHTML = originalText;
+            //     });
+            // });
+
             dataSetColsBody.addEventListener('dblclick', (event) => {
                 const cell = event.target.closest('td.editable-cell');
-                if (!cell || cell.querySelector('input')) return;
+                if (!cell || cell.querySelector('textarea')) return;
 
                 const originalText = cell.textContent.trim();
                 cell.innerHTML = '';
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'form-control form-control-sm';
-                input.value = originalText;
-                cell.appendChild(input);
-                input.focus();
 
-                // The 'blur' event on the input will fire a 'change' event,
-                // which is handled by the main listener below.
-                input.addEventListener('blur', () => {
-                    // Find the object and update it
-                    const newValue = input.value.trim();
+                // Use textarea instead of input
+                const textarea = document.createElement('textarea');
+                textarea.className = 'form-control form-control-sm';
+                textarea.value = originalText;
+                cell.appendChild(textarea);
+
+                // Auto-size to content on load and as user types
+                const autoResize = () => {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = textarea.scrollHeight + 'px';
+                };
+                textarea.addEventListener('input', autoResize);
+                autoResize();
+                textarea.focus();
+
+                textarea.addEventListener('blur', () => {
+                    const newValue = textarea.value.trim();
                     const field = cell.dataset.field;
                     updateInMemoryData(cell.closest('tr'), field, newValue);
-                    // Revert the cell to plain text
-                    cell.innerHTML = newValue;
+                    // Back to view mode: wrap in div for ellipsis behaviour
+                    cell.innerHTML = `<div title="${newValue}">${newValue}</div>`;
                 });
 
-                input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') input.blur();
-                    else if (e.key === 'Escape') cell.innerHTML = originalText;
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault(); // Shift+Enter still allows newlines
+                        textarea.blur();
+                    } else if (e.key === 'Escape') {
+                        cell.innerHTML = `<div title="${originalText}">${originalText}</div>`;
+                    }
                 });
             });
 
