@@ -557,10 +557,10 @@ async function validateDataSetColumns(parsedCols, metaRow) {
             return false;
         };
 
-        if (!isValidFlag(row.Tokenise)) {
+        if (!isValidFlag(row.Deidentify)) {
             return {
                 valid: false,
-                message: `Row ${rowNum}: 'Tokenise' must be boolean (found '${row.Tokenise}')`
+                message: `Row ${rowNum}: 'Deidentify' must be boolean (found '${row.Deidentify}')`
             };
         }
         if (!isValidFlag(row.Redact)) {
@@ -2151,7 +2151,7 @@ async function renderManageDataSetPage() {
                     const colsRows = XLSX.utils.sheet_to_json(colsSheet, { header: 1, defval: '' });
                     const metaRows = XLSX.utils.sheet_to_json(metaSheet, { header: 1, defval: '' });
 
-                    const expectedColsHeader = ['ColumnName','ColumnType','LogicalColumnName','BusinessDescription','ExampleValue','Tokenise','Redact',]; //,'TokenIdentifierType', 'DisplayOrder','IsFilter'
+                    const expectedColsHeader = ['ColumnName','ColumnType','LogicalColumnName','BusinessDescription','ExampleValue','Redact','Deidentify']; //,'TokenIdentifierType', 'DisplayOrder','IsFilter'
                     const expectedMetaHeader = ['Name','Description','DataSourceID','IsActive','Approvers','OptOutMessage','OptOutList','Owner','OptOutColumn','DataSetFieldValues','DataSetMetaDataValues','DataSetFolders','DataSetFolderFiles','DataSourceTypeID','DataSetID', '_VerificationHash'];
 
                     const actualColsHeader = (colsRows[0] || []).map(c => String(c).trim());
