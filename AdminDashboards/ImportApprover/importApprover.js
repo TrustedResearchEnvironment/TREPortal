@@ -961,6 +961,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     
 }
 
+
 /**
  * Displays combined request and dataset details in a single container
  * @param {HTMLElement} container - The container element
@@ -1028,7 +1029,7 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
                             <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
                         </div>` : ''}
 
-                        ${requestDetails.RejectedByedBy ? `
+                        ${requestDetails.RejectedBy ? `
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Rejected By</span>
                             <span class="text-sm text-gray-500">${requestDetails.RejectedBy}</span>

@@ -155,6 +155,163 @@ function getStatusChipColor(status) {
     }
 }
 
+// Global variable to store project data
+let projectsCache = null;
+
+async function getProjectsMapping() {
+    if (projectsCache) {
+        return projectsCache;
+    }
+    
+    try {
+        const initialParams = { "page": 1, "page_size": 100, "search": '' };
+        const data = await getFromAPI(IMPORT_REQUEST_API_ID, initialParams);
+        const mapping = {};
+        if (data) {
+            data.forEach(project => {
+                mapping[project.AssistProjectID] = {
+                    name: project.Name,
+                    description: project.Description
+                };
+            });
+        }
+        projectsCache = mapping;
+        return mapping;
+    } catch (error) {
+        console.error("Error fetching projects:", error);
+        return {};
+    }
+}
+
+async function getFromAPI(API_ID, initialParams) {
+    let allResults = [];
+    try {
+        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        if (!parsedInitial) {
+            console.log("API returned no data.");
+            return [];
+        }
+
+        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
+            allResults = parsedInitial.Results;
+            const totalPages = parsedInitial.PageCount;
+
+            if (totalPages > 1) {
+                for (let page = 2; page <= totalPages; page++) {
+                    const params = { ...initialParams, "page": page };
+                    const response = await window.loomeApi.runApiRequest(API_ID, params);
+                    const parsed = safeParseJson(response);
+
+                    if (parsed && parsed.Results) {
+                        allResults = allResults.concat(parsed.Results);
+                    }
+                }
+            }
+        } else {
+            if (Array.isArray(parsedInitial)) {
+                allResults = parsedInitial;
+            } else {
+                allResults = [parsedInitial];
+            }
+        }
+
+        return allResults;
+    } catch (error) {
+        console.error("An error occurred while fetching data:", error);
+        return [];
+    }
+}
+
+async function fetchRequestDetails(requestID) {
+    try {
+        const response = await window.loomeApi.runApiRequest('GetImportRequestByID', {
+            "RequestID": requestID,
+        });
+        return safeParseJson(response);
+    } catch (error) {
+        console.error(`Error fetching request details for ID ${requestID}:`, error);
+        throw error;
+    }
+}
+
+async function fetchDatasetDetails(datasetID) {
+    try {
+        const response = await window.loomeApi.runApiRequest('GetDataSetDetails', {
+            "DataSetID": datasetID,
+        });
+        return safeParseJson(response);
+    } catch (error) {
+        console.error(`Error fetching dataset details for ID ${datasetID}:`, error);
+        throw error;
+    }
+}
+
+async function displayCombinedDetails(container, requestDetails, datasetDetails) {
+    if ((!requestDetails || Object.keys(requestDetails).length === 0) && 
+        (!datasetDetails || Object.keys(datasetDetails).length === 0)) {
+        container.innerHTML = '<p class="text-center text-red-500">No details available</p>';
+        return;
+    }
+
+    try {
+        const projectsMapping = await getProjectsMapping();
+        const projectInfo = requestDetails && requestDetails.ProjectID ? 
+            (projectsMapping[requestDetails.ProjectID] || { name: 'Unknown Project', description: '' }) : 
+            { name: 'Unknown Project', description: '' };
+        
+        let html = `
+            <div class="grid grid-cols-2 gap-5">
+                <div>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Import Request ID</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ImportRequestID || 'N/A'}</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Target Project Name</span>
+                            <span class="text-sm text-gray-500">${projectInfo.name}</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="space-y-3">
+                        ${requestDetails.Purpose ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Purpose</span>
+                            <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
+                        </div>` : ''}
+
+                        ${datasetDetails && datasetDetails.Name ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Dataset Name</span>
+                            <span class="text-sm text-gray-500">${datasetDetails.Name}</span>
+                        </div>` : ''}
+
+                        ${datasetDetails && datasetDetails.Description ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Dataset Description</span>
+                            <span class="text-sm text-gray-500">${datasetDetails.Description}</span>
+                        </div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+    } catch (error) {
+        console.error("Error displaying combined details:", error);
+        container.innerHTML = `
+            <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+                <p class="text-center text-red-500 mb-2">Error loading details</p>
+                <p class="text-sm">${error.message || 'Unknown error'}</p>
+            </div>
+        `;
+    }
+}
+
 /**
  * Handles the submit action for import jobs
  */
@@ -416,7 +573,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         <div class="flex justify-end mb-1">
                             ${itemStatus === 'Awaiting Submission' || itemStatus === 'Working' ? `
                                 <button onclick="deleteImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
-                                        class="btn btn-danger action-delete px-3 py-1">
+                                        class="btn btn-danger px-3 py-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
@@ -436,21 +593,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         
                         <!-- Details Card -->
                         <div class="bg-white p-5 rounded-md shadow-sm">
-                            <div class="space-y-3">
-                                <div class="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <span class="font-medium text-gray-600">Import Request ID:</span>
-                                        <span class="ml-2 text-gray-800">${item.ImportRequestID || 'N/A'}</span>
-                                    </div>
-                                    <div>
-                                        <span class="font-medium text-gray-600">Target Project Name:</span>
-                                        <span class="ml-2 text-gray-800">${item.ProjectName || 'N/A'}</span>
-                                    </div>
-                                    <div>
-                                        <span class="font-medium text-gray-600">Job Name:</span>
-                                        <span class="ml-2 text-gray-800">${item.JobName || 'N/A'}</span>
-                                    </div>
-                                </div>
+                            <div id="combined-details-${item.ImportRequestID}" class="combined-content">
+                                <p class="text-center text-gray-500">Loading details...</p>
                             </div>
                         </div>
                     </div>
@@ -458,30 +602,62 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             </td>
         `;
         tbody.appendChild(detailRow);
+        
+        // Add click event to load details dynamically
+        row.addEventListener('click', async () => {
+            const detailsContainer = detailRow.querySelector(`#combined-details-${item.ImportRequestID}`);
+            
+            // Toggle visibility
+            detailRow.classList.toggle('hidden');
+            
+            // Toggle chevron rotation
+            const chevron = row.querySelector('.chevron-icon');
+            if (chevron) {
+                chevron.style.transform = detailRow.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(90deg)';
+            }
+            
+            // Only fetch data if the accordion is becoming visible
+            if (!detailRow.classList.contains('hidden')) {
+                detailsContainer.innerHTML = '<p class="text-center">Loading details...</p>';
+                
+                try {
+                    let requestDetails;
+                    try {
+                        requestDetails = await fetchRequestDetails(item.ImportRequestID);
+                    } catch (requestError) {
+                        console.error('Error fetching request details:', requestError);
+                        requestDetails = null;
+                    }
+                    
+                    let datasetDetails;
+                    try {
+                        datasetDetails = await fetchDatasetDetails(item.DataSetID);
+                    } catch (datasetError) {
+                        console.error('Error fetching dataset details:', datasetError);
+                        datasetDetails = null;
+                    }
+                    
+                    if (!requestDetails && !datasetDetails) {
+                        throw new Error('Failed to fetch both request and dataset details');
+                    }
+                    
+                    await displayCombinedDetails(detailsContainer, requestDetails, datasetDetails);
+                    
+                } catch (error) {
+                    console.error("Error loading details:", error);
+                    detailsContainer.innerHTML = `
+                        <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+                            <p class="text-center text-red-500 mb-2">Error loading details</p>
+                            <p class="text-sm">${error.message || 'Unknown error'}</p>
+                        </div>
+                    `;
+                }
+            }
+        });
     });
     
     table.appendChild(tbody);
     container.appendChild(table);
-
-    // Add click event listeners for accordion toggles
-    const toggleButtons = container.querySelectorAll('.toggle-details');
-    toggleButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const row = this.closest('tr');
-            const detailRow = row.nextElementSibling;
-            const chevronIcon = this.querySelector('.chevron-icon');
-            
-            // Toggle visibility
-            if (detailRow.classList.contains('hidden')) {
-                detailRow.classList.remove('hidden');
-                chevronIcon.style.transform = 'rotate(90deg)';
-            } else {
-                detailRow.classList.add('hidden');
-                chevronIcon.style.transform = 'rotate(0deg)';
-            }
-        });
-    });
 }
 
 function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
