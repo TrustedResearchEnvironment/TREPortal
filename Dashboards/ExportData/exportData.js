@@ -293,6 +293,20 @@ function renderUI() {
     renderPagination('pagination-controls', allJobs.length, rowsPerPage, currentPage);
 }
 
+/**
+ * Refreshes all data on the page
+ */
+async function refreshPageData() {
+    try {
+        showToast('Refreshing data...', 'info');
+        await initializePage();
+        showToast('Data refreshed successfully.', 'success');
+    } catch (error) {
+        console.error('Error refreshing page data:', error);
+        showToast('Failed to refresh data.', 'error');
+    }
+}
+
 // =================================================================
 //                      INITIALIZATION
 // =================================================================
@@ -335,6 +349,12 @@ async function initializePage() {
 // =================================================================
 
 function setupEventListeners() {
+    // Add refresh button event listener
+    const refreshBtn = document.getElementById('refresh-data-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshPageData);
+    }
+
     document.getElementById('pagination-controls').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-page]');
         if (!button || button.disabled) return;
