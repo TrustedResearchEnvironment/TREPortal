@@ -532,7 +532,7 @@ function RejectRequest(request) {
     const modalTitle = document.getElementById('rejectRequestModalLabel');
     
     // Update the modal title dynamically based on requestID
-    modalTitle.textContent = `Reject Request: ${request.Name}`;
+    modalTitle.textContent = `Reject Request: ${request.ImportRequestName}`;
     
     // Populate the modal body with the dynamic content
     modalBody.innerHTML = `
@@ -540,7 +540,7 @@ function RejectRequest(request) {
             <div class="alert alert-warning">
                 <i class="fa fa-exclamation-triangle"></i> 
                 Please confirm the Rejection of the request:<br>
-                <strong>${request.Name}</strong>
+                <strong>${request.ImportRequestName}</strong>
             </div>
 
             <div class="form-group mt-3">
@@ -580,7 +580,7 @@ function RejectRequest(request) {
 
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
-            console.log('Reject button clicked for request:', request.RequestID);
+            console.log('Reject button clicked for request:', request.ImportRequestID);
             const reason = reasonEl ? (reasonEl.value || '').trim() : '';
             if (!reason) {
                 if (reasonValidation) reasonValidation.classList.remove('d-none');
@@ -589,7 +589,7 @@ function RejectRequest(request) {
                 return;
             }
             // Call the API to reject the request and include reason
-            rejectRequestFromAPI(request.RequestID, reason);
+            rejectRequestFromAPI(request.ImportRequestID, reason);
         });
     }
 }
@@ -603,7 +603,7 @@ async function rejectRequestFromAPI(requestId, reason) {
         // Show loading state
         loadingToast = showToast('Rejecting request...', 'info');
         
-        const params = { "id": requestId, "reason": reason };
+        const params = { "id": parseInt(requestId, 10), "reason": reason };
         if (reason !== undefined && reason !== null) params.reason = String(reason);
 
         const response = await window.loomeApi.runApiRequest(API_REJECT_REQUEST, params);
@@ -750,11 +750,11 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     headerRow.appendChild(chevronHeader);
     
     // Define headers based on the selected status
-    const headers = ['Request ID', 'Request Name', 'Import Project', 'Requested On', 'Requested By'];
+    const headers = ['Request Name', 'Import Project', 'Requested On', 'Requested By'];
     //if (selectedStatus === 'Pending Approval') headers.push('Approvers');
     if (selectedStatus === 'Approved') { headers.push('Approved by'); headers.push('Approved on'); }
     else if (selectedStatus === 'Rejected') { headers.push('Rejected by'); headers.push('Rejected on'); }
-    else if (selectedStatus === 'Finalised') { headers.push('Approved by'); headers.push('Approved on'); headers.push('Finalised on'); }
+    else if (selectedStatus === 'Finalised') { headers.push('Finalised on'); }
     headers.forEach(headerText => {
         const th = document.createElement('th');
         th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
@@ -784,7 +784,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 // case 'Pending Approval': statusSpecificCols = `<td class="${tdClasses}">${item.Approvers || 'N/A'}</td>`; break;
                 case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${item.RejectedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
                 case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${item.ApprovedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
-                case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td><td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
+                case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
             }
             
             row.innerHTML = `
@@ -793,7 +793,6 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </td>
-                <td class="${tdClasses}">${item.ImportRequestID}</td>
                 <td class="${tdClasses}">${item.ImportRequestName}</td>
                 <td class="${tdClasses}">${item.ImportProjectName}</td>
                 <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
@@ -991,20 +990,10 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
             <div class="grid grid-cols-2 gap-5">
                 <div>
                     <div class="space-y-3">
+            
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Requested Dataset</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Name || 'N/A'}</span>
-                        </div>
-
-                        ${datasetDetails.Description ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Dataset Description</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Description}</span>
-                        </div>` : ''}
-                        
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Data Source ID</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.DataSource || datasetDetails.DataSourceID || 'N/A'}</span>
+                            <span class="font-medium">Import Request ID</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ImportRequestID || 'N/A'}</span>
                         </div>
 
                         <div class="grid grid-cols-1 gap-1">
@@ -1021,10 +1010,34 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
                             <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
                         </div>` : ''}
 
+                        ${requestDetails.ApprovedBy ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approved By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovedBy}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.ApprovedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approved On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.ApprovedDate)}</span>
+                        </div>` : ''}
+
                         ${requestDetails.ApprovalMessage ? `
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Approval Message</span>
                             <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectedByedBy ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectedBy}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.RejectedDate)}</span>
                         </div>` : ''}
 
                         ${requestDetails.RejectionMessage ? `

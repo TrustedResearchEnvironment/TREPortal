@@ -334,10 +334,20 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     headerRow.appendChild(chevronTh);
     
     // Define headers - only include Status for Awaiting Submission filter
-    const headers = ['Import Request Name', 'Date Created'];
+    const headers = ['Import Request Name', 'Requested On', 'Import Project Name'];
     if (selectedStatus === 'Awaiting Submission') {
         headers.push('Status');
+    } else if (selectedStatus === 'Approved' || selectedStatus === 'Finalised') {
+        headers.push('Approved by');
+        headers.push('Approved on');
+        headers.push('Status');
+    } else if (selectedStatus === 'Rejected') {
+        headers.push('Rejected by');
+        headers.push('Rejected on');
+    } else if (selectedStatus === 'Finalised') {
+        headers.push('Finalised on');
     }
+
     headers.forEach(headerText => {
         const th = document.createElement('th');
         th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
@@ -357,6 +367,16 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
         // Main row
         const row = document.createElement('tr');
         row.className = 'hover:bg-gray-50 cursor-pointer';
+        const tdClasses = 'px-6 py-4 whitespace-nowrap text-sm text-gray-800';
+            
+        let statusSpecificCols = '';
+        switch (item.status) {
+            // case 'Pending Approval': statusSpecificCols = `<td class="${tdClasses}">${item.ProjectName || 'N/A'}</td>`; break;
+            case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${item.RejectedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
+            case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${item.ApprovedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
+            case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
+        }
+        
         row.innerHTML = `
             <td class="w-10 px-6 py-4">
                 <button class="toggle-details flex items-center justify-center w-6 h-6 text-gray-400 hover:text-gray-600" data-item-index="${index}">
@@ -365,17 +385,19 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     </svg>
                 </button>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.ImportRequestName || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(item.CreateDate)}</td>
+            <td class="${tdClasses}">${item.ImportRequestName || 'N/A'}</td>
+            <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
+            <td class="${tdClasses}">${item.ImportProjectName || 'N/A'}</td>
+            ${statusSpecificCols}
             ${selectedStatus === 'Awaiting Submission' ? `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                <td class="${tdClasses}">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
                         ${itemStatus}
                     </span>
                 </td>
             ` : ''}
              ${selectedStatus === 'Approved' ? `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                <td class="${tdClasses}">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
                         Data Transfer In Progress
                     </span>
@@ -388,36 +410,49 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
         const detailRow = document.createElement('tr');
         detailRow.className = 'details-row hidden';
         detailRow.innerHTML = `
-            <td colspan="4" class="px-6 py-0">
-                <div class="border-l-4 border-blue-200 bg-gray-50 p-4">
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span class="font-medium text-gray-600">Job Name:</span>
-                                <span class="ml-2 text-gray-800">${item.JobName || 'N/A'}</span>
+            <td colspan="${headers.length + 1}" class="p-0">
+                <div class="bg-gray-50 p-4 m-2 rounded">
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="flex justify-end mb-1">
+                            ${itemStatus === 'Awaiting Submission' || itemStatus === 'Working' ? `
+                                <button onclick="deleteImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
+                                        class="btn btn-danger action-delete px-3 py-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete
+                                </button>
+                            ` : ''}
+                            ${itemStatus === 'Awaiting Submission' && config.showActions ? `
+                                <button onclick="submitImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
+                                        class="btn btn-primary px-3 py-1 ms-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Submit Import
+                                </button>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Details Card -->
+                        <div class="bg-white p-5 rounded-md shadow-sm">
+                            <div class="space-y-3">
+                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span class="font-medium text-gray-600">Import Request ID:</span>
+                                        <span class="ml-2 text-gray-800">${item.ImportRequestID || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium text-gray-600">Target Project Name:</span>
+                                        <span class="ml-2 text-gray-800">${item.ProjectName || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium text-gray-600">Job Name:</span>
+                                        <span class="ml-2 text-gray-800">${item.JobName || 'N/A'}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="mt-4 flex justify-end gap-2">
-                        ${itemStatus === 'Awaiting Submission' || itemStatus === 'Working' ? `
-                            <button onclick="deleteImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
-                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                                Delete
-                            </button>
-                        ` : ''}
-                        ${itemStatus === 'Awaiting Submission'  && config.showActions ? `
-                            <button onclick="submitImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
-                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                Submit Import
-                            </button>
-                        ` : ''}
                     </div>
                 </div>
             </td>
@@ -533,9 +568,14 @@ function renderUI() {
     // Apply pagination
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    const jobsForCurrentPage = filteredJobs.slice(startIndex, endIndex);
+    const importRequests = filteredJobs.slice(startIndex, endIndex);
 
-    renderTable(TABLE_CONTAINER_ID, jobsForCurrentPage, config, selectedStatus, searchTerm);
+    const importRequestsWithStatus = importRequests.map(item => ({
+        ...item,
+        status: statusIdToNameMap[item.StatusID] || 'Unknown'
+    }));
+
+    renderTable(TABLE_CONTAINER_ID, importRequestsWithStatus, config, selectedStatus, searchTerm);
     renderPagination('pagination-controls', filteredJobs.length, rowsPerPage, currentPage);
 }
 
