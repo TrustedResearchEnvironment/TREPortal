@@ -250,7 +250,7 @@ async function populateAssistProjectsDropdown() {
         const data = safeParseJson(response);
         const assistProjects = data.Results;
 
-        dropdown.innerHTML = '<option value="">Select source Assist Project...</option>';
+        dropdown.innerHTML = '<option value="">Select Target Assist Project...</option>';
 
         if (assistProjects && assistProjects.length > 0) {
             assistProjects.forEach(type => {
@@ -371,6 +371,13 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
                         ${itemStatus}
+                    </span>
+                </td>
+            ` : ''}
+             ${selectedStatus === 'Approved' ? `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
+                        Data Transfer In Progress
                     </span>
                 </td>
             ` : ''}
@@ -565,6 +572,20 @@ async function refreshAllChipCounts() {
     }
 }
 
+/**
+ * Refreshes all data on the page
+ */
+async function refreshPageData() {
+    try {
+        showToast('Refreshing data...', 'info');
+        await initializePage();
+        showToast('Data refreshed successfully.', 'success');
+    } catch (error) {
+        console.error('Error refreshing page data:', error);
+        showToast('Failed to refresh data.', 'error');
+    }
+}
+
 // =================================================================
 //                      INITIALIZATION
 // =================================================================
@@ -610,6 +631,14 @@ async function initializePage() {
 // =================================================================
 
 function setupEventListeners() {
+
+    // Add refresh button event listener
+    const refreshBtn = document.getElementById('refresh-data-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshPageData);
+    }
+        
+        
     // Status chip filtering
     const chipsContainer = document.getElementById('status-chips-container');
     if (chipsContainer) {
