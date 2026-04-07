@@ -185,7 +185,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                     <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
                 </td>
                 <td class="checkbox-cell">
-                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${col.Tokenise ? 'checked' : ''}>
+                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${col.Deidentify ? 'checked' : ''}>
                 </td>
             </tr>
         `).join('');
@@ -206,7 +206,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                         <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
                     </td>
                     <td class="checkbox-cell">
-                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${row.Tokenise ? 'checked' : ''}>
+                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${row.Deidentify ? 'checked' : ''}>
                     </td>
                 </tr>
             `;
@@ -232,7 +232,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                 const fileExtension = col.FileType || col.FileExtensions || '';
                 const fileDescription = col.FileDescription || '';
                 const isRedacted = col.Redact ? 1 : 0;  // Convert to 1/0
-                const isTokenised = col.Tokenise ? 1 : 0;  // Convert to 1/0
+                const isDeidentified = col.Deidentify ? 1 : 0;  // Convert to 1/0
 
                 if (index === 0) {
                     rowsHtml += `
@@ -244,7 +244,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised === 1 ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${isDeidentified === 1 ? 'checked' : ''}>
                             </td>
                         </tr>
                     `;
@@ -257,7 +257,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised === 1 ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${isDeidentified === 1 ? 'checked' : ''}>
                             </td>
                         </tr>
                     `;
@@ -560,7 +560,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
         if (!isValidFlag(row.Deidentify)) {
             return {
                 valid: false,
-                message: `Row ${rowNum}: 'Tokenise' must be boolean (found '${row.Tokenise}')`
+                message: `Row ${rowNum}: 'Deidentify' must be boolean (found '${row.Deidentify}')`
             };
         }
         if (!isValidFlag(row.Redact)) {
@@ -1197,7 +1197,7 @@ async function formatSQLColumnsFromSchema(tableId) {
             "LogicalColumnName": '',
             "BusinessDescription": '',
             "ExampleValue": '',
-            "Tokenise": false,
+            "Deidentify": false,
             "TokenIdentifierType": 0,
             "Redact": false,
             "DisplayOrder": index + 1,
@@ -1293,7 +1293,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                     let logicalName = '';
                     let businessDesc = '';
                     let example = '';
-                    let tokenise = false;
+                    let deidentify = false;
                     let tokenIdentifierType = 0;
                     let redact = false;
 
@@ -1302,7 +1302,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                     columnType = String(item.field_type).trim() || '';
                     logicalName =  String(item.field_name).trim() || '';
                     example = String(item.select_choices_or_calculations).trim() || '';
-                    tokenise = normalizeBooleanFlag(item.Tokenise ?? item.tokenise ?? item.Tokenize ?? false);
+                    deidentify = normalizeBooleanFlag(item.Deidentify ?? item.deidentify ?? item.Deidentify ?? false);
                     tokenIdentifierType = item.TokenIdentifierType || item.token_identifier_type || 0;
                     redact = normalizeBooleanFlag(item.Redact ?? item.redact ?? false);
                     
@@ -1313,7 +1313,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                         LogicalColumnName: logicalName,
                         BusinessDescription: businessDesc,
                         ExampleValue: example,
-                        Tokenise: tokenise,
+                        Deidentify: deidentify,
                         TokenIdentifierType: tokenIdentifierType,
                         Redact: redact,
                         DisplayOrder: idx + 1,
@@ -1334,7 +1334,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 FileType: item.FileType || item.FileExtensions || '',
                 FileDescription: item.FileDescription || '',
                 Redact: item.Redact || 0,
-                Tokenise: item.Tokenise || 0
+                Deidentify: item.Deidentify || 0
             };
         };
         if (dataSetId === 'new') {
@@ -1433,9 +1433,9 @@ function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
 
         let matchesDeidentify = true;
         if (columnDeidentifyFilter === 'yes') {
-            matchesDeidentify = normalizeBooleanFlag(column?.Tokenise);
+            matchesDeidentify = normalizeBooleanFlag(column?.Deidentify);
         } else if (columnDeidentifyFilter === 'no') {
-            matchesDeidentify = !normalizeBooleanFlag(column?.Tokenise);
+            matchesDeidentify = !normalizeBooleanFlag(column?.Deidentify);
         }
 
         return matchesTerm && matchesRedact && matchesDeidentify;
@@ -1624,7 +1624,7 @@ async function updateDataSet(data_set_id, data) {
                 FileExtensions: file.FileExtensions,
                 // TokeniseRule: "",
                 Redact: file.Redact ? 1 : 0,
-                Tokenise: file.Tokenise ? 1 : 0,
+                Deidentify: file.Deidentify ? 1 : 0,
             });
         });
 
@@ -2214,7 +2214,7 @@ async function renderManageDataSetPage() {
                         LogicalColumnName: r.LogicalColumnName || '',
                         BusinessDescription: r.BusinessDescription || '',
                         ExampleValue: r.ExampleValue || '',
-                        Tokenise: normalizeBooleanFlag(r.Tokenise),
+                        Deidentify: normalizeBooleanFlag(r.Deidentify),
                         TokenIdentifierType: Number(r.TokenIdentifierType) || 0,
                         Redact: normalizeBooleanFlag(r.Redact),
                         DisplayOrder: Number(r.DisplayOrder) || (idx + 1),
