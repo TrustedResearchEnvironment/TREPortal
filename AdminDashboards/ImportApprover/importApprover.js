@@ -752,8 +752,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     // Define headers based on the selected status
     const headers = ['Request Name', 'Import Project', 'Requested On', 'Requested By'];
     //if (selectedStatus === 'Pending Approval') headers.push('Approvers');
-    if (selectedStatus === 'Approved') { headers.push('Approved by'); headers.push('Approved on'); }
-    else if (selectedStatus === 'Rejected') { headers.push('Rejected by'); headers.push('Rejected on'); }
+    if (selectedStatus === 'Approved') { headers.push('Approved on'); }
+    else if (selectedStatus === 'Rejected') { headers.push('Rejected on'); }
     else if (selectedStatus === 'Finalised') { headers.push('Finalised on'); }
     headers.forEach(headerText => {
         const th = document.createElement('th');
@@ -782,8 +782,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             let statusSpecificCols = '';
             switch (item.status) {
                 // case 'Pending Approval': statusSpecificCols = `<td class="${tdClasses}">${item.Approvers || 'N/A'}</td>`; break;
-                case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${item.RejectedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
-                case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${item.ApprovedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
+                case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
+                case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
                 case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
             }
             

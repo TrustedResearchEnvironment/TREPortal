@@ -278,23 +278,43 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
                 </div>
                 <div>
                     <div class="space-y-3">
-                        ${requestDetails.Purpose ? `
+                         ${requestDetails.ApprovedBy ? `
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Purpose</span>
-                            <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
+                            <span class="font-medium">Approved By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovedBy}</span>
                         </div>` : ''}
 
-                        ${datasetDetails && datasetDetails.Name ? `
+                        ${requestDetails.ApprovedDate ? `
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Dataset Name</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Name}</span>
+                            <span class="font-medium">Approved On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.ApprovedDate)}</span>
                         </div>` : ''}
 
-                        ${datasetDetails && datasetDetails.Description ? `
+                        ${requestDetails.ApprovalMessage ? `
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Dataset Description</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Description}</span>
+                            <span class="font-medium">Approval Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
                         </div>` : ''}
+
+                        ${requestDetails.RejectedBy ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectedBy}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.RejectedDate)}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectionMessage ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejection Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectionMessage}</span>
+                        </div>` : ''}                
+
+
                     </div>
                 </div>
             </div>
@@ -494,12 +514,10 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     const headers = ['Import Request Name', 'Requested On', 'Import Project Name'];
     if (selectedStatus === 'Awaiting Submission') {
         headers.push('Status');
-    } else if (selectedStatus === 'Approved' || selectedStatus === 'Finalised') {
-        headers.push('Approved by');
+    } else if (selectedStatus === 'Approved') {
         headers.push('Approved on');
         headers.push('Status');
     } else if (selectedStatus === 'Rejected') {
-        headers.push('Rejected by');
         headers.push('Rejected on');
     } else if (selectedStatus === 'Finalised') {
         headers.push('Finalised on');
