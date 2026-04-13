@@ -436,7 +436,7 @@ function setupEventListeners() {
 
                 console.log('Submitting export request with params:', params);
                 await window.loomeApi.runApiRequest(SUBMIT_EXPORT_API_ID, params);
-                showToast('Export request submitted successfully!', "success");
+                showToast('Export request submitted successfully. Please refresh the page in a few minutes to check the status.', "success");
                 closeModal();
                 await initializePage(); 
             } catch (error) {
