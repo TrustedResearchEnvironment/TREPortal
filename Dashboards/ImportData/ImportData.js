@@ -248,9 +248,8 @@ async function fetchDatasetDetails(datasetID) {
     }
 }
 
-async function displayCombinedDetails(container, requestDetails, datasetDetails) {
-    if ((!requestDetails || Object.keys(requestDetails).length === 0) && 
-        (!datasetDetails || Object.keys(datasetDetails).length === 0)) {
+async function displayCombinedDetails(container, requestDetails) {
+    if (!requestDetails || Object.keys(requestDetails).length === 0) {
         container.innerHTML = '<p class="text-center text-red-500">No details available</p>';
         return;
     }
@@ -335,9 +334,9 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
 /**
  * Handles the submit action for import jobs
  */
-async function submitImportJob(jobId, jobName, importRequestID) {
+async function submitImportJob(importRequestID) {
     try {
-        const confirmed = confirm(`Are you sure you want to submit the import job "${jobName}"?`);
+        const confirmed = confirm(`Are you sure you want to submit the import job?`);
         if (!confirmed) return;
 
         showToast('Submitting import job...', 'info');
@@ -355,7 +354,7 @@ async function submitImportJob(jobId, jobName, importRequestID) {
         
         // Check if the submission was successful and the StatusID was successfully changed
         if (parsedResponse && ( parsedResponse.StatusID === 1)) {
-            showToast(`Import job "${jobName}" submitted successfully!`, 'success');
+            showToast(`Import job submitted successfully!`, 'success');
             
             // Refresh the data after a short delay
             setTimeout(() => {
@@ -376,9 +375,9 @@ async function submitImportJob(jobId, jobName, importRequestID) {
 /**
  * Handles the delete action for import jobs
  */
-async function deleteImportJob(jobId, jobName, importRequestID) {
+async function deleteImportJob(importRequestID) {
     try {
-        const confirmed = confirm(`Are you sure you want to delete the import job "${jobName}"? This action cannot be undone.`);
+        const confirmed = confirm(`Are you sure you want to delete the import job? This action cannot be undone.`);
         if (!confirmed) return;
 
         showToast('Deleting import job...', 'info');
@@ -392,8 +391,8 @@ async function deleteImportJob(jobId, jobName, importRequestID) {
         console.log('Delete import job response:', parsedResponse);
         
         // Check if the deletion was successful
-        if (parsedResponse && (parsedResponse.success || parsedResponse.Success || parsedResponse.status === 'success')) {
-            showToast(`Import job "${jobName}" deleted successfully!`, 'success');
+        if (parsedResponse) {
+            showToast(`Import job deleted successfully!`, 'success');
             
             // Refresh the data after a short delay
             setTimeout(() => {
@@ -515,6 +514,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     if (selectedStatus === 'Awaiting Submission') {
         headers.push('Status');
     } else if (selectedStatus === 'Approved') {
+        headers.push('Approved by');
         headers.push('Approved on');
         headers.push('Status');
     } else if (selectedStatus === 'Rejected') {
@@ -589,7 +589,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 <div class="bg-gray-50 p-4 m-2 rounded">
                     <div class="grid grid-cols-1 gap-4">
                         <div class="flex justify-end mb-1">
-                            ${itemStatus === 'Awaiting Submission' || itemStatus === 'Working' ? `
+                            ${itemStatus === 'Awaiting Submission' || itemStatus === 'Working' || itemStatus === 'Failed' ? `
                                 <button onclick="deleteImportJob('${item.ImportRequestID}', '${item.ImportRequestName}', '${item.ImportRequestID}')" 
                                         class="btn btn-danger px-3 py-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -647,19 +647,11 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         requestDetails = null;
                     }
                     
-                    let datasetDetails;
-                    try {
-                        datasetDetails = await fetchDatasetDetails(item.DataSetID);
-                    } catch (datasetError) {
-                        console.error('Error fetching dataset details:', datasetError);
-                        datasetDetails = null;
+                    if (!requestDetails) {
+                        throw new Error('Failed to fetch request details');
                     }
                     
-                    if (!requestDetails && !datasetDetails) {
-                        throw new Error('Failed to fetch both request and dataset details');
-                    }
-                    
-                    await displayCombinedDetails(detailsContainer, requestDetails, datasetDetails);
+                    await displayCombinedDetails(detailsContainer, requestDetails);
                     
                 } catch (error) {
                     console.error("Error loading details:", error);
