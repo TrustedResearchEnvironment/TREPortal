@@ -34,8 +34,8 @@ statusIdToNameMap[-1] = 'Working';
 statusIdToNameMap[0] = 'Awaiting Submission';
 statusIdToNameMap[1] = 'Pending Approval';
 statusIdToNameMap[2] = 'Approved';
-statusIdToNameMap[3] = 'Rejected';
-statusIdToNameMap[4] = 'Finalised';
+statusIdToNameMap[3] = 'Finalised';
+statusIdToNameMap[4] = 'Rejected';
 
 // Configuration for each status tab
 const configMap = {
@@ -256,9 +256,9 @@ async function displayCombinedDetails(container, requestDetails) {
 
     try {
         const projectsMapping = await getProjectsMapping();
-        const projectInfo = requestDetails && requestDetails.ProjectID ? 
-            (projectsMapping[requestDetails.ProjectID] || { name: 'Unknown Project', description: '' }) : 
-            { name: 'Unknown Project', description: '' };
+        // const projectInfo = requestDetails && requestDetails.ProjectID ? 
+        //     (projectsMapping[requestDetails.ProjectID] || { name: 'Unknown Project', description: '' }) : 
+        //     { name: 'Unknown Project', description: '' };
         
         let html = `
             <div class="grid grid-cols-2 gap-5">
@@ -271,7 +271,7 @@ async function displayCombinedDetails(container, requestDetails) {
 
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Target Project Name</span>
-                            <span class="text-sm text-gray-500">${projectInfo.name}</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ProjectName}</span>
                         </div>
                     </div>
                 </div>
