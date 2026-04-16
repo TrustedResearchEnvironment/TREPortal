@@ -1461,6 +1461,16 @@ function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
 }
 
 /**
+ * Validates email format
+ * @param {string} email - The email to validate
+ * @returns {boolean} True if email is valid
+ */
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+/**
  * Gathers all data from the form fields and tables into a structured object.
  * @returns {object} An object containing mainDetails and columns arrays.
  */
@@ -2819,10 +2829,33 @@ async function renderManageDataSetPage() {
                     // 3. Gather all data from the form into a structured object
                     const formData = gatherFormData(allColumnsData);
                     console.log("Form Data to Submit:", formData);
-                    // --- Client-side validation (optional but recommended) ---
+                    
+                    // --- Client-side validation ---
                     if (!formData.Name) {
                         showToast('Data Set Name is required.', 'error');
                         throw new Error('Validation failed: Name is required.');
+                    }
+
+                    // Validate Owner field
+                    if (!formData.Owner || formData.Owner.trim() === '') {
+                        showToast('Owner email is required.', 'error');
+                        throw new Error('Validation failed: Owner is required.');
+                    }
+
+                    if (!isValidEmail(formData.Owner)) {
+                        showToast('Owner email is not in a valid format.', 'error');
+                        throw new Error('Validation failed: Owner email format is invalid.');
+                    }
+
+                    // Validate Approver field
+                    if (!formData.Approvers || formData.Approvers.trim() === '') {
+                        showToast('Approver email is required.', 'error');
+                        throw new Error('Validation failed: Approver is required.');
+                    }
+
+                    if (!isValidEmail(formData.Approvers)) {
+                        showToast('Approver email is not in a valid format.', 'error');
+                        throw new Error('Validation failed: Approver email format is invalid.');
                     }
 
                     // 4. Determine if this is a CREATE or UPDATE operation
