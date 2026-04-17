@@ -4,31 +4,213 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Unified Requests Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="unified.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <div class="max-w-7xl mx-auto p-6">
-        <!-- Tab Bar -->
-        <div class="tab-bar">
-            <button class="tab-btn active" data-tab="data-access">
-                Data Access Requests
-            </button>
-            <button class="tab-btn" data-tab="import">
-                Import Requests
-            </button>
-            <button class="tab-btn" data-tab="export">
-                Export Requests
-            </button>
-        </div>
 
-        <!-- Tab Content: one iframe per dashboard, lazy-loaded on first activation -->
-        <div class="tab-content">
-            <iframe id="frame-data-access" class="tab-frame active" src="userreqs-frame.html"></iframe>
-            <iframe id="frame-import" class="tab-frame" data-src="import-frame.html"></iframe>
-            <iframe id="frame-export" class="tab-frame" data-src="../ExportData/exportData.html"></iframe>
+    <div id="webcrumbs">
+        <div class="bg-gray-50 min-h-screen p-6">
+            <div class="max-w-7xl mx-auto">
+
+                <!-- Tab Bar -->
+                <div class="tab-bar">
+                    <button class="tab-btn active" data-tab="data-access">Data Access Requests</button>
+                    <button class="tab-btn" data-tab="import">Import Requests</button>
+                    <button class="tab-btn" data-tab="export">Export Requests</button>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- TAB 1: DATA ACCESS REQUESTS                                  -->
+                <!-- ============================================================ -->
+                <div id="tab-data-access" class="tab-panel active">
+                    <div class="bg-white rounded-b-xl shadow-md flex flex-col overflow-hidden">
+                        <div class="p-6 border-b border-gray-200">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                                <h1 class="text-2xl font-bold">My Data Access Requests</h1>
+                            </div>
+                        </div>
+                        <div class="flex-grow overflow-y-auto p-6">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                                <div id="da-status-chips-container" class="chip-container mb-4">
+                                    <button class="chip active" data-status="Pending Approval">
+                                        Pending Approval <span class="chip-count"></span>
+                                    </button>
+                                    <button class="chip" data-status="Approved">
+                                        Approved <span class="chip-count"></span>
+                                    </button>
+                                    <button class="chip" data-status="Rejected">
+                                        Rejected <span class="chip-count"></span>
+                                    </button>
+                                    <button class="chip" data-status="Finalised">
+                                        Finalised <span class="chip-count"></span>
+                                    </button>
+                                </div>
+                                <div class="flex items-center mt-3 md:mt-0 gap-2">
+                                    <div class="relative">
+                                        <input id="da-searchRequests" type="text" placeholder="Search data..." class="px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                                    </div>
+                                    <button id="da-refresh-data-btn" class="btn btn-outline-primary" title="Refresh data">↻</button>
+                                </div>
+                            </div>
+                            <div id="da-requests-table-area"></div>
+                            <div id="da-pagination-controls" class="flex justify-between items-center mt-4 px-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- TAB 2: IMPORT REQUESTS                                       -->
+                <!-- ============================================================ -->
+                <div id="tab-import" class="tab-panel">
+                    <div class="bg-white rounded-b-xl shadow-md overflow-hidden">
+                        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h1 class="text-2xl font-bold text-black">My Data Import Requests</h1>
+                            <button id="imp-request-import-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg hover:bg-[#3da59d] transition-colors">
+                                Request Data Import
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                                <div id="imp-status-chips-container" class="chip-container mb-4">
+                                    <button class="chip active" data-status="Awaiting Submission">
+                                        Awaiting Submission <span class="chip-count"></span>
+                                    </button>
+                                    <button class="chip" data-status="Pending Approval">
+                                        Pending Approval <span class="chip-count"></span>
+                                    </button>
+                                    <button class="chip" data-status="Approved">
+                                        Approved <span class="chip-count"></span>
+                                    </button>
+                                    <button class="chip" data-status="Rejected">
+                                        Rejected <span class="chip-count"></span>
+                                    </button>
+                                    <button class="chip" data-status="Finalised">
+                                        Finalised <span class="chip-count"></span>
+                                    </button>
+                                </div>
+                                <div class="flex items-center mt-3 md:mt-0 gap-2">
+                                    <div class="relative">
+                                        <input id="imp-searchImports" type="text" placeholder="Search import jobs..." class="px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                                    </div>
+                                    <button id="imp-refresh-data-btn" class="btn btn-outline-primary" title="Refresh data">↻</button>
+                                </div>
+                            </div>
+                            <div id="imp-import-jobs-table-area"></div>
+                            <div id="imp-pagination-controls" class="flex justify-between items-center mt-4 px-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- TAB 3: EXPORT REQUESTS                                       -->
+                <!-- ============================================================ -->
+                <div id="tab-export" class="tab-panel">
+                    <div class="bg-white rounded-b-xl shadow-md overflow-hidden">
+                        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h1 class="text-2xl font-bold text-black">My Data Export Requests</h1>
+                            <div class="flex items-center gap-2">
+                                <button id="exp-request-export-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg hover:bg-[#3da59d] transition-colors">
+                                    Request Data Export
+                                </button>
+                                <button id="exp-refresh-data-btn" class="btn btn-outline-primary" title="Refresh data">↻</button>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <div id="exp-export-jobs-table-area"></div>
+                            <div id="exp-pagination-controls" class="flex justify-between items-center mt-4 px-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
+
+    <!-- ================================================================== -->
+    <!-- MODALS                                                             -->
+    <!-- ================================================================== -->
+
+    <!-- Data Access: View Request Modal (Bootstrap) -->
+    <div class="modal fade" id="da-viewRequestModal" tabindex="-1" aria-labelledby="da-viewRequestModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="da-viewRequestModalLabel">Edit Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="da-viewRequestModalBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Access: Delete Request Modal (Bootstrap) -->
+    <div class="modal fade" id="da-deleteRequestModal" tabindex="-1" aria-labelledby="da-deleteRequestModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="da-deleteRequestModalLabel">Delete Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="da-deleteRequestModalBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import: New Request Modal (custom overlay) -->
+    <div id="imp-import-modal" class="modal-overlay hidden">
+        <div class="custom-modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">New Data Import Request</h2>
+                <button id="imp-modal-close-btn" class="modal-close-btn text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <form id="imp-import-form">
+                <div class="form-group mb-3">
+                    <label for="imp-import-request-name" class="form-label">Import Request Name <span class="text-danger">*</span></label>
+                    <input id="imp-import-request-name" type="text" class="form-control" placeholder="Enter a name for this import request" required>
+                </div>
+                <div class="mb-4">
+                    <label for="imp-import-type" class="block text-sm font-medium text-gray-700 mb-2">Target Assist Project</label>
+                    <select id="imp-import-type" name="import-type" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#4ec4bc] focus:border-[#4ec4bc]">
+                        <option value="">Select Target Assist Project...</option>
+                    </select>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" id="imp-modal-submit-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#3da59d]" disabled>
+                        Submit Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Export: New Request Modal (custom overlay) -->
+    <div id="exp-export-modal" class="modal-overlay hidden">
+        <div class="custom-modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">New Data Export Request</h2>
+                <button id="exp-modal-close-btn" class="modal-close-btn text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <form id="exp-export-form">
+                <div class="mb-4">
+                    <label for="exp-export-type" class="block text-sm font-medium text-gray-700 mb-2">Source Assist Project</label>
+                    <select id="exp-export-type" name="export-type" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#4ec4bc] focus:border-[#4ec4bc]">
+                        <option value="">Select source Assist Project...</option>
+                    </select>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" id="exp-modal-submit-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#3da59d]" disabled>
+                        Submit Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shared toast container -->
+    <div id="toast-container" class="toast-top-right"></div>
 
     <script src="unified.js"></script>
 </body>
