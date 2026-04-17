@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Track ResizeObservers per frame to avoid leaks on reload
+    const observers = new Map();
+
     // Auto-resize iframes to match their content height
     Object.values(frames).forEach(frame => {
         frame.addEventListener('load', () => {
@@ -48,6 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function resizeFrame(frame) {
+        // Disconnect any previous observer for this frame
+        if (observers.has(frame)) {
+            observers.get(frame).disconnect();
+            observers.delete(frame);
+        }
+
         try {
             const doc = frame.contentDocument || frame.contentWindow.document;
             const newHeight = doc.documentElement.scrollHeight;
@@ -64,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
                 observer.observe(doc.body);
+                observers.set(frame, observer);
             }
         } catch (e) {
             // Cross-origin fallback: keep the min-height from CSS
