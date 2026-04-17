@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unified Requests Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="unified.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="data-access">
+                Data Access Requests
+            </button>
+            <button class="tab-btn" data-tab="import">
+                Import Requests
+            </button>
+            <button class="tab-btn" data-tab="export">
+                Export Requests
+            </button>
+        </div>
+
+        <!-- Tab Content: one iframe per dashboard, lazy-loaded on first activation -->
+        <div class="tab-content">
+            <iframe id="frame-data-access" class="tab-frame active" src="userreqs-frame.html"></iframe>
+            <iframe id="frame-import" class="tab-frame" data-src="import-frame.html"></iframe>
+            <iframe id="frame-export" class="tab-frame" data-src="../ExportData/exportData.html"></iframe>
+        </div>
+    </div>
+
+    <script src="unified.js"></script>
+</body>
+</html>

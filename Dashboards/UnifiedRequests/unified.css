@@ -1,0 +1,60 @@
+/* Unified Requests Dashboard - Tab bar and layout styles */
+
+.tab-bar {
+    display: flex;
+    gap: 0;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    overflow: hidden;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 14px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.tab-btn:hover {
+    color: #374151;
+    background-color: #f9fafb;
+}
+
+.tab-btn.active {
+    color: #4ec4bc;
+    border-bottom-color: #4ec4bc;
+    background-color: #ffffff;
+    font-weight: 600;
+}
+
+/* Tab content area */
+.tab-content {
+    position: relative;
+    width: 100%;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.tab-frame {
+    display: none;
+    width: 100%;
+    border: none;
+    min-height: 700px;
+}
+
+.tab-frame.active {
+    display: block;
+}
