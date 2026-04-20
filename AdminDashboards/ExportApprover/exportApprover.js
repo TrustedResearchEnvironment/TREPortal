@@ -448,12 +448,12 @@ function ApproveRequest(request) {
                 return;
             }
             // Call the API to approve the request and include note
-            approveRequestFromAPI(request.ExportRequestID, note);
+            approveRequestFromAPI(request.ExportRequestID, request.ExportProjectID, request.CreateUser, note);
         });
     }
 }
 
-async function approveRequestFromAPI(requestId, reason) {
+async function approveRequestFromAPI(requestId, projectId, createUser, reason) {
     let loadingToast = null;
     
     try {
@@ -491,7 +491,7 @@ async function approveRequestFromAPI(requestId, reason) {
         }
         
         // Show success message
-        const successToast = showToast('Request approved. Data transfer initiated. When complete, your request will appear in the Finalised tab.', 'success');
+        const successToast = showToast('Request approved. Adding Researcher to Airlock Project initiated. When complete, your request will appear in the Finalised tab.', 'success');
         console.log('Success toast shown:', successToast);
         
         // Update chip counts
@@ -506,11 +506,13 @@ async function approveRequestFromAPI(requestId, reason) {
         // Set up the Integrate Job that will do the Data transfer
         console.log('Setting up Integrate job for approved request...');
         const integrateJobParams = { 
-            "ExportRequestID": requestId
+            "ExportRequestID": requestId,
+            "ExportProjectID": projectId, // Assuming the response contains ExportProjectID
+            "ResearcherEmail": createUser, // Assuming the response contains CreateUser email
         };
         const integrateJobResponse = await window.loomeApi.runApiRequest(API_APPROVE_REQ_INTEGRATE_JOB, integrateJobParams);
         console.log('Integrate job response:', integrateJobResponse);
-        showToast('Data Transfer from Export Project to Target Project has been initiated.', 'info');
+        showToast('Adding Researcher to Airlock Project has been initiated.', 'info');
     } catch (error) {
         console.error("Error request:", error);
         
