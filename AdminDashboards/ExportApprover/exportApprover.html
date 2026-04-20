@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>My Webcrumbs Plugin</title>
+        <!-- Your head content... -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <body>
+        <div id="webcrumbs">
+            <div class="bg-gray-50 min-h-screen p-6">
+                <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-md flex flex-col h-[90vh] overflow-hidden">
+                    <!-- 1. UNIFIED & RESPONSIVE HEADER: This part will NOT scroll -->
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                            <div>
+                                <h1 id="userRequests" class="text-2xl font-bold">Data Export Requests</h1>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Chips -->
+                     <div class="flex-grow overflow-y-auto p-6">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                            <div id="status-chips-container" class="chip-container mb-4">
+                                <button class="chip active" data-status="Pending Approval">
+                                    Pending Approval
+                                    <span class="chip-count"></span>
+                                </button>
+                                <button class="chip" data-status="Approved">
+                                    Approved
+                                    <span class="chip-count"></span>
+                                </button>
+                                <button class="chip" data-status="Rejected">
+                                    Rejected
+                                    <span class="chip-count"></span>
+                                </button>
+                                <button class="chip" data-status="Finalised">
+                                    Finalised
+                                    <span class="chip-count"></span>
+                                </button>
+                            </div>
+
+                            <div class="flex items-center mt-3 md:mt-0 gap-2">
+                                <div class="relative">
+                                    <input id="searchRequests" type="text" placeholder="Search data..." class="px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                                    <span class="material-symbols-outlined absolute right-3 top-2.5 text-gray-400">search</span>
+                                </div>
+                                <button id="refresh-data-btn" class="btn btn-outline-primary" title="Refresh data">
+                                    <i class="fa fa-refresh"></i>
+                                </button>
+                            </div>
+                            
+                        </div>
+
+                        <div id="requests-table-area">
+                            <!--The JavaScript will generate the table inside this div -->
+                        </div>
+                        <!-- PAGINATION CONTROLS CONTAINER -->
+                        <div id="pagination-controls" class="flex justify-between items-center mt-4 px-2">
+                            <!-- The pagination buttons will be generated here -->
+                        </div>
+                    </div>
+
+                    
+                    
+                </div>
+            </div>
+        </div>
+
+        <!-- Approve Request Modal -->
+        <div class="modal fade" id="approveRequestModal" tabindex="-1" aria-labelledby="approveRequestModalLabel" aria-hidden="true">
+            <div class="modal-dialog" style="max-width: 400px;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="approveRequestModalLabel">Approve Request</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="approveRequestModalBody">
+                        <!-- Content will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reject Request Modal -->
+        <div class="modal fade" id="rejectRequestModal" tabindex="-1" aria-labelledby="rejectRequestModalLabel" aria-hidden="true">
+            <div class="modal-dialog" style="max-width: 400px;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="rejectRequestModalLabel">Reject Request</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="rejectRequestModalBody">
+                        <!-- Dynamic content will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </body>
+</html>

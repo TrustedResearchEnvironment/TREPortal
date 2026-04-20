@@ -3,9 +3,12 @@
 // =================================================================
 
 const TABLE_CONTAINER_ID = 'export-jobs-table-area';
-const API_REQUEST_ID = 'GetDataExport';
+const GET_DATAEXPORT_FROM_INTEGRATE = 'GetDataExport';
+const GET_DATAEXPORT_FROM_DB = 'GetDataExportFromDBbyUpn'; 
 const EXPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
 const SUBMIT_EXPORT_API_ID = 'RequestDataExportByAssistProjectID';
+const UPDATE_EXPORT_REQUEST = 'UpdateDataExportRequestStatus'; 
+const DELETE_EXPORT_REQUEST = 'DeleteExportRequest'; 
 
 // Modal Element IDs
 const MODAL_ID = 'export-modal';
@@ -13,15 +16,40 @@ const OPEN_MODAL_BTN_ID = 'request-export-btn';
 const CLOSE_MODAL_BTN_ID = 'modal-close-btn';
 const EXPORT_FORM_ID = 'export-form';
 const DROPDOWN_ID = 'export-type';
-const SUBMIT_MODAL_BTN_ID = 'modal-submit-btn'; // ADDED: ID for submit button
+const SUBMIT_MODAL_BTN_ID = 'modal-submit-btn';
 
 // State for pagination
 let currentPage = 1;
+let totalPages = 1;
 const rowsPerPage = 5;
 
 // This will store all the jobs after the initial fetch
 let allJobs = [];
-let isDropdownPopulated = false; 
+let isDropdownPopulated = false;
+
+// Mapping from Status to Status display (used for filtering)
+const statusIdToNameMap = {};
+statusIdToNameMap[-2] = 'Failed';
+statusIdToNameMap[-1] = 'Working';
+statusIdToNameMap[0] = 'Awaiting Submission';
+statusIdToNameMap[1] = 'Pending Approval';
+statusIdToNameMap[2] = 'Approved';
+statusIdToNameMap[3] = 'Finalised';
+statusIdToNameMap[4] = 'Rejected';
+
+// Configuration for each status tab
+const configMap = {
+    'Failed': { showActions: false },
+    'Working': { showActions: false },
+    'Awaiting Submission': { showActions: true },
+    'Pending Approval': { showActions: false },
+    'Approved': { showActions: false },
+    'Rejected': { showActions: false },
+    'Finalised': { showActions: false },
+};
+
+// Search input
+const searchInput = document.getElementById('searchExports'); 
 
 // =================================================================
 //                      UTILITY FUNCTIONS
@@ -103,6 +131,285 @@ function formatDate(inputDate) {
     });
 }
 
+/**
+ * Returns appropriate CSS classes for status chips based on status
+ */
+function getStatusChipColor(status) {
+    const statusLower = (status || '').toLowerCase();
+    switch (statusLower) {
+        case 'failed':
+            return 'bg-red-100 text-red-800';
+        case 'working':
+            return 'bg-purple-100 text-purple-800';
+        case 'awaiting submission':
+            return 'bg-yellow-100 text-yellow-800';
+        case 'pending approval':
+            return 'bg-blue-100 text-blue-800';
+        case 'approved':
+        case 'finalised':
+            return 'bg-green-100 text-green-800';
+        case 'rejected':
+            return 'bg-red-100 text-red-800';
+        default:
+            return 'bg-gray-100 text-gray-800';
+    }
+}
+
+// Global variable to store project data
+let projectsCache = null;
+
+async function getProjectsMapping() {
+    if (projectsCache) {
+        return projectsCache;
+    }
+    
+    try {
+        const initialParams = { "page": 1, "page_size": 100, "search": '' };
+        const data = await getFromAPI(EXPORT_REQUEST_API_ID, initialParams);
+        const mapping = {};
+        if (data) {
+            data.forEach(project => {
+                mapping[project.AssistProjectID] = {
+                    name: project.Name,
+                    description: project.Description
+                };
+            });
+        }
+        projectsCache = mapping;
+        return mapping;
+    } catch (error) {
+        console.error("Error fetching projects:", error);
+        return {};
+    }
+}
+
+async function getFromAPI(API_ID, initialParams) {
+    let allResults = [];
+    try {
+        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        if (!parsedInitial) {
+            console.log("API returned no data.");
+            return [];
+        }
+
+        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
+            allResults = parsedInitial.Results;
+            const totalPages = parsedInitial.PageCount;
+
+            if (totalPages > 1) {
+                for (let page = 2; page <= totalPages; page++) {
+                    const params = { ...initialParams, "page": page };
+                    const response = await window.loomeApi.runApiRequest(API_ID, params);
+                    const parsed = safeParseJson(response);
+
+                    if (parsed && parsed.Results) {
+                        allResults = allResults.concat(parsed.Results);
+                    }
+                }
+            }
+        } else {
+            if (Array.isArray(parsedInitial)) {
+                allResults = parsedInitial;
+            } else {
+                allResults = [parsedInitial];
+            }
+        }
+
+        return allResults;
+    } catch (error) {
+        console.error("An error occurred while fetching data:", error);
+        return [];
+    }
+}
+
+async function fetchRequestDetails(requestID) {
+    try {
+        const response = await window.loomeApi.runApiRequest('GetExportRequestByID', {
+            "ExportRequestID": parseInt(requestID, 10),
+        });
+        return safeParseJson(response);
+    } catch (error) {
+        console.error(`Error fetching request details for ID ${requestID}:`, error);
+        throw error;
+    }
+}
+
+async function fetchDatasetDetails(datasetID) {
+    try {
+        const response = await window.loomeApi.runApiRequest('GetDataSetDetails', {
+            "DataSetID": datasetID,
+        });
+        return safeParseJson(response);
+    } catch (error) {
+        console.error(`Error fetching dataset details for ID ${datasetID}:`, error);
+        throw error;
+    }
+}
+
+async function displayCombinedDetails(container, requestDetails) {
+    if (!requestDetails || Object.keys(requestDetails).length === 0) {
+        container.innerHTML = '<p class="text-center text-red-500">No details available</p>';
+        return;
+    }
+
+    try {
+        const projectsMapping = await getProjectsMapping();
+        // const projectInfo = requestDetails && requestDetails.ProjectID ? 
+        //     (projectsMapping[requestDetails.ProjectID] || { name: 'Unknown Project', description: '' }) : 
+        //     { name: 'Unknown Project', description: '' };
+        
+        let html = `
+            <div class="grid grid-cols-2 gap-5">
+                <div>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Export Request ID</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ExportRequestID || 'N/A'}</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Source Project Name</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ProjectName}</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="space-y-3">
+                         ${requestDetails.ApprovedBy ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approved By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovedBy}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.ApprovedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approved On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.ApprovedDate)}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.ApprovalMessage ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approval Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectedBy ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectedBy}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.RejectedDate)}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectionMessage ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejection Message</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectionMessage}</span>
+                        </div>` : ''}                
+
+
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+    } catch (error) {
+        console.error("Error displaying combined details:", error);
+        container.innerHTML = `
+            <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+                <p class="text-center text-red-500 mb-2">Error loading details</p>
+                <p class="text-sm">${error.message || 'Unknown error'}</p>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Handles the submit action for export jobs
+ */
+async function submitExportJob(exportRequestID) {
+    try {
+        const confirmed = confirm(`Are you sure you want to submit the export job?`);
+        if (!confirmed) return;
+
+        showToast('Submitting export job...', 'info');
+        
+        // API call to submit the job
+        const params = { 
+            ExportRequestID: parseInt(exportRequestID, 10), 
+            statusID: 1 
+        };
+        const response = await window.loomeApi.runApiRequest(UPDATE_EXPORT_REQUEST, params);
+        
+        // Parse and validate the response
+        const parsedResponse = safeParseJson(response);
+        console.log('Submit export job response:', parsedResponse);
+        
+        // Check if the submission was successful and the StatusID was successfully changed
+        if (parsedResponse && ( parsedResponse.StatusID === 1)) {
+            showToast(`Export job submitted successfully!`, 'success');
+            
+            // Refresh the data after a short delay
+            setTimeout(() => {
+                initializePage();
+            }, 1000);
+        } else {
+            // Handle cases where the API call succeeded but the operation failed
+            const errorMessage = parsedResponse?.message || parsedResponse?.Message || 'Submission failed';
+            showToast(`Failed to submit export job: ${errorMessage}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error submitting export job:', error);
+        showToast('Failed to submit export job. Please try again.', 'error');
+    }
+}
+
+/**
+ * Handles the delete action for export jobs
+ */
+async function deleteExportJob(exportRequestID) {
+    try {
+        const confirmed = confirm(`Are you sure you want to delete the export job? This action cannot be undone.`);
+        if (!confirmed) return;
+
+        showToast('Deleting export job...', 'info');
+        
+        // API call to delete the job
+        const params = { ExportRequestID: exportRequestID };
+        const response = await window.loomeApi.runApiRequest(DELETE_EXPORT_REQUEST, params);
+        
+        // Parse and validate the response
+        const parsedResponse = safeParseJson(response);
+        console.log('Delete export job response:', parsedResponse);
+        
+        // Check if the deletion was successful
+        if (parsedResponse) {
+            showToast(`Export job deleted successfully!`, 'success');
+            
+            // Refresh the data after a short delay
+            setTimeout(() => {
+                initializePage();
+            }, 1000);
+        } else {
+            // Handle cases where the API call succeeded but the operation failed
+            const errorMessage = parsedResponse?.message || parsedResponse?.Message || 'Deletion failed';
+            showToast(`Failed to delete export job: ${errorMessage}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting export job:', error);
+        showToast('Failed to delete export job. Please try again.', 'error');
+    }
+}
+
 // =================================================================
 //                      MODAL & FORM FUNCTIONS
 // =================================================================
@@ -119,7 +426,7 @@ async function populateAssistProjectsDropdown() {
         const data = safeParseJson(response);
         const assistProjects = data.Results;
 
-        dropdown.innerHTML = '<option value="">Select source Assist Project...</option>';
+        dropdown.innerHTML = '<option value="">Select Source Assist Project...</option>';
 
         if (assistProjects && assistProjects.length > 0) {
             assistProjects.forEach(type => {
@@ -176,46 +483,180 @@ function closeModal() {
 //                      RENDERING FUNCTIONS
 // =================================================================
 
-function renderTable(containerId, data) {
+function renderTable(containerId, data, config, selectedStatus, searchTerm = '') {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     container.innerHTML = '';
     
     if (!data || data.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500">No export requests found.</p>';
+        const message = searchTerm.trim() ? 
+            'No export jobs found. Please review your search term.' : 
+            'No export jobs found.';
+        container.innerHTML = `<p class="text-center text-gray-500">${message}</p>`;
         return;
     }
 
     const table = document.createElement('table');
-    table.className = 'min-w-full divide-y divide-gray-200';
+    table.className = 'w-full divide-y divide-gray-200';
     const thead = document.createElement('thead');
     thead.className = 'bg-gray-50';
     const headerRow = document.createElement('tr');
-    // const headers = ['Job Name', 'Created By', 'Date Created', 'Status'];
-    const headers = ['Job Name', 'Date Created', 'Status'];
+    
+    // Add a column for the chevron
+    const chevronTh = document.createElement('th');
+    chevronTh.className = 'w-10 px-6 py-3';
+    chevronTh.innerHTML = '';
+    headerRow.appendChild(chevronTh);
+    
+    // Define headers - only include Status for Pending Approval filter
+    const headers = ['Export Request Name', 'Requested On', 'Export Project Name'];
+    if (selectedStatus === 'Pending Approval') {
+        headers.push('Status');
+    } else if (selectedStatus === 'Approved') {
+        headers.push('Approved by');
+        headers.push('Approved on');
+        headers.push('Status');
+    } else if (selectedStatus === 'Rejected') {
+        headers.push('Rejected on');
+    } else if (selectedStatus === 'Finalised') {
+        headers.push('Finalised on');
+    }
+
     headers.forEach(headerText => {
         const th = document.createElement('th');
-        th.scope = 'col';
         th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
         th.textContent = headerText;
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
-
+    
     const tbody = document.createElement('tbody');
     tbody.className = 'bg-white divide-y divide-gray-200';
     
-    data.forEach(item => {
+    data.forEach((item, index) => {
+        const statusId = item.StatusID ?? 0;
+        const itemStatus = statusIdToNameMap[statusId] !== undefined ? statusIdToNameMap[statusId] : (statusIdToNameMap[String(statusId)] || 'Pending Approval');
+        
+        // Main row
         const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 cursor-pointer';
+        const tdClasses = 'px-6 py-4 whitespace-nowrap text-sm text-gray-800';
+            
+        let statusSpecificCols = '';
+        switch (item.status) {
+            // case 'Pending Approval': statusSpecificCols = `<td class="${tdClasses}">${item.ProjectName || 'N/A'}</td>`; break;
+            case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${item.RejectedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
+            case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${item.ApprovedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
+            case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
+        }
+        
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.jobName || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(item.dateCreated)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.lastExecution.status ?? 'In progress'}</td>
+            <td class="w-10 px-6 py-4">
+                <button class="toggle-details flex items-center justify-center w-6 h-6 text-gray-400 hover:text-gray-600" data-item-index="${index}">
+                    <svg class="w-4 h-4 transition-transform duration-200 transform chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </td>
+            <td class="${tdClasses}">${item.ExportRequestName || 'N/A'}</td>
+            <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
+            <td class="${tdClasses}">${item.ExportProjectName || 'N/A'}</td>
+            ${statusSpecificCols}
+            ${selectedStatus === 'Pending Approval' ? `
+                <td class="${tdClasses}">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
+                        ${itemStatus}
+                    </span>
+                </td>
+            ` : ''}
+             ${selectedStatus === 'Approved' ? `
+                <td class="${tdClasses}">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
+                        Data Transfer In Progress
+                    </span>
+                </td>
+            ` : ''}
         `;
         tbody.appendChild(row);
+
+        // Accordion details row (initially hidden)
+        const detailRow = document.createElement('tr');
+        detailRow.className = 'details-row hidden';
+        detailRow.innerHTML = `
+            <td colspan="${headers.length + 1}" class="p-0">
+                <div class="bg-gray-50 p-4 m-2 rounded">
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="flex justify-end mb-1">
+                            ${itemStatus === 'Pending Approval' || itemStatus === 'Working' || itemStatus === 'Failed' ? `
+                                <button onclick="deleteExportJob('${item.ExportRequestID}')" 
+                                        class="btn btn-danger px-3 py-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete
+                                </button>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Details Card -->
+                        <div class="bg-white p-5 rounded-md shadow-sm">
+                            <div id="combined-details-${item.ExportRequestID}" class="combined-content">
+                                <p class="text-center text-gray-500">Loading details...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(detailRow);
+        
+        // Add click event to load details dynamically
+        row.addEventListener('click', async () => {
+            const detailsContainer = detailRow.querySelector(`#combined-details-${item.ExportRequestID}`);
+            
+            // Toggle visibility
+            detailRow.classList.toggle('hidden');
+            
+            // Toggle chevron rotation
+            const chevron = row.querySelector('.chevron-icon');
+            if (chevron) {
+                chevron.style.transform = detailRow.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(90deg)';
+            }
+            
+            // Only fetch data if the accordion is becoming visible
+            if (!detailRow.classList.contains('hidden')) {
+                detailsContainer.innerHTML = '<p class="text-center">Loading details...</p>';
+                
+                try {
+                    let requestDetails;
+                    try {
+                        requestDetails = await fetchRequestDetails(item.ExportRequestID);
+                    } catch (requestError) {
+                        console.error('Error fetching request details:', requestError);
+                        requestDetails = null;
+                    }
+                    
+                    if (!requestDetails) {
+                        throw new Error('Failed to fetch request details');
+                    }
+                    
+                    await displayCombinedDetails(detailsContainer, requestDetails);
+                    
+                } catch (error) {
+                    console.error("Error loading details:", error);
+                    detailsContainer.innerHTML = `
+                        <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+                            <p class="text-center text-red-500 mb-2">Error loading details</p>
+                            <p class="text-sm">${error.message || 'Unknown error'}</p>
+                        </div>
+                    `;
+                }
+            }
+        });
     });
+    
     table.appendChild(tbody);
     container.appendChild(table);
 }
@@ -224,7 +665,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    totalPages = Math.ceil(totalItems / itemsPerPage);
     container.innerHTML = '';
 
     if (totalPages <= 1) return;
@@ -285,12 +726,67 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
 }
 
 function renderUI() {
+    const activeChip = document.querySelector('.chip.active');
+    const selectedStatus = activeChip ? activeChip.dataset.status : 'Pending Approval';
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const config = configMap[selectedStatus];
+
+    // Filter allJobs by selected status
+    let filteredJobs = allJobs.filter(job => {
+        const statusId = job.StatusID ?? 0;
+        const jobStatus = statusIdToNameMap[statusId] || 'Pending Approval';
+        
+        if (selectedStatus === 'Pending Approval') {
+            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Pending Approval';
+        }
+        return jobStatus === selectedStatus;
+    });
+
+    // Apply pagination
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    const jobsForCurrentPage = allJobs.slice(startIndex, endIndex);
+    const exportRequests = filteredJobs.slice(startIndex, endIndex);
 
-    renderTable(TABLE_CONTAINER_ID, jobsForCurrentPage);
-    renderPagination('pagination-controls', allJobs.length, rowsPerPage, currentPage);
+    const exportRequestsWithStatus = exportRequests.map(item => ({
+        ...item,
+        status: statusIdToNameMap[item.StatusID] || 'Unknown'
+    }));
+
+    renderTable(TABLE_CONTAINER_ID, exportRequestsWithStatus, config, selectedStatus, searchTerm);
+    renderPagination('pagination-controls', filteredJobs.length, rowsPerPage, currentPage);
+}
+
+// =================================================================
+//                      API & COUNTING FUNCTIONS
+// =================================================================
+
+async function getCounts(status) {
+    // Count jobs by status from the full allJobs array
+    // "Pending Approval" includes Working (-1), Failed (-2), and Pending Approval (0)
+    const count = allJobs.filter(job => {
+        const statusId = job.StatusID ?? 0;
+        const jobStatus = statusIdToNameMap[statusId] || 'Pending Approval';
+        
+        if (status === 'Pending Approval') {
+            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Pending Approval';
+        }
+        return jobStatus === status;
+    }).length;
+    return count;
+}
+
+async function refreshAllChipCounts() {
+    const chipsContainer = document.getElementById('status-chips-container');
+    if (!chipsContainer) return;
+    
+    for (const chip of chipsContainer.querySelectorAll('.chip')) {
+        const status = chip.dataset.status;
+        const count = await getCounts(status);
+        const countSpan = chip.querySelector('.chip-count');
+        if (countSpan) {
+            countSpan.textContent = count;
+        }
+    }
 }
 
 /**
@@ -315,27 +811,37 @@ async function initializePage() {
     const container = document.getElementById(TABLE_CONTAINER_ID);
     if (!container) return;
 
-    container.innerHTML = '<p class="text-center text-gray-500">Loading Requests...</p>';
+    container.innerHTML = '<p class="text-center text-gray-500">Loading Export Jobs...</p>';
 
     try {
-        const initialResponse = await window.loomeApi.runApiRequest(API_REQUEST_ID, { page: 1, pageSize: 1 });
+        const initialResponse = await window.loomeApi.runApiRequest(GET_DATAEXPORT_FROM_DB, { page: 1, pageSize: 1, search: '' });
         const initialData = safeParseJson(initialResponse);
         const totalJobs = initialData.RowCount;
         allJobs = []; // Clear previous data
 
         if (totalJobs > 0) {
-            const allDataResponse = await window.loomeApi.runApiRequest(API_REQUEST_ID, { page: 1, pageSize: totalJobs });
+            const allDataResponse = await window.loomeApi.runApiRequest(GET_DATAEXPORT_FROM_DB, { page: 1, pageSize: totalJobs, search: ''   });
             const allData = safeParseJson(allDataResponse);
-            // allJobs = allData.Results;
-            // Populate allJobs and sort by `dateCreated` descending (most recent first)
+            // Populate allJobs and sort by request creation date descending (most recent first)
             allJobs = (allData.Results || []).slice();
             allJobs.sort((a, b) => {
-                const ta = a && a.dateCreated ? new Date(a.dateCreated).getTime() : 0;
-                const tb = b && b.dateCreated ? new Date(b.dateCreated).getTime() : 0;
-                return tb - ta; // newest first
+                const ta = a && (a.CreateDate || a.dateCreated) ? new Date(a.CreateDate || a.dateCreated).getTime() : 0;
+                const tb = b && (b.CreateDate || b.dateCreated) ? new Date(b.CreateDate || b.dateCreated).getTime() : 0;
+
+                if (tb !== ta) {
+                    return tb - ta;
+                }
+
+                const idA = Number.parseInt(a?.ExportRequestID, 10) || 0;
+                const idB = Number.parseInt(b?.ExportRequestID, 10) || 0;
+                return idB - idA;
             });
         }
         
+        // Update chip counts
+        await refreshAllChipCounts();
+        
+        // Render initial UI
         renderUI();
 
     } catch (error) {
@@ -349,12 +855,40 @@ async function initializePage() {
 // =================================================================
 
 function setupEventListeners() {
+
     // Add refresh button event listener
     const refreshBtn = document.getElementById('refresh-data-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', refreshPageData);
     }
+        
+        
+    // Status chip filtering
+    const chipsContainer = document.getElementById('status-chips-container');
+    if (chipsContainer) {
+        chipsContainer.addEventListener('click', (event) => {
+            const clickedChip = event.target.closest('.chip');
+            if (!clickedChip) return;
 
+            // Remove active class from all chips and add to clicked chip
+            chipsContainer.querySelectorAll('.chip').forEach(chip => chip.classList.remove('active'));
+            clickedChip.classList.add('active');
+            
+            // Reset to first page and render
+            currentPage = 1;
+            renderUI();
+        });
+    }
+
+    // Search functionality
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            currentPage = 1; // Reset to first page on search
+            renderUI();
+        });
+    }
+
+    // Pagination button clicks
     document.getElementById('pagination-controls').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-page]');
         if (!button || button.disabled) return;
@@ -363,11 +897,10 @@ function setupEventListeners() {
         renderUI();
     });
 
-    // NEW: Add listener for page input field
+    // Pagination page input
     document.getElementById('pagination-controls').addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && event.target.id === 'page-input') {
             const inputElement = event.target;
-            const totalPages = Math.ceil(allJobs.length / rowsPerPage);
             const newPage = parseInt(inputElement.value, 10);
 
             if (newPage >= 1 && newPage <= totalPages) {
@@ -380,17 +913,17 @@ function setupEventListeners() {
         }
     });
 
+    // Modal event listeners
     const openBtn = document.getElementById(OPEN_MODAL_BTN_ID);
     const closeBtn = document.getElementById(CLOSE_MODAL_BTN_ID);
     const modal = document.getElementById(MODAL_ID);
     const form = document.getElementById(EXPORT_FORM_ID);
-    const dropdown = document.getElementById(DROPDOWN_ID); // ADDED
-    const submitButton = document.getElementById(SUBMIT_MODAL_BTN_ID); // ADDED
+    const dropdown = document.getElementById(DROPDOWN_ID);
+    const submitButton = document.getElementById(SUBMIT_MODAL_BTN_ID);
 
     if (openBtn) openBtn.addEventListener('click', openModal);
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
 
-    // ADDED: Event listener for the dropdown to enable/disable the submit button
     if (dropdown && submitButton) {
         dropdown.addEventListener('change', () => {
             submitButton.disabled = !dropdown.value;
@@ -406,12 +939,17 @@ function setupEventListeners() {
     if (form) {
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
-            // const selectedAssistProjectID = dropdown.value;
 
-            // Get the full selected option element to access its data attributes
+            const exportNameInput = document.getElementById('export-request-name');
+            const exportName = exportNameInput ? exportNameInput.value.trim() : '';
+            
+            if (!exportName) {
+                showToast('Please enter an Export Request Name.');
+                return;
+            }
+
             const selectedOption = dropdown.options[dropdown.selectedIndex];
             
-            // Check if a valid option is selected
             if (!selectedOption || !selectedOption.value) {
                 showToast('Please select an Assist Project.');
                 return;
@@ -421,23 +959,23 @@ function setupEventListeners() {
             const selectedName = selectedOption.dataset.name;
             const selectedTenantsID = selectedOption.dataset.tenantsId;
 
-            
             submitButton.disabled = true;
             submitButton.textContent = 'Submitting...';
 
             try {
-                // const params = { "LoomeAssistProjectID": parseInt(selectedAssistProjectID, 10) };
-
                 const params = { 
-                "LoomeAssistProjectID": parseInt(selectedAssistProjectID, 10),
-                "LoomeAssistName": selectedName,
-                "LoomeAssistTenantsID": selectedTenantsID
+                    "ExportRequestName": exportName,
+                    "LoomeAssistProjectID": parseInt(selectedAssistProjectID, 10),
+                    "LoomeAssistName": selectedName,
+                    "LoomeAssistTenantsID": selectedTenantsID
                 };
 
                 console.log('Submitting export request with params:', params);
                 await window.loomeApi.runApiRequest(SUBMIT_EXPORT_API_ID, params);
-                showToast('Export request submitted successfully. Please refresh the page in a few minutes to check the status.', "success");
+                showToast('Export request submitted successfully! Refreshing page in 5 seconds...', "success");
                 closeModal();
+                // Wait a moment before refreshing to allow backend processing to start
+                await new Promise(resolve => setTimeout(resolve, 5000));
                 await initializePage(); 
             } catch (error) {
                 console.error('Failed to submit export request:', error);
@@ -450,7 +988,7 @@ function setupEventListeners() {
     }
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
             closeModal();
         }
     });
