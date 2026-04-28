@@ -10,7 +10,7 @@ const API_GET_DATASOURCES = 'GetDataSource';
 const API_GET_DATASOURCE_BY_ID = 'GetDataSourceByID';
 const API_CREATE_DATASET = 'CreateDataSet';
 const API_UPDATE_DATASET = 'UpdateDataSet';
-const API_DELETE_DATASET = 'DeleteDataSet';
+const API_CANCEL_DATASET = 'CancelDataSet';
 const API_GET_DATASOURCE_SUBFOLDERS = 'GetLoomeDataSourceFirstSubFolders';
 const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWithFiles';
 const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
@@ -2416,7 +2416,7 @@ async function renderManageDataSetPage() {
             try {
                 const params = { id: parseInt(selectedId, 10) };
                 // Use the low-level runApiRequest so we can inspect error payloads directly
-                const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASET, params);
+                const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);
                 const parsed = safeParseJson(raw);
 
                 // If the API responded with a detail message, treat it as an error

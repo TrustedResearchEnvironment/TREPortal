@@ -5,10 +5,10 @@ const API_UPDATE_DATASOURCE_ID = 'UpdateDataSource';
 const API_DBCONNECTION_ID = 'GetDatabaseConnection';
 
 const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
-const API__DATASOURCE_FIELDVALUE_ID = 'GetDataSourceFieldValues';
-const API__DATASOURCE_FOLDER_ID = 'GetFolderConnection';
+const API_DATASOURCE_FIELDVALUE_ID = 'GetDataSourceFieldValues';
+const API_DATASOURCE_FOLDER_ID = 'GetFolderConnection';
 const API_ADD_DATASOURCE_ID = 'AddDataSource';
-const API_DELETE_DATASOURCE_ID = 'DeleteDataSource';
+const API_CANCEL_DATASOURCE_ID = 'CancelDataSource';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -124,7 +124,7 @@ async function createDbConnectionMap() {
  */
 async function createFolderConnectionMap() {
     try {
-        const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID, {});
+        const response = await window.loomeApi.runApiRequest(API_DATASOURCE_FOLDER_ID, {});
         const connections = safeParseJson(response);
 
         if (!connections || connections.length === 0) {
@@ -370,7 +370,7 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
         // Special handling for Folder type (ID = 3)
         else if (selectedTypeId === 3) {
             try {
-                const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID);
+                const response = await window.loomeApi.runApiRequest(API_DATASOURCE_FOLDER_ID);
                 const folders = safeParseJson(response);
 
                 if (!folders || folders.length === 0) {
@@ -639,7 +639,7 @@ async function fetchApiData(apiId, params = {}, context = 'data') {
  */
 async function getAllFields(fieldID) {
     // Call the generic helper
-    return fetchApiData(API__DATASOURCE_FIELDVALUE_ID, {});
+    return fetchApiData(API_DATASOURCE_FIELDVALUE_ID, {});
 }
 
 /**
@@ -729,7 +729,7 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
             "page": page,
             "pageSize": rowsPerPage,
             "search": searchTerm,
-            "activeStatus": 2 // 2 means "All" (Active + Inactive)
+            "activeStatus": 3 // 3 means "All" (Active + Inactive)
         };
         console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
@@ -1049,7 +1049,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 if (!confirm('Are you sure you want to delete this Data Source? This action cannot be undone.')) return;
                 try {
                     const params = { id: parseInt(dataSourceId, 10) };
-                    const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASOURCE_ID, params);
+                    const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASOURCE_ID, params);
                     const parsed = safeParseJson(raw);
                     if (parsed && parsed.detail) {
                         showToast(parsed.detail, 'error');

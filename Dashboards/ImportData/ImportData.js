@@ -8,7 +8,7 @@ const GET_DATAIMPORT_FROM_DB = 'GetDataImportFromDBbyUpn';
 const IMPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
 const SUBMIT_IMPORT_API_ID = 'RequestDataImportByAssistProjectID';
 const UPDATE_IMPORT_REQUEST = 'UpdateDataImportRequestStatus';
-const DELETE_IMPORT_REQUEST = 'DeleteImportRequest';
+const CANCEL_IMPORT_REQUEST = 'CancelImportRequest';
 
 // Modal Element IDs
 const MODAL_ID = 'import-modal';
@@ -384,7 +384,7 @@ async function deleteImportJob(importRequestID) {
         
         // API call to delete the job
         const params = { ImportRequestID: importRequestID };
-        const response = await window.loomeApi.runApiRequest(DELETE_IMPORT_REQUEST, params);
+        const response = await window.loomeApi.runApiRequest(CANCEL_IMPORT_REQUEST, params);
         
         // Parse and validate the response
         const parsedResponse = safeParseJson(response);

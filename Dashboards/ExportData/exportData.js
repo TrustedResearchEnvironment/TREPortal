@@ -8,7 +8,7 @@ const GET_DATAEXPORT_FROM_DB = 'GetDataExportFromDBbyUpn';
 const EXPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
 const SUBMIT_EXPORT_API_ID = 'RequestDataExportByAssistProjectID';
 const UPDATE_EXPORT_REQUEST = 'UpdateDataExportRequestStatus'; 
-const DELETE_EXPORT_REQUEST = 'DeleteExportRequest'; 
+const CANCEL_EXPORT_REQUEST = 'CancelExportRequest'; 
 
 // Modal Element IDs
 const MODAL_ID = 'export-modal';
@@ -384,7 +384,7 @@ async function deleteExportJob(exportRequestID) {
         
         // API call to delete the job
         const params = { ExportRequestID: exportRequestID };
-        const response = await window.loomeApi.runApiRequest(DELETE_EXPORT_REQUEST, params);
+        const response = await window.loomeApi.runApiRequest(CANCEL_EXPORT_REQUEST, params);
         
         // Parse and validate the response
         const parsedResponse = safeParseJson(response);
