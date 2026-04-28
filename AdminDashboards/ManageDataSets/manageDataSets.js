@@ -2831,7 +2831,101 @@ async function renderManageDataSetPage() {
             // =================================================================
 
             const manageDataSetForm = document.getElementById('manageDataSetForm');
-            
+
+            // --- Confirmation modal elements ---
+            const confirmModal = document.getElementById('confirm-save-modal');
+            const confirmBody = document.getElementById('confirm-save-body');
+            const confirmOkBtn = document.getElementById('confirm-save-ok-btn');
+            const confirmCancelBtn = document.getElementById('confirm-save-cancel-btn');
+            const confirmBackdrop = document.getElementById('confirm-save-backdrop');
+
+            // Stash for the pending save so the confirm button can execute it
+            let pendingSave = null;
+
+            function showConfirmModal() { confirmModal.style.display = ''; }
+            function hideConfirmModal() { confirmModal.style.display = 'none'; }
+
+            function buildConfirmModalBody(columns) {
+                const redacted = columns.filter(c => c.Redact);
+                const deidentified = columns.filter(c => c.Deidentify);
+                const nameKey = currentDataSourceTypeID === 3 ? 'FolderName' : 'ColumnName';
+                const itemLabel = currentDataSourceTypeID === 3 ? 'File' : 'Column';
+                const plural = (n) => n !== 1 ? 's' : '';
+
+                if (redacted.length === 0 && deidentified.length === 0) {
+                    return `
+                        <div style="display:flex;align-items:center;gap:0.75rem;padding:1rem;background:#fefce8;border:1px solid #fde68a;border-radius:0.5rem;">
+                            <span style="font-size:1.25rem;">⚠️</span>
+                            <p style="margin:0;font-size:0.875rem;color:#854d0e;">No columns are marked for <strong>Redact</strong> or <strong>Deidentify</strong>. The data will be saved as-is.</p>
+                        </div>`;
+                }
+
+                const buildSection = (items, label, headerBg, headerColor, badgeBg, sectionId) => {
+                    const count = items.length;
+                    const badge = `<span style="display:inline-block;background:${badgeBg};color:#fff;font-size:0.75rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">${count}</span>`;
+
+                    if (count === 0) {
+                        return `
+                            <div style="border:1px solid #e5e7eb;border-radius:0.5rem;overflow:hidden;">
+                                <div style="padding:0.625rem 0.75rem;background:${headerBg};color:${headerColor};font-size:0.8125rem;font-weight:600;display:flex;align-items:center;">
+                                    ${label} ${badge}
+                                    <span style="margin-left:auto;font-size:0.75rem;font-weight:400;color:#9ca3af;font-style:italic;">None</span>
+                                </div>
+                            </div>`;
+                    }
+
+                    const rows = items.map(c => {
+                        const name = c[nameKey] || 'Unknown';
+                        const extra = currentDataSourceTypeID === 3 && c.FileType ? `<span style="color:#9ca3af;font-size:0.75rem;margin-left:0.5rem;">(${escapeHtml(c.FileType)})</span>` : '';
+                        return `<tr><td style="padding:0.375rem 0.75rem;font-size:0.8125rem;color:#374151;border-bottom:1px solid #f3f4f6;">${escapeHtml(name)}${extra}</td></tr>`;
+                    }).join('');
+
+                    return `
+                        <div style="border:1px solid #e5e7eb;border-radius:0.5rem;overflow:hidden;">
+                            <div onclick="(function(el){var b=el.nextElementSibling;var a=el.querySelector('[data-arrow]');if(b.style.display==='none'){b.style.display='block';a.textContent='▾';}else{b.style.display='none';a.textContent='▸';}})(this)"
+                                 style="padding:0.625rem 0.75rem;background:${headerBg};color:${headerColor};font-size:0.8125rem;font-weight:600;display:flex;align-items:center;cursor:pointer;user-select:none;">
+                                <span data-arrow style="margin-right:0.5rem;font-size:0.75rem;">▸</span>
+                                ${label} ${badge}
+                                <span style="margin-left:auto;font-size:0.75rem;font-weight:400;color:${headerColor};opacity:0.7;">Show details</span>
+                            </div>
+                            <div style="display:none;max-height:200px;overflow-y:auto;">
+                                <table style="width:100%;"><tbody>${rows}</tbody></table>
+                            </div>
+                        </div>`;
+                };
+
+                return `
+                    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                        ${buildSection(redacted, 'Redacted', '#fef2f2', '#b91c1c', '#dc2626', 'redact-list')}
+                        ${buildSection(deidentified, 'Deidentified', '#eff6ff', '#1d4ed8', '#2563eb', 'deident-list')}
+                    </div>`;
+            }
+
+            // Close modal on Cancel / backdrop click / Escape
+            confirmCancelBtn.addEventListener('click', () => {
+                hideConfirmModal();
+                pendingSave = null;
+                submitButton.disabled = false;
+                submitButton.textContent = 'Save Data Set';
+            });
+            confirmBackdrop.addEventListener('click', () => {
+                confirmCancelBtn.click();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && confirmModal.style.display !== 'none') {
+                    confirmCancelBtn.click();
+                }
+            });
+
+            // Confirm button — execute the stashed save
+            confirmOkBtn.addEventListener('click', async () => {
+                hideConfirmModal();
+                if (typeof pendingSave === 'function') {
+                    await pendingSave();
+                    pendingSave = null;
+                }
+            });
+
             /**
              * The main submit handler for the entire form.
              */
@@ -2877,36 +2971,63 @@ async function renderManageDataSetPage() {
                         throw new Error('Validation failed: Approver email format is invalid.');
                     }
 
-                    // 4. Determine if this is a CREATE or UPDATE operation
-                    const dataSetId = document.getElementById('dataSetSelection').value;
+                    // --- Show confirmation modal before saving ---
+                    confirmBody.innerHTML = buildConfirmModalBody(allColumnsData);
 
-                    if (dataSetId === 'new') {
-                        // --- CREATE (POST) LOGIC ---
+                    // Stash the actual save as a function the Confirm button will call
+                    pendingSave = async () => {
+                        submitButton.disabled = true;
+                        submitButton.textContent = 'Saving...';
+                        try {
+                            // 4. Determine if this is a CREATE or UPDATE operation
+                            const dataSetId = document.getElementById('dataSetSelection').value;
 
-                        // Create the main data set record first
-                        console.log("Creating new Data Set with payload:", formData);
-                        const newDataSet = await createDataSet(formData); // Assume this returns the new object with its ID
-                        const newDataSetId = newDataSet.DataSetID;
+                            if (dataSetId === 'new') {
+                                console.log("Creating new Data Set with payload:", formData);
+                                const newDataSet = await createDataSet(formData);
+                                const newDataSetId = newDataSet.DataSetID;
+                                showToast('Data Set created successfully!');
+                            } else {
+                                console.log(`Updating Data Set ID ${dataSetId} with payload:`, formData);
+                                await updateDataSet(dataSetId, formData);
+                                showToast('Dataset updated successfully!');
+                            }
 
-                        showToast('Data Set created successfully!');
+                            // Clear the forms
+                            clearForm();
+                            updateDataSetFieldsTable(null, null);
+                            updateMetaDataTable(null, null);
+                            displayColumnsTable(null);
+                            populateExistingDataSets(optgroup, await getAllDataSets());
 
-                    } else {
-                        // --- UPDATE (PUT/PATCH) LOGIC ---
-                        console.log(`Updating Data Set ID ${dataSetId} with payload:`, formData);
+                        } catch (error) {
+                            console.error('An error occurred during submission:', error);
+                            let detailMsg = 'Failed to save the Data Set.';
+                            try {
+                                if (error && typeof error === 'object') {
+                                    if (error.detail) detailMsg = error.detail;
+                                    else if (error.response) {
+                                        const parsed = safeParseJson(error.response);
+                                        detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
+                                    } else {
+                                        detailMsg = error.message || JSON.stringify(error);
+                                    }
+                                } else if (typeof error === 'string') {
+                                    detailMsg = error;
+                                }
+                            } catch (e) {
+                                detailMsg = 'Failed to save the Data Set.';
+                            }
+                            showToast(detailMsg, 'error');
+                        } finally {
+                            submitButton.disabled = false;
+                            submitButton.textContent = originalButtonText;
+                        }
+                    };
 
-                        // Update the main data set record;
-                        await updateDataSet(dataSetId, formData);
-
-                        showToast('Dataset updated successfully!');
-                    }
-
-                    // Clear the forms
-                    clearForm();
-                    updateDataSetFieldsTable(null, null);
-                    updateMetaDataTable(null, null);
-                    displayColumnsTable(null);
-                    populateExistingDataSets(optgroup, await getAllDataSets());
-
+                    // Show the modal and return — save will happen via confirmOkBtn
+                    showConfirmModal();
+                    return;
 
                 } catch (error) {
                     console.error('An error occurred during submission:', error);
