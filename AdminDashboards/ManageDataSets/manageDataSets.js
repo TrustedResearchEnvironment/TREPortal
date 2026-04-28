@@ -171,6 +171,13 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
     }
 
     // --- DATA EXISTS ---
+    // Enforce mutual exclusivity: if both Redact and Deidentify are set, Redact takes priority.
+    data.forEach(col => {
+        if (col.Redact && col.Deidentify) {
+            col.Deidentify = false;
+        }
+    });
+
     let rowsHtml = '';
     if (dataSetTypeId == 1) { // Database type
 
@@ -2761,8 +2768,20 @@ async function renderManageDataSetPage() {
                 const target = event.target;
                 if (target.classList.contains('editable-checkbox')) {
                     const field = target.dataset.field;
+                    const row = target.closest('tr');
+
+                    // Mutual exclusivity: Redact and Deidentify cannot both be checked
+                    if (target.checked && (field === 'Redact' || field === 'Deidentify')) {
+                        const oppositeField = field === 'Redact' ? 'Deidentify' : 'Redact';
+                        const oppositeCheckbox = row.querySelector(`.editable-checkbox[data-field="${oppositeField}"]`);
+                        if (oppositeCheckbox && oppositeCheckbox.checked) {
+                            oppositeCheckbox.checked = false;
+                            updateInMemoryData(row, oppositeField, 0);
+                        }
+                    }
+
                     const value = target.checked ? 1 : 0;
-                    updateInMemoryData(target.closest('tr'), field, value);
+                    updateInMemoryData(row, field, value);
                 }
             });
 
