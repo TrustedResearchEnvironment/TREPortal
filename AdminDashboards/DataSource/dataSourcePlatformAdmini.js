@@ -729,7 +729,7 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
             "page": page,
             "pageSize": rowsPerPage,
             "search": searchTerm,
-            "activeStatus": 2 // 2 means "All" (Active + Inactive)
+            "activeStatus": 3 // 3 means "All" (Active + Inactive)
         };
         console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
