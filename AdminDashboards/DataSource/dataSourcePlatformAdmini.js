@@ -164,7 +164,7 @@ function getDataSourceFormData(formElement) {
     // We use .value for text inputs/textareas and .checked for checkboxes.
     const name = formElement.querySelector('#dataSourceName').value;
     const description = formElement.querySelector('#dataSourceDescription').value;
-    const isActive = formElement.querySelector('#dataSourceActive').checked;
+    const isActive = formElement.querySelector('#dataSourceActive').checked ? 1 : 0;
 
     // For the <select>, we get the value of the selected <option>.
     // Parse it as an integer to match the type used in comparisons (e.g. === 2)
