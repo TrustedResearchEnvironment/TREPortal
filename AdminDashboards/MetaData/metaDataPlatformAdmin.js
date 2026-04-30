@@ -207,7 +207,7 @@ function getMetaDataFormData(formElement) {
     // We use .value for text inputs/textareas and .checked for checkboxes.
     const name = sanitizeStringForJson(formElement.querySelector('#metaDataName').value);
     const description = sanitizeStringForJson(formElement.querySelector('#metaDataDescription').value);
-    const isActive = !!formElement.querySelector('#metaDataActive').checked;
+    const isActive = formElement.querySelector('#metaDataActive').checked ? 1 : 0;
     // Capture multiple selected Data Source Type IDs (if any)
     // Target only the data source type checkboxes using specific class
     const dataSourceTypeSelectCheckedBoxes = formElement.querySelectorAll('.data-source-type-checkbox:checked');
@@ -732,7 +732,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     // Use document.querySelector to find elements within the accordionBody
                     const updatedName = sanitizeStringForJson(accordionBody.querySelector('.edit-state-name').value);
                     const updatedDescription = sanitizeStringForJson(accordionBody.querySelector('.edit-state-description').value);
-                    const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked;
+                    const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked ? 1 : 0;
 
 
                     // --- 2. Send Request to the Endpoint using fetch ---
