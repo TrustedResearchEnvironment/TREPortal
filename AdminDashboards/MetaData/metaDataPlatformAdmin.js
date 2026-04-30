@@ -5,7 +5,7 @@ const API_GET_ALL_METADATA = 'GetMetadata';
 const API_ADD_METADATA = 'AddMetaData';
 const API_UPDATE_METADATA = 'UpdateMetaData';
 const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
-const API_DELETE_METADATA = 'DeleteMetaData';
+const API_CANCEL_METADATA = 'CancelMetaData';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -798,7 +798,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     const metaDataID = deleteButton?.dataset?.metaid || accordionBody?.dataset?.id;
                     const params = { meta_data_id : parseInt(metaDataID, 10) };
                     // Use the low-level runApiRequest so we can inspect error payloads directly
-                    const raw = await window.loomeApi.runApiRequest(API_DELETE_METADATA, params);
+                    const raw = await window.loomeApi.runApiRequest(API_CANCEL_METADATA, params);
                     const parsed = safeParseJson(raw);
 
                     // If the API responded with a detail message, treat it as an error

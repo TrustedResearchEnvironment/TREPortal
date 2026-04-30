@@ -4,7 +4,7 @@
 // =================================================================
 const TABLE_CONTAINER_ID = 'requests-table-area';
 const API_REQUEST_ID = 'GetRequests';
-const API_DELETE_REQUEST = 'DeleteRequestID';
+const API_CANCEL_REQUEST = 'CancelRequestID';
 const API_GET_REQUEST_DETAILS = 'GetRequestID';
 const API_GET_DATASET_DETAILS = 'GetDataSetID';
 const API_GET_ASSIST_PROJECTS = 'GetAssistProjectsFilteredByUpn';
@@ -314,7 +314,7 @@ async function deleteRequestFromAPI(requestId) {
         loadingToast = showToast('Deleting request...', 'info');
         console.log('Loading toast shown:', loadingToast);
         
-        const response = await window.loomeApi.runApiRequest(API_DELETE_REQUEST, {
+        const response = await window.loomeApi.runApiRequest(API_CANCEL_REQUEST, {
             "id": requestId,
         });
         
