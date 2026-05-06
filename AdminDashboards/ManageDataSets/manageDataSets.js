@@ -2846,19 +2846,17 @@ async function renderManageDataSetPage() {
             function hideConfirmModal() { confirmModal.style.display = 'none'; }
 
             function buildConfirmModalBody(columns) {
-                const redacted = columns.filter(c => c.Redact);
+                const included = columns.filter(c => !c.Redact);
                 const deidentified = columns.filter(c => c.Deidentify);
+                const redacted = columns.filter(c => c.Redact);
                 const nameKey = currentDataSourceTypeID === 3 ? 'FolderName' : 'ColumnName';
-                const itemLabel = currentDataSourceTypeID === 3 ? 'File' : 'Column';
                 const plural = (n) => n !== 1 ? 's' : '';
 
-                if (redacted.length === 0 && deidentified.length === 0) {
-                    return `
-                        <div style="display:flex;align-items:center;gap:0.75rem;padding:1rem;background:#fefce8;border:1px solid #fde68a;border-radius:0.5rem;">
-                            <span style="font-size:1.25rem;">⚠️</span>
-                            <p style="margin:0;font-size:0.875rem;color:#854d0e;">No columns are marked for <strong>Redact</strong> or <strong>Deidentify</strong>. The data will be saved as-is.</p>
-                        </div>`;
-                }
+                const warningBanner = (redacted.length === 0 && deidentified.length === 0) ? `
+                    <div style="display:flex;align-items:center;gap:0.75rem;padding:1rem;background:#fefce8;border:1px solid #fde68a;border-radius:0.5rem;">
+                        <span style="font-size:1.25rem;">⚠️</span>
+                        <p style="margin:0;font-size:0.875rem;color:#854d0e;">No columns are marked for <strong>Redact</strong> or <strong>Deidentify</strong>. The data will be saved as-is.</p>
+                    </div>` : '';
 
                 const buildSection = (items, label, headerBg, headerColor, badgeBg, sectionId) => {
                     const count = items.length;
@@ -2896,8 +2894,10 @@ async function renderManageDataSetPage() {
 
                 return `
                     <div style="display:flex;flex-direction:column;gap:0.75rem;">
-                        ${buildSection(redacted, 'Redacted', '#fef2f2', '#b91c1c', '#dc2626', 'redact-list')}
+                        ${warningBanner}
+                        ${buildSection(included, 'Included', '#f0fdf4', '#15803d', '#16a34a', 'included-list')}
                         ${buildSection(deidentified, 'Deidentified', '#eff6ff', '#1d4ed8', '#2563eb', 'deident-list')}
+                        ${buildSection(redacted, 'Redacted', '#fef2f2', '#b91c1c', '#dc2626', 'redact-list')}
                     </div>`;
             }
 
