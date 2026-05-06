@@ -1095,6 +1095,14 @@ async function renderPlatformAdminMetaDataPage() {
             const response = await window.loomeApi.runApiRequest(API_ADD_METADATA, payload);
             console.log("RESPONSE: ", response)
 
+            // Check for error response (e.g. 400 Bad Request)
+            const parsed = safeParseJson(response);
+            if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
+                console.error("Status Code:", parsed.status || 400);
+                console.error("Detail:", parsed.detail);
+                throw new Error(parsed.detail || 'Server returned an error.');
+            }
+
             showToast('Meta Data created successfully!');
             
             // This should now work!
