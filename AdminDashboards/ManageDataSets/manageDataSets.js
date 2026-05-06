@@ -657,11 +657,11 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
             <tr>
                 <td>Folder Name <input type="text" hidden="true"></td>
                 <td width="70%">
-                    <select id="tableNameSelector" class="form-control selectpicker bg-white">
+                    <select id="tableNameSelector" class="form-control selectpicker bg-white" style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value&&this.value!=='-1'){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}">
                         <option value="-1">Select a Folder</option>
                         ${optionsHtml}
                     </select>
-                    <div class="validation-message"></div>
+                    <div class="validation-message" style="color:#f97316;font-size:0.8rem;margin-top:0.25rem;">⚠ A folder must be selected before saving.</div>
                 </td>
             </tr>`;
         } else {
@@ -827,11 +827,11 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
             <tr>
                 <td>Table Name <input type="text" hidden="true"></td>
                 <td width="70%">
-                    <select id="tableNameSelector" class="form-control selectpicker bg-white">
+                    <select id="tableNameSelector" class="form-control selectpicker bg-white" style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value&&this.value!=='-1'){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}">
                         <option value="-1">Select a Table</option>
                         ${optionsHtml}
                     </select>
-                    <div class="validation-message"></div>
+                    <div class="validation-message" style="color:#f97316;font-size:0.8rem;margin-top:0.25rem;">⚠ A table must be selected before saving.</div>
                 </td>
             </tr>`;
 
