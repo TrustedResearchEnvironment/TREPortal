@@ -3,7 +3,7 @@
 //                      STATE & CONFIGURATION
 // =================================================================
 const TABLE_CONTAINER_ID = 'requests-table-area';
-const API_REQUEST_ID = 'GetRequests';
+const API_REQUEST_ID = 'GetAllRequests';
 const API_CANCEL_REQUEST = 'CancelRequestID';
 const API_GET_REQUEST_DETAILS = 'GetRequestID';
 const API_GET_DATASET_DETAILS = 'GetDataSetID';
@@ -665,7 +665,6 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
         const projectInfo = requestDetails && requestDetails.ProjectID ? 
             (projectsMapping[requestDetails.ProjectID] || { name: 'Unknown Project', description: '' }) : 
             { name: 'Unknown Project', description: '' };
-        
         // Start building HTML
         let html = `
             <div class="grid grid-cols-2 gap-5">
