@@ -17,6 +17,14 @@ let totalPages = 1; // Add global totalPages variable
 const rowsPerPage = 5; // You can control page size here
 const searchInput = document.getElementById('searchRequests');
 
+/**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
 // Mapping from Status to Status display (used for filtering)
 const statusIdToNameMap = {};
 statusIdToNameMap[-2] = 'Failed';
@@ -403,7 +411,7 @@ function ApproveRequest(request) {
 
             <div class="form-group mt-3">
                 <label for="approveReason" class="form-label">Approval Note <span class="text-danger">*</span></label>
-                <textarea id="approveReason" class="form-control" rows="3" placeholder="Enter a short note for approval" required maxlength="255"></textarea>
+                <textarea id="approveReason" class="form-control" rows="3" placeholder="Enter a short note for approval" required maxlength="500"></textarea>
                 <div id="approveReasonValidation" class="validation-message text-danger small d-none">Approval note is required.</div>
             </div>
 
@@ -440,7 +448,7 @@ function ApproveRequest(request) {
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
             console.log('Approve button clicked for request:', request.ExportRequestID);
-            const note = approveReasonEl ? (approveReasonEl.value || '').trim() : '';
+            const note = sanitizeInput(approveReasonEl ? (approveReasonEl.value || '').trim() : '');
             if (!note) {
                 if (approveReasonValidation) approveReasonValidation.classList.remove('d-none');
                 showToast('Please provide an approval note.', 'error');
@@ -547,7 +555,7 @@ function RejectRequest(request) {
 
             <div class="form-group mt-3">
                 <label for="rejectReason" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
-                <textarea id="rejectReason" class="form-control" rows="3" placeholder="Enter reason for rejection" required maxlength="255"></textarea>
+                <textarea id="rejectReason" class="form-control" rows="3" placeholder="Enter reason for rejection" required maxlength="500"></textarea>
                 <div id="rejectReasonValidation" class="validation-message text-danger small d-none">Reason is required.</div>
             </div>
 
@@ -583,7 +591,7 @@ function RejectRequest(request) {
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
             console.log('Reject button clicked for request:', request.ExportRequestID);
-            const reason = reasonEl ? (reasonEl.value || '').trim() : '';
+            const reason = sanitizeInput(reasonEl ? (reasonEl.value || '').trim() : '');
             if (!reason) {
                 if (reasonValidation) reasonValidation.classList.remove('d-none');
                 showToast('Please provide a reason for rejection.', 'error');

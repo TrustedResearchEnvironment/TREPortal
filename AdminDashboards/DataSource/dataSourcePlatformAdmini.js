@@ -162,8 +162,8 @@ function getDataSourceFormData(formElement) {
 
     // --- 1. Get values from the STATIC fields ---
     // We use .value for text inputs/textareas and .checked for checkboxes.
-    const name = formElement.querySelector('#dataSourceName').value;
-    const description = formElement.querySelector('#dataSourceDescription').value;
+    const name = sanitizeInput(formElement.querySelector('#dataSourceName').value);
+    const description = sanitizeInput(formElement.querySelector('#dataSourceDescription').value);
     const isActive = formElement.querySelector('#dataSourceActive').checked ? 1 : 0;
 
     // For the <select>, we get the value of the selected <option>.
@@ -222,12 +222,12 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
                 <form id="addDataSourceForm">
                   <div class="mb-3">
                     <label for="dataSourceName" class="form-label">Name</label>
-                    <input type="text" class="form-control" id="dataSourceName" placeholder="Name for this Data Source" required>
+                    <input type="text" class="form-control" id="dataSourceName" placeholder="Name for this Data Source" maxlength="100" required>
                   </div>
                   
                   <div class="mb-3">
                     <label for="dataSourceDescription" class="form-label">Description</label>
-                    <textarea class="form-control" id="dataSourceDescription" rows="2" placeholder="Description of this Data Source"></textarea>
+                    <textarea class="form-control" id="dataSourceDescription" rows="2" placeholder="Description of this Data Source" maxlength="500"></textarea>
                   </div>
 
                   <div class="mb-3">
@@ -865,11 +865,11 @@ const renderAccordionDetails = (item) => {
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.DataSourceID}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-name">${item.Name}</span>
-                            <input type="text" value="${item.Name}" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-description">${item.Description || ''}</span>
-                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${item.Description || ''}</textarea>
+                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-isactive">${item.IsActive ? 'Yes' : 'No'}</span>
@@ -1112,8 +1112,8 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 try {
 
                     // --- 1. Gather Data from the Form ---
-                    const updatedName = accordionBody.querySelector('.edit-state-name').value;
-                    const updatedDescription = accordionBody.querySelector('.edit-state-description').value;
+                    const updatedName = sanitizeInput(accordionBody.querySelector('.edit-state-name').value);
+                    const updatedDescription = sanitizeInput(accordionBody.querySelector('.edit-state-description').value);
                     const updatedIsActive = accordionBody.querySelector('.edit-state-isactive').checked;
 
                     // Gather all dynamic field values into a dictionary
@@ -1265,6 +1265,14 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
 
 async function renderPlatformAdminDataSourcePage() {
     // --- 1. Define the table configuration ---
@@ -1351,10 +1359,28 @@ async function renderPlatformAdminDataSourcePage() {
     });
 
 
-    const addDataSrcButton = document.querySelector('#addDatasourceBtn');;
+    const addDataSrcButton = document.querySelector('#addDatasourceBtn');
     if (addDataSrcButton) {
         addDataSrcButton.addEventListener('click', () => {
             AddDataSource(typeNamesList, fields, allTypesArray);
+        });
+    }
+
+    const refreshBtn = document.getElementById('refreshDatasourceBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            const originalHtml = refreshBtn.innerHTML;
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing…`;
+            try {
+                await fetchAndRenderPage(tableConfig, currentPage, searchInput?.value || '');
+                showToast('Data refreshed.', 'success');
+            } catch (e) {
+                showToast('Failed to refresh data.', 'error');
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = originalHtml;
+            }
         });
     }
 

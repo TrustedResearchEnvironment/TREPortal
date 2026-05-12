@@ -213,12 +213,12 @@
                 <div id="dataSetDetailsContainer">
                     <div class="mb-3">
                         <label for="dataSetName" class="form-label">Name</label>
-                        <input type="text" class="form-control" id="dataSetName" required>
+                        <input type="text" class="form-control" id="dataSetName" maxlength="100" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="dataSetDescription" class="form-label">Description</label>
-                        <textarea class="form-control" id="dataSetDescription" rows="2"></textarea>
+                        <textarea class="form-control" id="dataSetDescription" rows="2" maxlength="500"></textarea>
                     </div>
                     <div class="mb-3">
                         <label for="dataSource" class="form-label">Data Source</label>
@@ -229,11 +229,11 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="dataSetOwner" class="form-label">Owner</label>
-                            <input type="email" class="form-control" id="dataSetOwner" required>
+                            <input type="email" class="form-control" id="dataSetOwner" maxlength="254" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="dataSetApprover" class="form-label">Approver</label>
-                            <input type="email" class="form-control" id="dataSetApprover" required>
+                            <input type="email" class="form-control" id="dataSetApprover" maxlength="254" required>
                         </div>
                     </div>
                     <div class="form-check mb-3">

@@ -19,6 +19,14 @@ const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
 const API_GET_METADATA = 'GetMetadata';
 const API_VERIFY_UPLOAD_SHEET = 'VerifyUploadedSheet';
 
+/**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
 const pageSize = 10;
 let currentPage = 1;
 let dataSourceTypeMap = new Map();
@@ -1484,8 +1492,8 @@ function isValidEmail(email) {
 function gatherFormData(allColumnsData) {
     // --- Part A: Gather Main Form Details ---
     const mainDetails = {
-        Name: document.getElementById('dataSetName').value,
-        Description: document.getElementById('dataSetDescription').value,
+        Name: sanitizeInput(document.getElementById('dataSetName').value),
+        Description: sanitizeInput(document.getElementById('dataSetDescription').value),
         DataSourceID: parseInt(document.getElementById('dataSource').value, 10),
         Owner: document.getElementById('dataSetOwner').value,
         Approvers: document.getElementById('dataSetApprover').value,
@@ -2420,6 +2428,13 @@ async function renderManageDataSetPage() {
 
             if (!confirm('Are you sure you want to delete this Data Set? This action cannot be undone.')) return;
 
+            // --- Show "Deleting..." state ---
+            const originalHtml = deleteBtn.innerHTML;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Deleting…`;
+
             try {
                 const params = { id: parseInt(selectedId, 10) };
                 // Use the low-level runApiRequest so we can inspect error payloads directly
@@ -2429,6 +2444,8 @@ async function renderManageDataSetPage() {
                 // If the API responded with a detail message, treat it as an error
                 if (parsed && parsed.detail) {
                     showToast(parsed.detail, 'error');
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalHtml;
                     return;
                 }
 
@@ -2454,6 +2471,9 @@ async function renderManageDataSetPage() {
                     detailMsg = 'Failed to delete Data Set.';
                 }
                 showToast(detailMsg, 'error');
+                // Restore button on failure so the user can retry
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalHtml;
             }
         });
     }

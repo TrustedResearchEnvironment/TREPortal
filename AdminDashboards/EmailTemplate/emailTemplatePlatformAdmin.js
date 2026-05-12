@@ -585,10 +585,10 @@ async function renderPlatformAdminEmailTemplatesPage() {
             currentPage = page; // Update the global state
 
             // Get the current search term to maintain the filter
-            const searchTerm = searchInput.value; // <-- FIX: Use .value for inputs
+            const searchTerm = searchInput.value;
 
             // Re-render the table with the new page and existing search term
-            updateTable(tableConfig, data, TABLE_CONTAINER_ID, currentPage, rowsPerPage, searchTerm);
+            fetchAndRenderPage(tableConfig, page, searchTerm);
         });
 
         // Add keydown listener for page input

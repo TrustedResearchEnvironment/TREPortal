@@ -99,11 +99,11 @@ function AddMetadata(typeNamesList) {
             <!-- Name, Description, Active fields... -->
             <div class="mb-3">
                 <label for="metaDataName" class="form-label">Name</label>
-                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control" required>
+                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control" maxlength="100" required>
             </div>
             <div class="mb-3">
                 <label for="metaDataDescription" class="form-label">Description</label>
-                <textarea rows="2" id="metaDataDescription" placeholder="Description of this Meta Data" class="form-control"></textarea>
+                <textarea rows="2" id="metaDataDescription" placeholder="Description of this Meta Data" class="form-control" maxlength="500"></textarea>
             </div>
             <div class="mb-3 form-check">
                 <input type="checkbox" id="metaDataActive" class="form-check-input" checked>
@@ -191,6 +191,14 @@ function sanitizeStringForJson(input) {
 }
 
 /**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+/**
  * Gathers all data from the "Add Data Source" modal form.
  * It handles both static fields and dynamically generated fields.
  *
@@ -205,9 +213,9 @@ function getMetaDataFormData(formElement) {
 
     // --- 1. Get values from the STATIC fields ---
     // We use .value for text inputs/textareas and .checked for checkboxes.
-    const name = sanitizeStringForJson(formElement.querySelector('#metaDataName').value);
-    const description = sanitizeStringForJson(formElement.querySelector('#metaDataDescription').value);
-    const isActive = !!formElement.querySelector('#metaDataActive').checked ? 1 : 0;
+    const name = sanitizeInput(sanitizeStringForJson(formElement.querySelector('#metaDataName').value));
+    const description = sanitizeInput(sanitizeStringForJson(formElement.querySelector('#metaDataDescription').value));
+    const isActive = formElement.querySelector('#metaDataActive').checked ? 1 : 0;
     // Capture multiple selected Data Source Type IDs (if any)
     // Target only the data source type checkboxes using specific class
     const dataSourceTypeSelectCheckedBoxes = formElement.querySelectorAll('.data-source-type-checkbox:checked');
@@ -293,11 +301,11 @@ const renderAccordionDetails = (item) => {
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.MetaDataID}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-name">${item.Name}</span>
-                            <input type="text" value="${item.Name}" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-description">${item.Description || ''}</span>
-                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${item.Description || ''}</textarea>
+                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-isactive">${item.IsActive ? 'Yes' : 'No'}</span>
@@ -730,9 +738,9 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 try {
                     // --- 1. Gather Data from the Form ---
                     // Use document.querySelector to find elements within the accordionBody
-                    const updatedName = sanitizeStringForJson(accordionBody.querySelector('.edit-state-name').value);
-                    const updatedDescription = sanitizeStringForJson(accordionBody.querySelector('.edit-state-description').value);
-                    const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked ? 1 : 0; // Convert to 1/0. API expects int
+                    const updatedName = sanitizeInput(sanitizeStringForJson(accordionBody.querySelector('.edit-state-name').value));
+                    const updatedDescription = sanitizeInput(sanitizeStringForJson(accordionBody.querySelector('.edit-state-description').value));
+                    const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked ? 1 : 0;
 
 
                     // --- 2. Send Request to the Endpoint using fetch ---
