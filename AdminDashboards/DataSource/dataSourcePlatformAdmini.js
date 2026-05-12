@@ -260,6 +260,9 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
     const typeSelect = modalBody.querySelector('#dataSourceType');
     const fieldsContainer = modalBody.querySelector('#dataSourceFieldsContainer');
 
+    attachCharCounter(modalBody.querySelector('#dataSourceName'), 100);
+    attachCharCounter(modalBody.querySelector('#dataSourceDescription'), 700);
+
     // --- 5. CREATE the event handler function ---
     const handleTypeChange = async (event) => {
         const selectedTypeId = parseInt(event.target.value);
@@ -1093,7 +1096,11 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 parentAccordion.querySelectorAll('.edit-state').forEach(el => el.classList.toggle('hidden', !isEditing));
             };
 
-            if (editButton) toggleEditState(true);
+            if (editButton) {
+                toggleEditState(true);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-name'), 100);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-description'), 500);
+            }
 
             if (saveButton) {
 
@@ -1273,6 +1280,30 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
 
 async function renderPlatformAdminDataSourcePage() {
     // --- 1. Define the table configuration ---

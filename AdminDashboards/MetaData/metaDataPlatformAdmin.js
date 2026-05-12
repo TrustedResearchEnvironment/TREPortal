@@ -125,6 +125,9 @@ function AddMetadata(typeNamesList) {
         </form>
     `;
 
+    attachCharCounter(modalBody.querySelector('#metaDataName'), 100);
+    attachCharCounter(modalBody.querySelector('#metaDataDescription'), 500);
+
     // 3. Add JavaScript to make the dropdown interactive (THIS PART IS REVISED)
     const dropdownButton = document.getElementById('dataSourceTypeDropdown');
     const dropdownMenu = document.getElementById('dataSourceTypeMenu');
@@ -196,6 +199,49 @@ function sanitizeStringForJson(input) {
  */
 function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
+
+/**
+ * Extracts a human-readable error message from an API response.
+ * Handles: plain string, { detail: string }, { detail: [{field,message}] },
+ * and top-level [{field,message}] arrays.
+ */
+function extractApiError(parsed) {
+    if (!parsed) return null;
+    // Top-level array of validation errors: [{field, message}, ...]
+    if (Array.isArray(parsed)) {
+        return parsed.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (typeof parsed.detail === 'string') return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+        return parsed.detail.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    return null;
 }
 
 /**
@@ -720,7 +766,11 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 }
             };
 
-            if (editButton) toggleEditState(true);
+            if (editButton) {
+                toggleEditState(true);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-name'), 100);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-description'), 500);
+            }
 
             if (saveButton) {
                 // Stop the click from propagating and closing the accordion
@@ -764,9 +814,11 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     
                     // --- 3. Handle the Server's Response ---
                     if (!updatedMetaData) {
-                        // Handle cases where the API might return an empty or null response on success
-                        throw new Error("API call succeeded but returned no data.");
+                        throw new Error('API call succeeded but returned no data.');
                     }
+                    const updateParsed = safeParseJson(updatedMetaData);
+                    const updateApiErr = extractApiError(updateParsed);
+                    if (updateApiErr) throw new Error(updateApiErr);
                     console.log(updatedMetaData)
                     showToast('MetaData edited successfully!\nPlease wait while the data refreshes.', 'success');
 
@@ -1105,10 +1157,13 @@ async function renderPlatformAdminMetaDataPage() {
 
             // Check for error response (e.g. 400 Bad Request)
             const parsed = safeParseJson(response);
-            if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
-                console.error("Status Code:", parsed.status || 400);
-                console.error("Detail:", parsed.detail);
-                throw new Error(parsed.detail || 'Server returned an error.');
+            const apiErr = extractApiError(parsed);
+            if (apiErr) {
+                console.error('API error:', apiErr);
+                throw new Error(apiErr);
+            }
+            if (parsed && parsed.status && parsed.status >= 400) {
+                throw new Error(parsed.message || 'Server returned an error.');
             }
 
             showToast('Meta Data created successfully!');

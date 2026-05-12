@@ -20,6 +20,30 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
 
 function AddDataSrcType() {
     // Get the modal's body element
@@ -50,7 +74,9 @@ function AddDataSrcType() {
                     </form>
             
     `;
-    
+
+    attachCharCounter(modalBody.querySelector('#dataSrcTypeName'), 100);
+    attachCharCounter(modalBody.querySelector('#dataSrcTypeDescription'), 500);
 }
 
 /**

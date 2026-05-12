@@ -119,6 +119,31 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
+
 // =================================================================
 // ACCESS TAB  (server-side pagination via GetRequests API)
 // =================================================================
@@ -596,7 +621,7 @@ function importSetupListeners() {
 
     importModal?.addEventListener('show.bs.modal', () => {
         if (!importProjectsFetched) importPopulateProjects();
-        if (importNameEl) { importNameEl.value = ''; importNameEl.maxLength = 100; }
+        if (importNameEl) { importNameEl.value = ''; importNameEl.maxLength = 100; attachCharCounter(importNameEl, 100); }
         if (importSelEl)   importSelEl.value  = '';
         if (importSubmBtn) importSubmBtn.disabled = true;
     });
@@ -889,7 +914,7 @@ function exportSetupListeners() {
 
     exportModal?.addEventListener('show.bs.modal', () => {
         if (!exportProjectsFetched) exportPopulateProjects();
-        if (exportNameEl) { exportNameEl.value = ''; exportNameEl.maxLength = 100; }
+        if (exportNameEl) { exportNameEl.value = ''; exportNameEl.maxLength = 100; attachCharCounter(exportNameEl, 100); }
         if (exportSelEl)   exportSelEl.value  = '';
         if (exportSubmBtn) exportSubmBtn.disabled = true;
     });

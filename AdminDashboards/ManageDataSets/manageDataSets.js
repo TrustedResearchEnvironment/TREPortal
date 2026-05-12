@@ -28,6 +28,31 @@ function sanitizeInput(value) {
 }
 
 /**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
+
+/**
  * Extracts a human-readable error message from an API response.
  * Handles: plain string, { detail: string }, { detail: [{field,message}] },
  * and top-level [{field,message}] arrays.
@@ -2628,6 +2653,9 @@ async function renderManageDataSetPage() {
     // Add the 'async' keyword to the function that wraps this logic.
     // For example, if it's inside a DOMContentLoaded listener:
     document.addEventListener('DOMContentLoaded', async () => {
+
+        attachCharCounter(document.getElementById('dataSetName'), 100);
+        attachCharCounter(document.getElementById('dataSetDescription'), 700);
 
         try {
             // 1. Use 'await' to wait for the data to arrive.
