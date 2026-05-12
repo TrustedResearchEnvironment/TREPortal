@@ -227,7 +227,7 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
                   
                   <div class="mb-3">
                     <label for="dataSourceDescription" class="form-label">Description</label>
-                    <textarea class="form-control" id="dataSourceDescription" rows="2" placeholder="Description of this Data Source" maxlength="500"></textarea>
+                    <textarea class="form-control" id="dataSourceDescription" rows="2" placeholder="Description of this Data Source" maxlength="700"></textarea>
                   </div>
 
                   <div class="mb-3">
