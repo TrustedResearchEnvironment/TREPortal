@@ -27,6 +27,23 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/**
+ * Extracts a human-readable error message from an API response.
+ * Handles: plain string, { detail: string }, { detail: [{field,message}] },
+ * and top-level [{field,message}] arrays.
+ */
+function extractApiError(parsed) {
+    if (!parsed) return null;
+    if (Array.isArray(parsed)) {
+        return parsed.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (typeof parsed.detail === 'string') return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+        return parsed.detail.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    return null;
+}
+
 const pageSize = 10;
 let currentPage = 1;
 let dataSourceTypeMap = new Map();
@@ -1600,9 +1617,15 @@ async function createDataSet(data) {
         
         // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
         const parsed = safeParseJson(response);
-        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
-            const error = new Error(parsed.detail || parsed.message || 'Server error');
-            error.detail = parsed.detail;
+        const apiErr = extractApiError(parsed);
+        if (apiErr) {
+            const error = new Error(apiErr);
+            error.detail = apiErr;
+            error.response = response;
+            throw error;
+        }
+        if (parsed && parsed.status && parsed.status >= 400) {
+            const error = new Error(parsed.message || 'Server error');
             error.response = response;
             throw error;
         }
@@ -1695,9 +1718,15 @@ async function updateDataSet(data_set_id, data) {
 
         // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
         const parsed = safeParseJson(response);
-        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
-            const error = new Error(parsed.detail || parsed.message || 'Server error');
-            error.detail = parsed.detail;
+        const apiErr = extractApiError(parsed);
+        if (apiErr) {
+            const error = new Error(apiErr);
+            error.detail = apiErr;
+            error.response = response;
+            throw error;
+        }
+        if (parsed && parsed.status && parsed.status >= 400) {
+            const error = new Error(parsed.message || 'Server error');
             error.response = response;
             throw error;
         }
