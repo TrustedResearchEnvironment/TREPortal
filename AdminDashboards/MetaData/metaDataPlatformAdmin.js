@@ -201,6 +201,11 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 /**
  * Attaches a progressive character counter to an input/textarea.
  * The counter only appears when the user has used ≥80% of the character limit.
@@ -788,8 +793,22 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 try {
                     // --- 1. Gather Data from the Form ---
                     // Use document.querySelector to find elements within the accordionBody
-                    const updatedName = sanitizeInput(sanitizeStringForJson(accordionBody.querySelector('.edit-state-name').value));
-                    const updatedDescription = sanitizeInput(sanitizeStringForJson(accordionBody.querySelector('.edit-state-description').value));
+                    const rawName = accordionBody.querySelector('.edit-state-name').value;
+                    const rawDesc = accordionBody.querySelector('.edit-state-description').value;
+                    if (containsInvalidChars(rawName)) {
+                        showToast('Special characters are not allowed in the Name.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (!rawName.trim()) {
+                        showToast('Name is required.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (containsInvalidChars(rawDesc)) {
+                        showToast('Special characters are not allowed in the Description.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    const updatedName = sanitizeInput(sanitizeStringForJson(rawName));
+                    const updatedDescription = sanitizeInput(sanitizeStringForJson(rawDesc));
                     const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked ? 1 : 0;
 
 
@@ -1138,8 +1157,18 @@ async function renderPlatformAdminMetaDataPage() {
         const payload = getMetaDataFormData(form);
         
         // Validate required fields: Name and at least one Data Source Type
+        const rawName = form.querySelector('#metaDataName')?.value || '';
+        const rawDesc = form.querySelector('#metaDataDescription')?.value || '';
+        if (containsInvalidChars(rawName)) {
+            showToast('Special characters are not allowed in the Name.', 'error');
+            return;
+        }
         if (!payload || !payload.name || String(payload.name).trim() === '') {
             showToast('Name is required.', 'error');
+            return;
+        }
+        if (containsInvalidChars(rawDesc)) {
+            showToast('Special characters are not allowed in the Description.', 'error');
             return;
         }
         console.log("Data gathered from form:", payload);

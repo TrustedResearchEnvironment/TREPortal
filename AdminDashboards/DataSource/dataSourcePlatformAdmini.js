@@ -1119,8 +1119,22 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 try {
 
                     // --- 1. Gather Data from the Form ---
-                    const updatedName = sanitizeInput(accordionBody.querySelector('.edit-state-name').value);
-                    const updatedDescription = sanitizeInput(accordionBody.querySelector('.edit-state-description').value);
+                    const rawName = accordionBody.querySelector('.edit-state-name').value;
+                    const rawDesc = accordionBody.querySelector('.edit-state-description').value;
+                    if (containsInvalidChars(rawName)) {
+                        showToast('Special characters are not allowed in the Name.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (!rawName.trim()) {
+                        showToast('Name is required.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (containsInvalidChars(rawDesc)) {
+                        showToast('Special characters are not allowed in the Description.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    const updatedName = sanitizeInput(rawName);
+                    const updatedDescription = sanitizeInput(rawDesc);
                     const updatedIsActive = accordionBody.querySelector('.edit-state-isactive').checked;
 
                     // Gather all dynamic field values into a dictionary
@@ -1280,6 +1294,11 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 /**
  * Attaches a progressive character counter to an input/textarea.
  * The counter only appears when the user has used ≥80% of the character limit.
@@ -1434,6 +1453,21 @@ async function renderPlatformAdminDataSourcePage() {
 
         const payload = getDataSourceFormData(form);
         console.log("Data gathered from form:", payload);
+
+        const rawName = form.querySelector('#dataSourceName')?.value || '';
+        const rawDesc = form.querySelector('#dataSourceDescription')?.value || '';
+        if (containsInvalidChars(rawName)) {
+            showToast('Special characters are not allowed in the Name.', 'error');
+            return;
+        }
+        if (!payload.name || !payload.name.trim()) {
+            showToast('Name is required.', 'error');
+            return;
+        }
+        if (containsInvalidChars(rawDesc)) {
+            showToast('Special characters are not allowed in the Description.', 'error');
+            return;
+        }
 
         saveButton.disabled = true;
         saveButton.innerHTML = `

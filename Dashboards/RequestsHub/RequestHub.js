@@ -635,6 +635,7 @@ function importSetupListeners() {
     importSubmBtn?.addEventListener('click', async () => {
         const name = sanitizeInput(importNameEl?.value.trim());
         const opt  = importSelEl?.options[importSelEl.selectedIndex];
+        if (containsInvalidChars(importNameEl?.value || '')) { showToast('Special characters are not allowed in the request name.', 'error'); return; }
         if (!name || !opt?.value) { showToast('Please fill in all fields.', 'error'); return; }
         importSubmBtn.disabled    = true;
         importSubmBtn.textContent = 'Submitting…';
@@ -928,6 +929,7 @@ function exportSetupListeners() {
     exportSubmBtn?.addEventListener('click', async () => {
         const name = sanitizeInput(exportNameEl?.value.trim());
         const opt  = exportSelEl?.options[exportSelEl.selectedIndex];
+        if (containsInvalidChars(exportNameEl?.value || '')) { showToast('Special characters are not allowed in the request name.', 'error'); return; }
         if (!name || !opt?.value) { showToast('Please fill in all fields.', 'error'); return; }
         exportSubmBtn.disabled    = true;
         exportSubmBtn.textContent = 'Submitting…';

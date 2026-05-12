@@ -20,6 +20,11 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 /**
  * Attaches a progressive character counter to an input/textarea.
  * The counter only appears when the user has used ≥80% of the character limit.
@@ -630,7 +635,22 @@ async function renderPlatformAdminDataSourceTypesPage() {
 
             const payload = getDataSrcTypeFormData(form);
             console.log("Data gathered from form:", payload);
-            
+
+            const rawName = form.querySelector('#dataSrcTypeName')?.value || '';
+            const rawDesc = form.querySelector('#dataSrcTypeDescription')?.value || '';
+            if (containsInvalidChars(rawName)) {
+                showToast('Special characters are not allowed in the Name.', 'error');
+                return;
+            }
+            if (!payload.name || !payload.name.trim()) {
+                showToast('Name is required.', 'error');
+                return;
+            }
+            if (containsInvalidChars(rawDesc)) {
+                showToast('Special characters are not allowed in the Description.', 'error');
+                return;
+            }
+
             saveButton.disabled = true;
             saveButton.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>

@@ -105,6 +105,11 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 // =================================================================
 // SHARED ACTION MODAL  (Approve / Reject — used by all three tabs)
 // =================================================================
@@ -195,6 +200,14 @@ function setupActionModalConfirm() {
         const modal  = bootstrap.Modal.getInstance(document.getElementById('adminActionModal'));
         const msg    = sanitizeInput(document.getElementById('approvalMessage')?.value.trim() || '');
         const reason = sanitizeInput(document.getElementById('rejectionReason')?.value.trim() || '');
+        if (type === 'approve' && containsInvalidChars(document.getElementById('approvalMessage')?.value || '')) {
+            showToast('Special characters are not allowed in the approval message.', 'error');
+            return;
+        }
+        if (type === 'reject' && containsInvalidChars(document.getElementById('rejectionReason')?.value || '')) {
+            showToast('Special characters are not allowed in the rejection reason.', 'error');
+            return;
+        }
         modal?.hide();
 
         const t = showToast(`${type === 'approve' ? 'Approving' : 'Rejecting'}…`, 'info');

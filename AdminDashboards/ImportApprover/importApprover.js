@@ -25,6 +25,11 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 /**
  * Attaches a progressive character counter to an input/textarea.
  * The counter only appears when the user has used ≥80% of the character limit.
@@ -475,6 +480,11 @@ function ApproveRequest(request) {
         confirmBtn.addEventListener('click', () => {
             console.log('Approve button clicked for request:', request.ImportRequestID);
             const note = sanitizeInput(approveReasonEl ? (approveReasonEl.value || '').trim() : '');
+            if (containsInvalidChars(approveReasonEl?.value || '')) {
+                showToast('Special characters are not allowed in the approval note.', 'error');
+                if (approveReasonEl) approveReasonEl.focus();
+                return;
+            }
             if (!note) {
                 if (approveReasonValidation) approveReasonValidation.classList.remove('d-none');
                 showToast('Please provide an approval note.', 'error');
@@ -617,6 +627,11 @@ function RejectRequest(request) {
         confirmBtn.addEventListener('click', () => {
             console.log('Reject button clicked for request:', request.ImportRequestID);
             const reason = sanitizeInput(reasonEl ? (reasonEl.value || '').trim() : '');
+            if (containsInvalidChars(reasonEl?.value || '')) {
+                showToast('Special characters are not allowed in the rejection reason.', 'error');
+                if (reasonEl) reasonEl.focus();
+                return;
+            }
             if (!reason) {
                 if (reasonValidation) reasonValidation.classList.remove('d-none');
                 showToast('Please provide a reason for rejection.', 'error');

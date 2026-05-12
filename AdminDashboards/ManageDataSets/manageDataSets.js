@@ -27,6 +27,11 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 /**
  * Attaches a progressive character counter to an input/textarea.
  * The counter only appears when the user has used ≥80% of the character limit.
@@ -1533,9 +1538,13 @@ function isValidEmail(email) {
  */
 function gatherFormData(allColumnsData) {
     // --- Part A: Gather Main Form Details ---
+    const rawName = document.getElementById('dataSetName').value;
+    const rawDescription = document.getElementById('dataSetDescription').value;
     const mainDetails = {
-        Name: sanitizeInput(document.getElementById('dataSetName').value),
-        Description: sanitizeInput(document.getElementById('dataSetDescription').value),
+        Name: sanitizeInput(rawName),
+        _rawName: rawName,
+        Description: sanitizeInput(rawDescription),
+        _rawDescription: rawDescription,
         DataSourceID: parseInt(document.getElementById('dataSource').value, 10),
         Owner: document.getElementById('dataSetOwner').value,
         Approvers: document.getElementById('dataSetApprover').value,
@@ -3021,9 +3030,20 @@ async function renderManageDataSetPage() {
                     console.log("Form Data to Submit:", formData);
                     
                     // --- Client-side validation ---
-                    if (!formData.Name) {
-                        showToast('Data Set Name is required.', 'error');
-                        throw new Error('Validation failed: Name is required.');
+                    if (containsInvalidChars(formData._rawName)) {
+                        const msg = 'Special characters are not allowed in the Dataset Name.';
+                        showToast(msg, 'error');
+                        const err = new Error(msg); err.handled = true; throw err;
+                    }
+                    if (!formData.Name || !formData.Name.trim()) {
+                        const msg = 'Data Set Name is required.';
+                        showToast(msg, 'error');
+                        const err = new Error(msg); err.handled = true; throw err;
+                    }
+                    if (containsInvalidChars(formData._rawDescription)) {
+                        const msg = 'Special characters are not allowed in the Dataset Description.';
+                        showToast(msg, 'error');
+                        const err = new Error(msg); err.handled = true; throw err;
                     }
 
                     // Validate Owner field
@@ -3108,23 +3128,25 @@ async function renderManageDataSetPage() {
 
                 } catch (error) {
                     console.error('An error occurred during submission:', error);
-                    let detailMsg = 'Failed to save the Data Set.';
-                    try {
-                        if (error && typeof error === 'object') {
-                            if (error.detail) detailMsg = error.detail;
-                            else if (error.response) {
-                                const parsed = safeParseJson(error.response);
-                                detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
-                            } else {
-                                detailMsg = error.message || JSON.stringify(error);
+                    if (!error.handled) {
+                        let detailMsg = 'Failed to save the Data Set.';
+                        try {
+                            if (error && typeof error === 'object') {
+                                if (error.detail) detailMsg = error.detail;
+                                else if (error.response) {
+                                    const parsed = safeParseJson(error.response);
+                                    detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
+                                } else {
+                                    detailMsg = error.message || JSON.stringify(error);
+                                }
+                            } else if (typeof error === 'string') {
+                                detailMsg = error;
                             }
-                        } else if (typeof error === 'string') {
-                            detailMsg = error;
+                        } catch (e) {
+                            detailMsg = 'Failed to save the Data Set.';
                         }
-                    } catch (e) {
-                        detailMsg = 'Failed to save the Data Set.';
+                        showToast(detailMsg, 'error');
                     }
-                    showToast(detailMsg, 'error');
                 } finally {
                     submitButton.disabled = false;
                     submitButton.textContent = originalButtonText;
