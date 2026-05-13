@@ -119,6 +119,11 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 /**
  * Attaches a progressive character counter to an input/textarea.
  * The counter only appears when the user has used ≥80% of the character limit.
@@ -648,7 +653,8 @@ function importSetupListeners() {
                 LoomeAssistTenantsID: opt.dataset.tenantsId
             });
             dismissToast(t);
-            showToast('Import request created successfully. Refreshing in 5 seconds…', 'success');
+            showToast('Import request created successfully.', 'success');
+            sessionStorage.setItem('showRequestPendingHint', '1');
             bootstrap.Modal.getInstance(importModal)?.hide();
             await importFetchAllJobs();
             importRefreshChipCounts();
@@ -657,6 +663,7 @@ function importSetupListeners() {
                 c.classList.toggle('active', c.dataset.status === 'Awaiting Submission');
             });
             importRenderUI();
+            sessionStorage.setItem('restoreTab', 'import-tab');
             setTimeout(() => location.reload(), 5000);
         } catch (err) {
             dismissToast(t);
@@ -942,7 +949,8 @@ function exportSetupListeners() {
                 LoomeAssistTenantsID: opt.dataset.tenantsId
             });
             dismissToast(t);
-            showToast('Export request created successfully. Refreshing in 5 seconds…', 'success');
+            showToast('Export request created successfully.', 'success');
+            sessionStorage.setItem('showRequestPendingHint', '1');
             bootstrap.Modal.getInstance(exportModal)?.hide();
             await exportFetchAllJobs();
             exportRefreshChipCounts();
@@ -951,6 +959,7 @@ function exportSetupListeners() {
                 c.classList.toggle('active', c.dataset.status === 'Awaiting Submission');
             });
             exportRenderUI();
+            sessionStorage.setItem('restoreTab', 'export-tab');
             setTimeout(() => location.reload(), 5000);
         } catch (err) {
             dismissToast(t);
@@ -970,6 +979,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     accessSetupListeners();
     importSetupListeners();
     exportSetupListeners();
+
+    if (sessionStorage.getItem('showRequestPendingHint')) {
+        sessionStorage.removeItem('showRequestPendingHint');
+        showToast('Request submitted. It may take a few minutes to move from “Working” to “Awaiting Submission” — refresh the page to check its progress.', 'info', 12000);
+    }
 
     // Refresh button
     document.getElementById('refresh-btn')?.addEventListener('click', async () => {
@@ -1011,6 +1025,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         exportRenderUI();
     });
 
-    // Initial render — Access tab is active by default
-    await Promise.all([accessRenderUI(), accessRefreshChipCounts()]);
+    // Restore tab from before reload — must happen AFTER shown.bs.tab listeners are attached
+    const tabToRestore = sessionStorage.getItem('restoreTab');
+    if (tabToRestore) {
+        sessionStorage.removeItem('restoreTab');
+        const tabEl = document.getElementById(tabToRestore);
+        if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
+    } else {
+        // Default: render Access tab
+        await Promise.all([accessRenderUI(), accessRefreshChipCounts()]);
+    }
 });
