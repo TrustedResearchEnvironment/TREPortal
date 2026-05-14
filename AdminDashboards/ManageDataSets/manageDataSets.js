@@ -712,8 +712,8 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
             <tr>
                 <td>Folder Name <input type="text" hidden="true"></td>
                 <td width="70%">
-                    <select id="tableNameSelector" class="form-control selectpicker bg-white" style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value&&this.value!=='-1'){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}">
-                        <option value="-1">Select a Folder</option>
+                    <select id="tableNameSelector" class="form-control selectpicker bg-white" required style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}"> 
+                        <option value="">Select a Folder</option>
                         ${optionsHtml}
                     </select>
                     <div class="validation-message" style="color:#f97316;font-size:0.8rem;margin-top:0.25rem;">⚠ A folder must be selected before saving.</div>
@@ -882,8 +882,8 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
             <tr>
                 <td>Table Name <input type="text" hidden="true"></td>
                 <td width="70%">
-                    <select id="tableNameSelector" class="form-control selectpicker bg-white" style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value&&this.value!=='-1'){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}">
-                        <option value="-1">Select a Table</option>
+                    <select id="tableNameSelector" class="form-control selectpicker bg-white" required style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}">
+                        <option value="">Select a Table</option>
                         ${optionsHtml}
                     </select>
                     <div class="validation-message" style="color:#f97316;font-size:0.8rem;margin-top:0.25rem;">⚠ A table must be selected before saving.</div>
@@ -1575,7 +1575,7 @@ function gatherFormData(allColumnsData) {
     const scrapeFieldsTable = (tbody) => {
         // --- PATH 1: Check for the specific SQL Table Name selector first ---
         const tableNameSelector = tbody.querySelector('#tableNameSelector');
-        if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== "-1") {
+        if (tableNameSelector && tableNameSelector.value) {
             if (currentDataSourceTypeID === 1) { // SQL Database
                 // The FieldID for "Table Name" is 3.
                 dataSetFieldValues.push({
@@ -3066,6 +3066,17 @@ async function renderManageDataSetPage() {
                     if (!isValidEmail(formData.Approvers)) {
                         showToast('Approver email is not in a valid format.', 'error');
                         throw new Error('Validation failed: Approver email format is invalid.');
+                    }
+
+                    // Validate Data Set Field (Table/Folder selection) for types that require it
+                    if (currentDataSourceTypeID === 1 || currentDataSourceTypeID === 3) {
+                        const fieldLabel = currentDataSourceTypeID === 1 ? 'Table' : 'Folder';
+                        const selector = document.getElementById('tableNameSelector');
+                        if (!selector || !selector.value) {
+                            const msg = `A ${fieldLabel} must be selected before saving.`;
+                            showToast(msg, 'error');
+                            const err = new Error(msg); err.handled = true; throw err;
+                        }
                     }
 
                     // --- Show confirmation modal before saving ---
