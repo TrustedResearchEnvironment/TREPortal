@@ -19,6 +19,10 @@ const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
 const API_GET_METADATA = 'GetMetadata';
 const API_VERIFY_UPLOAD_SHEET = 'VerifyUploadedSheet';
 
+const API_GET_PORTAL_TOKEN = 'Portal - GetToken';
+const API_GET_ASSET_BY_NAME = 'Portal - GetAssetByName';
+const API_DELETE_ASSET_BY_ASSET_ID = 'Portal - DeleteByAssetId';
+
 /**
  * Strips characters outside the safe whitelist to guard against injection.
  * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
@@ -2499,8 +2503,34 @@ async function renderManageDataSetPage() {
                 Deleting…`;
 
             try {
+
+                // These API calls update the Portal Catalogue list
+                const datasetName = nameInput.value.trim();
+                const dataSourceTypeLabels = { 1: 'Database', 2: 'REDCap', 3: 'Folder' };
+                const dataSourceTypeLabel = dataSourceTypeLabels[currentDataSourceTypeID] || 'Dataset';
+                const token = await window.loomeApi.runApiRequest(API_GET_PORTAL_TOKEN);
+                const returnedAssets = await window.loomeApi.runApiRequest(API_GET_ASSET_BY_NAME, { 
+                        assetName: datasetName,
+                        entityTypes: dataSourceTypeLabel,
+                        token: token.access_token
+                    }
+                );
+                const asset = returnedAssets?.items?.[0];
+                if (asset && asset.id) {
+                    const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
+                        assetId: asset.id, token: token.access_token 
+                    });
+                    console.log('Deleted catalogue asset:', deletedDataSet);
+                } else {
+                    showToast(`No matching catalogue asset found for "${datasetName}" (${dataSourceTypeLabel}). Database was not modified.`, 'error');
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalHtml;
+                    return;
+                }
+
                 const params = { id: parseInt(selectedId, 10) };
                 // Use the low-level runApiRequest so we can inspect error payloads directly
+                // This API call updates the database
                 const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);
                 const parsed = safeParseJson(raw);
 
@@ -2511,6 +2541,7 @@ async function renderManageDataSetPage() {
                     deleteBtn.innerHTML = originalHtml;
                     return;
                 }
+
 
                 // Some APIs may return a truthy success value or empty array; consider that success
                 showToast('Data Set deleted successfully.', 'success');
