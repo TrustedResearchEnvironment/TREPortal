@@ -2,11 +2,12 @@
 //                      STATE & CONFIGURATION
 // =================================================================
 const TABLE_CONTAINER_ID = 'requests-table-area';
-const API_REQUEST_ID = 'GetAllRequests';
-const API_APPROVE_REQUEST = 'ApproveRequestID';
-const API_REJECT_REQUEST = 'RejectRequestID';
-const API_GET_REQUEST_DETAILS = 'GetRequestID';
-const API_GET_DATASET_DETAILS = 'GetDataSetID';
+const GET_ALL_EXPORT_REQUESTS = 'GetAllExportRequests';
+const API_APPROVE_REQUEST = 'ApproveExportRequest';
+const API_APPROVE_REQ_INTEGRATE_JOB = 'ApprovedExportRequestIntegrateJob';
+const API_REJECT_REQUEST = 'RejectExportRequest';
+const API_GET_REQUEST_DETAILS = 'GetExportRequestByID';
+const API_GET_DATASET_DETAILS = 'GetDataSetDetails';
 const API_GET_ALL_ASSIST_PROJECTS = 'GetAllAssistProjects';
 
 // We will store all fetched data here
@@ -16,45 +17,68 @@ let totalPages = 1; // Add global totalPages variable
 const rowsPerPage = 5; // You can control page size here
 const searchInput = document.getElementById('searchRequests');
 
-// Mapping from Status ID to Status Name
-const statusIdToNameMap = { 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
+/**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
+
+// Mapping from Status to Status display (used for filtering)
+const statusIdToNameMap = {};
+statusIdToNameMap[-2] = 'Failed';
+statusIdToNameMap[-1] = 'Working';
+statusIdToNameMap[0] = 'Awaiting Submission';
+statusIdToNameMap[1] = 'Pending Approval';
+statusIdToNameMap[2] = 'Approved';
+statusIdToNameMap[3] = 'Finalised';
+statusIdToNameMap[4] = 'Rejected';
 
 // Configuration for each status tab
 const configMap = {
-    'Pending Approval': { showActions: true },
-    'Approved': { showActions: true },
-    'Rejected': { showActions: true },
-    'Finalised': { showActions: true },
+    'Failed': { showActions: false },
+    'Working': { showActions: false },
+    'Awaiting Submission': { showActions: true },
+    'Pending Approval': { showActions: false },
+    'Approved': { showActions: false },
+    'Rejected': { showActions: false },
+    'Finalised': { showActions: false },
 };
 
 // =================================================================
 //                      UTILITY & MODAL FUNCTIONS
 // =================================================================
-async function refreshPageData() {
-    let loadingToast = null;
-    
-    try {
-        loadingToast = showToast('Refreshing data...', 'info');
-        await renderUI();
-        await refreshAllChipCounts();
-        
-        if (loadingToast) {
-            hideToast(loadingToast);
-        }
-        
-        showToast('Data refreshed', 'success');
-    } catch (error) {
-        console.error('Error refreshing page data:', error);
-        
-        if (loadingToast) {
-            hideToast(loadingToast);
-        }
-        
-        showToast('Failed to refresh data. Please try again.', 'error');
-    }
-}
-
-
 function ViewRequest(request) {
     // Get the modal's body element
     const modalBody = document.getElementById('viewRequestModalBody');
@@ -397,13 +421,164 @@ function formatDate(inputDate) {
     return date.toLocaleDateString('en-US', formattingOptions);
 }
 
+function ApproveRequest(request) {
+    // Get the modal elements
+    const modalBody = document.getElementById('approveRequestModalBody');
+    const modalTitle = document.getElementById('approveRequestModalLabel');
+
+
+    // Update the modal title dynamically
+    modalTitle.textContent = `Approve Request: ${request.ExportRequestName}`;
+
+    // Populate the modal body with the dynamic content
+    modalBody.innerHTML = `
+        <div class="col-md-12">
+            <div class="alert alert-warning">
+                <i class="fa fa-exclamation-triangle"></i> 
+                Please confirm the approval of the request:<br>
+                <strong>${request.ExportRequestName}</strong>
+            </div>
+
+            <div class="form-group mt-3">
+                <label for="approveReason" class="form-label">Approval Note <span class="text-danger">*</span></label>
+                <textarea id="approveReason" class="form-control" rows="3" placeholder="Enter a short note for approval" required maxlength="500"></textarea>
+                <div id="approveReasonValidation" class="validation-message text-danger small d-none">Approval note is required.</div>
+            </div>
+
+            <div class="form-group mt-3 d-flex justify-content-center">
+                <button id="confirmApprovalBtn" class="btn btn-success px-3 py-1" disabled>
+                    <i class="fa fa-thumbs-up mr-2"></i>
+                    Approve
+                </button>
+            </div>
+        </div>
+    `;
+
+
+    // Add event listener for the confirm approval button with validation
+    const confirmBtn = document.getElementById('confirmApprovalBtn');
+    const approveReasonEl = document.getElementById('approveReason');
+    const approveReasonValidation = document.getElementById('approveReasonValidation');
+
+    // Enable/disable the confirm button based on input
+    attachCharCounter(approveReasonEl, 500);
+    if (approveReasonEl) {
+        approveReasonEl.addEventListener('input', () => {
+            const val = (approveReasonEl.value || '').trim();
+            if (confirmBtn) confirmBtn.disabled = !val;
+            if (approveReasonValidation) {
+                if (val) {
+                    approveReasonValidation.classList.add('d-none');
+                } else {
+                    approveReasonValidation.classList.remove('d-none');
+                }
+            }
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            // console.log('Approve button clicked for request:', request.ExportRequestID);
+            const note = sanitizeInput(approveReasonEl ? (approveReasonEl.value || '').trim() : '');
+            if (containsInvalidChars(approveReasonEl?.value || '')) {
+                showToast('Special characters are not allowed in the approval note.', 'error');
+                if (approveReasonEl) approveReasonEl.focus();
+                return;
+            }
+            if (!note) {
+                if (approveReasonValidation) approveReasonValidation.classList.remove('d-none');
+                showToast('Please provide an approval note.', 'error');
+                if (approveReasonEl) approveReasonEl.focus();
+                return;
+            }
+            // Call the API to approve the request and include note
+            approveRequestFromAPI(request.ExportRequestID, request.ExportProjectID, request.CreateUser, note);
+        });
+    }
+}
+
+async function approveRequestFromAPI(requestId, projectId, createUser, reason) {
+    let loadingToast = null;
+    
+    try {
+        // console.log('Approving request ID:', requestId, 'note:', reason);
+        
+        // Show loading state
+        loadingToast = showToast('Approving request...', 'info');
+        // console.log('Loading toast shown:', loadingToast);
+        
+        const params = { "id": parseInt(requestId), "reason": reason };
+        if (reason !== undefined && reason !== null) params.reason = String(reason);
+
+        const response = await window.loomeApi.runApiRequest(API_APPROVE_REQUEST, params);
+        
+        // Log the response to console
+        // console.log('Approve request API response:', response);
+        
+        // Hide the modal
+        try {
+            const approveModal = bootstrap.Modal.getInstance(document.getElementById('approveRequestModal'));
+            if (approveModal) {
+                approveModal.hide();
+                // console.log('Approve modal hidden');
+            } // else {
+                // console.log('Approve modal not found or already hidden');
+            // }
+        } catch (modalError) {
+            console.error('Error hiding modal:', modalError);
+        }
+        
+        // Hide loading toast
+        if (loadingToast) {
+            hideToast(loadingToast);
+            // console.log('Loading toast hidden');
+        }
+        
+        // Show success message
+        const successToast = showToast('Request approved. Adding Researcher to Airlock Project initiated. When complete, your request will appear in the Finalised tab.', 'success');
+        // console.log('Success toast shown:', successToast);
+        
+        // Update chip counts
+        await refreshAllChipCounts();
+        
+        // Refresh the UI
+        // console.log('Refreshing UI');
+        setTimeout(() => {
+            renderUI();
+        }, 100);
+
+        // Set up the Integrate Job that will do the Data transfer
+        // console.log('Setting up Integrate job for approved request...');
+        const integrateJobParams = { 
+            "ExportRequestID": requestId,
+            "ExportProjectID": projectId, // Assuming the response contains ExportProjectID
+            "ResearcherEmail": createUser, // Assuming the response contains CreateUser email
+        };
+        const integrateJobResponse = await window.loomeApi.runApiRequest(API_APPROVE_REQ_INTEGRATE_JOB, integrateJobParams);
+        // console.log('Integrate job response:', integrateJobResponse);
+        showToast('Adding Researcher to Airlock Project has been initiated.', 'info');
+    } catch (error) {
+        console.error("Error request:", error);
+        
+        // Hide loading toast
+        if (loadingToast) {
+            hideToast(loadingToast);
+            // console.log('Loading toast hidden after error');
+        }
+        
+        // Show error message
+        const errorToast = showToast('Please try again.', 'error');
+        // console.log('Error toast shown:', errorToast);
+    }
+}
+
 function RejectRequest(request) {
     // Get the modal elements
     const modalBody = document.getElementById('rejectRequestModalBody');
     const modalTitle = document.getElementById('rejectRequestModalLabel');
     
     // Update the modal title dynamically based on requestID
-    modalTitle.textContent = `Reject Request: ${request.Name}`;
+    modalTitle.textContent = `Reject Request: ${request.ExportRequestName}`;
     
     // Populate the modal body with the dynamic content
     modalBody.innerHTML = `
@@ -411,12 +586,12 @@ function RejectRequest(request) {
             <div class="alert alert-warning">
                 <i class="fa fa-exclamation-triangle"></i> 
                 Please confirm the Rejection of the request:<br>
-                <strong>${request.Name}</strong>
+                <strong>${request.ExportRequestName}</strong>
             </div>
 
             <div class="form-group mt-3">
                 <label for="rejectReason" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
-                <textarea id="rejectReason" class="form-control" rows="3" placeholder="Enter reason for rejection" required maxlength="255"></textarea>
+                <textarea id="rejectReason" class="form-control" rows="3" placeholder="Enter reason for rejection" required maxlength="500"></textarea>
                 <div id="rejectReasonValidation" class="validation-message text-danger small d-none">Reason is required.</div>
             </div>
 
@@ -435,6 +610,7 @@ function RejectRequest(request) {
     const reasonValidation = document.getElementById('rejectReasonValidation');
 
     // Enable/disable the confirm button based on input
+    attachCharCounter(reasonEl, 500);
     if (reasonEl) {
         reasonEl.addEventListener('input', () => {
             const val = (reasonEl.value || '').trim();
@@ -451,8 +627,13 @@ function RejectRequest(request) {
 
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
-            // console.log('Reject button clicked for request:', request.RequestID);
-            const reason = reasonEl ? (reasonEl.value || '').trim() : '';
+            // console.log('Reject button clicked for request:', request.ExportRequestID);
+            const reason = sanitizeInput(reasonEl ? (reasonEl.value || '').trim() : '');
+            if (containsInvalidChars(reasonEl?.value || '')) {
+                showToast('Special characters are not allowed in the rejection reason.', 'error');
+                if (reasonEl) reasonEl.focus();
+                return;
+            }
             if (!reason) {
                 if (reasonValidation) reasonValidation.classList.remove('d-none');
                 showToast('Please provide a reason for rejection.', 'error');
@@ -460,7 +641,7 @@ function RejectRequest(request) {
                 return;
             }
             // Call the API to reject the request and include reason
-            rejectRequestFromAPI(request.RequestID, reason);
+            rejectRequestFromAPI(request.ExportRequestID, reason);
         });
     }
 }
@@ -474,7 +655,7 @@ async function rejectRequestFromAPI(requestId, reason) {
         // Show loading state
         loadingToast = showToast('Rejecting request...', 'info');
         
-        const params = { "id": requestId, "reason": reason };
+        const params = { "id": parseInt(requestId, 10), "reason": reason };
         if (reason !== undefined && reason !== null) params.reason = String(reason);
 
         const response = await window.loomeApi.runApiRequest(API_REJECT_REQUEST, params);
@@ -621,11 +802,11 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     headerRow.appendChild(chevronHeader);
     
     // Define headers based on the selected status
-    const headers = ['Request ID', 'Request Name', 'Requested On', 'Requested By'];
-    if (selectedStatus === 'Pending Approval') headers.push('Approvers');
-    else if (selectedStatus === 'Approved') { headers.push('Approved by'); headers.push('Approved on'); }
-    else if (selectedStatus === 'Rejected') { headers.push('Rejected by'); headers.push('Rejected on'); }
-    else if (selectedStatus === 'Finalised') { headers.push('Approved by'); headers.push('Approved on'); headers.push('Finalised on'); }
+    const headers = ['Request Name', 'Export Project', 'Requested On', 'Requested By'];
+    //if (selectedStatus === 'Pending Approval') headers.push('Approvers');
+    if (selectedStatus === 'Approved') { headers.push('Approved on'); }
+    else if (selectedStatus === 'Rejected') { headers.push('Rejected on'); }
+    else if (selectedStatus === 'Finalised') { headers.push('Finalised on'); }
     headers.forEach(headerText => {
         const th = document.createElement('th');
         th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
@@ -652,10 +833,10 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             
             let statusSpecificCols = '';
             switch (item.status) {
-                case 'Pending Approval': statusSpecificCols = `<td class="${tdClasses}">${item.Approvers || 'N/A'}</td>`; break;
-                case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${item.RejectedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
-                case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
-                case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td><td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
+                // case 'Pending Approval': statusSpecificCols = `<td class="${tdClasses}">${item.Approvers || 'N/A'}</td>`; break;
+                case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
+                case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
+                case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
             }
             
             row.innerHTML = `
@@ -664,8 +845,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </td>
-                <td class="${tdClasses}">${item.RequestID}</td>
-                <td class="${tdClasses}">${item.Name}</td>
+                <td class="${tdClasses}">${item.ExportRequestName}</td>
+                <td class="${tdClasses}">${item.ExportProjectName}</td>
                 <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
                 <td class="${tdClasses}">${item.CreateUser}</td>
                 ${statusSpecificCols}
@@ -681,7 +862,11 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         <div class="grid grid-cols-1 gap-4">
                             
                             <div class="flex justify-end mb-1">
-                                <div class="btn-group">                                  
+                                <div class="btn-group">   
+                                    <button class="btn btn-success action-approve px-3 py-1 mr-2" data-bs-toggle="modal" data-bs-target="#approveRequestModal">
+                                        <i class="fa fa-thumbs-up mr-2"></i>
+                                        Approve
+                                    </button>                               
 
                                     <button class="btn btn-danger action-reject px-3 py-1" data-bs-toggle="modal" data-bs-target="#rejectRequestModal">
                                         <i class="fa fa-thumbs-down mr-2"></i>
@@ -692,7 +877,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
 
                             <!-- Combined Information Card -->
                             <div class="bg-white p-5 rounded-md shadow-sm">
-                                <div id="combined-details-${item.RequestID}" class="combined-content">
+                                <div id="combined-details-${item.ExportRequestID}" class="combined-content">
                                     <p class="text-center text-gray-500">Loading details...</p>
                                 </div>
                             </div>
@@ -707,7 +892,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                             <div class="grid grid-cols-1 gap-4">                               
                                 <!-- Combined Information Card -->
                                 <div class="bg-white p-5 rounded-md shadow-sm">
-                                    <div id="combined-details-${item.RequestID}" class="combined-content">
+                                    <div id="combined-details-${item.ExportRequestID}" class="combined-content">
                                         <p class="text-center text-gray-500">Loading details...</p>
                                     </div>
                                 </div>
@@ -718,7 +903,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             }            
             // Add click event to toggle accordion
             row.addEventListener('click', async () => {
-                // console.log('Row clicked:', item.RequestID);
+                // console.log('Row clicked:', item.ExportRequestID);
                 // Toggle the accordion visibility
                 accordionRow.classList.toggle('hidden');
                 
@@ -730,19 +915,19 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 
                 // Only fetch data if the accordion is becoming visible
                 if (!accordionRow.classList.contains('hidden')) {
-                    const combinedDetailsContainer = accordionRow.querySelector(`#combined-details-${item.RequestID}`);
+                    const combinedDetailsContainer = accordionRow.querySelector(`#combined-details-${item.ExportRequestID}`);
                     
                     // Show loading indicator
                     combinedDetailsContainer.innerHTML = '<p class="text-center">Loading details...</p>';
                     
                     try {
-                        // console.log(`Fetching details for RequestID: ${item.RequestID}, DataSetID: ${item.DataSetID}`);
+                        // console.log(`Fetching details for RequestID: ${item.ExportRequestID}`);
                         
                         // Try fetching request details first
                         let requestDetails;
                         try {
                             // console.log('Fetching request details...');
-                            requestDetails = await fetchRequestDetails(item.RequestID);
+                            requestDetails = await fetchRequestDetails(item.ExportRequestID);
                             // console.log('Request details received:', requestDetails);
                         } catch (requestError) {
                             console.error('Error fetching request details:', requestError);
@@ -786,7 +971,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                             e.stopPropagation();
                             combinedDetailsContainer.innerHTML = '<p class="text-center">Loading details...</p>';
                             try {
-                                const retryRequestDetails = await fetchRequestDetails(item.RequestID);
+                                const retryRequestDetails = await fetchRequestDetails(item.ExportRequestID);
                                 const retryDatasetDetails = await fetchDatasetDetails(item.DataSetID);
                                 displayCombinedDetails(combinedDetailsContainer, retryRequestDetails, retryDatasetDetails);
                             } catch (retryError) {
@@ -807,7 +992,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             
             // Only add event listeners for the action buttons if they exist (Pending Approval status = 1)
             // if (item.StatusID === 'Pending Approval') {
-                // console.log(`Status ID: ${item.StatusID}`);
+            //     console.log(`Status ID: ${item.StatusID}`);
             // }
             // if (item.StatusID === 'Pending Approval') {
             accordionRow.querySelector('.action-approve')?.addEventListener('click', (e) => {
@@ -827,6 +1012,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     container.appendChild(table);
     
 }
+
 
 /**
  * Displays combined request and dataset details in a single container
@@ -857,25 +1043,15 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
             <div class="grid grid-cols-2 gap-5">
                 <div>
                     <div class="space-y-3">
+            
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Requested Dataset</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Name || 'N/A'}</span>
-                        </div>
-
-                        ${datasetDetails.Description ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Dataset Description</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Description}</span>
-                        </div>` : ''}
-                        
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Data Source ID</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.DataSource || datasetDetails.DataSourceID || 'N/A'}</span>
+                            <span class="font-medium">Export Request ID</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ExportRequestID || 'N/A'}</span>
                         </div>
 
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Target Project Name</span>
-                            <span class="text-sm text-gray-500">${projectInfo.name}</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ProjectName}</span>
                         </div>
                     </div>
                 </div>
@@ -887,10 +1063,34 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
                             <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
                         </div>` : ''}
 
+                        ${requestDetails.ApprovedBy ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approved By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ApprovedBy}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.ApprovedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approved On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.ApprovedDate)}</span>
+                        </div>` : ''}
+
                         ${requestDetails.ApprovalMessage ? `
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Approval Message</span>
                             <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectedBy ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected By</span>
+                            <span class="text-sm text-gray-500">${requestDetails.RejectedBy}</span>
+                        </div>` : ''}
+
+                        ${requestDetails.RejectedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Rejected On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.RejectedDate)}</span>
                         </div>` : ''}
 
                         ${requestDetails.RejectionMessage ? `
@@ -966,9 +1166,9 @@ function hideToast(toast) {
                 // console.log('Toast removed');
             }
         }, 300); // Wait for fade out
-    } //else {
+    } // else {
         // console.log('Toast not found or already removed');
-    //}
+    // }
 }
 
 function createToastContainer() {
@@ -980,12 +1180,28 @@ function createToastContainer() {
     return container;
 }
 
+
 async function refreshAllChipCounts() {
     const chipsContainer = document.getElementById('status-chips-container');
     for (const chip of chipsContainer.querySelectorAll('.chip')) {
         const status = chip.dataset.status;
         const count = await getCounts(status);
         chip.querySelector('.chip-count').textContent = count;
+    }
+}
+
+/**
+ * Refreshes all data on the page
+ */
+async function refreshPageData() {
+    try {
+        showToast('Refreshing data...', 'info');
+        await refreshAllChipCounts();
+        await renderUI();
+        showToast('Data refreshed successfully.', 'success');
+    } catch (error) {
+        console.error('Error refreshing page data:', error);
+        showToast('Failed to refresh data.', 'error');
     }
 }
 
@@ -1004,7 +1220,7 @@ async function getCounts(status) {
     }
     
     // console.log(apiParams)
-    const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
+    const response = await window.loomeApi.runApiRequest(GET_ALL_EXPORT_REQUESTS, apiParams);
     const parsedResponse = safeParseJson(response);
 
     return parsedResponse.RowCount;
@@ -1032,7 +1248,7 @@ async function renderUI() {
     }
     
     // console.log(apiParams)
-    const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
+    const response = await window.loomeApi.runApiRequest(GET_ALL_EXPORT_REQUESTS, apiParams);
     const parsedResponse = safeParseJson(response)
     const rawData = parsedResponse.Results;
     const totalItems = parsedResponse.RowCount;
@@ -1082,6 +1298,7 @@ async function renderMyRequestsPage() {
         }
 
         // --- 4. SETUP EVENT LISTENERS ---
+        
         // Add refresh button event listener
         const refreshBtn = document.getElementById('refresh-data-btn');
         if (refreshBtn) {
@@ -1133,7 +1350,7 @@ async function renderMyRequestsPage() {
 
         // --- 5. INITIAL PAGE RENDER ---
         // Programmatically click the first chip to trigger the initial render.
-        document.querySelector('.chip[data-status="Pending Approval"]').click();
+        document.querySelector('.chip[data-status="Pending Approval"]')?.click();
 
     } catch (error) {
         console.error("Error setting up the page:", error);

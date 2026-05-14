@@ -2,20 +2,20 @@
 //                      STATE & CONFIGURATION
 // =================================================================
 
-const TABLE_CONTAINER_ID = 'export-jobs-table-area';
-const GET_DATAEXPORT_FROM_INTEGRATE = 'GetDataExport';
-const GET_DATAEXPORT_FROM_DB = 'GetDataExportFromDBbyUpn'; 
-const EXPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
-const SUBMIT_EXPORT_API_ID = 'RequestDataExportByAssistProjectID';
-const UPDATE_EXPORT_REQUEST = 'UpdateDataExportRequestStatus'; 
-const CANCEL_EXPORT_REQUEST = 'CancelExportRequest'; 
+const TABLE_CONTAINER_ID = 'import-jobs-table-area';
+const GET_DATAIMPORT_FROM_INTEGRATE = 'GetDataImport';
+const GET_DATAIMPORT_FROM_DB = 'GetDataImportFromDBbyUpn';
+const IMPORT_REQUEST_API_ID = 'GetAssistProjectsFilteredByUpn'; 
+const SUBMIT_IMPORT_API_ID = 'RequestDataImportByAssistProjectID';
+const UPDATE_IMPORT_REQUEST = 'UpdateDataImportRequestStatus';
+const CANCEL_IMPORT_REQUEST = 'CancelImportRequest';
 
 // Modal Element IDs
-const MODAL_ID = 'export-modal';
-const OPEN_MODAL_BTN_ID = 'request-export-btn';
+const MODAL_ID = 'import-modal';
+const OPEN_MODAL_BTN_ID = 'request-import-btn';
 const CLOSE_MODAL_BTN_ID = 'modal-close-btn';
-const EXPORT_FORM_ID = 'export-form';
-const DROPDOWN_ID = 'export-type';
+const IMPORT_FORM_ID = 'import-form';
+const DROPDOWN_ID = 'import-type';
 const SUBMIT_MODAL_BTN_ID = 'modal-submit-btn';
 
 // State for pagination
@@ -49,7 +49,7 @@ const configMap = {
 };
 
 // Search input
-const searchInput = document.getElementById('searchExports'); 
+const searchInput = document.getElementById('searchImports'); 
 
 // =================================================================
 //                      UTILITY FUNCTIONS
@@ -165,7 +165,7 @@ async function getProjectsMapping() {
     
     try {
         const initialParams = { "page": 1, "page_size": 100, "search": '' };
-        const data = await getFromAPI(EXPORT_REQUEST_API_ID, initialParams);
+        const data = await getFromAPI(IMPORT_REQUEST_API_ID, initialParams);
         const mapping = {};
         if (data) {
             data.forEach(project => {
@@ -226,8 +226,8 @@ async function getFromAPI(API_ID, initialParams) {
 
 async function fetchRequestDetails(requestID) {
     try {
-        const response = await window.loomeApi.runApiRequest('GetExportRequestByID', {
-            "ExportRequestID": parseInt(requestID, 10),
+        const response = await window.loomeApi.runApiRequest('GetImportRequestByID', {
+            "RequestID": requestID,
         });
         return safeParseJson(response);
     } catch (error) {
@@ -265,12 +265,12 @@ async function displayCombinedDetails(container, requestDetails) {
                 <div>
                     <div class="space-y-3">
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Export Request ID</span>
-                            <span class="text-sm text-gray-500">${requestDetails.ExportRequestID || 'N/A'}</span>
+                            <span class="font-medium">Import Request ID</span>
+                            <span class="text-sm text-gray-500">${requestDetails.ImportRequestID || 'N/A'}</span>
                         </div>
 
                         <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Source Project Name</span>
+                            <span class="font-medium">Target Project Name</span>
                             <span class="text-sm text-gray-500">${requestDetails.ProjectName}</span>
                         </div>
                     </div>
@@ -332,29 +332,29 @@ async function displayCombinedDetails(container, requestDetails) {
 }
 
 /**
- * Handles the submit action for export jobs
+ * Handles the submit action for import jobs
  */
-async function submitExportJob(exportRequestID) {
+async function submitImportJob(importRequestID) {
     try {
-        const confirmed = confirm(`Are you sure you want to submit the export job?`);
+        const confirmed = confirm(`Are you sure you want to submit the import job?`);
         if (!confirmed) return;
 
-        showToast('Submitting export job...', 'info');
+        showToast('Submitting import job...', 'info');
         
         // API call to submit the job
         const params = { 
-            ExportRequestID: parseInt(exportRequestID, 10), 
+            ImportRequestID: parseInt(importRequestID, 10), 
             statusID: 1 
         };
-        const response = await window.loomeApi.runApiRequest(UPDATE_EXPORT_REQUEST, params);
+        const response = await window.loomeApi.runApiRequest(UPDATE_IMPORT_REQUEST, params);
         
         // Parse and validate the response
         const parsedResponse = safeParseJson(response);
-        // console.log('Submit export job response:', parsedResponse);
+        // console.log('Submit import job response:', parsedResponse);
         
         // Check if the submission was successful and the StatusID was successfully changed
         if (parsedResponse && ( parsedResponse.StatusID === 1)) {
-            showToast(`Export job submitted successfully!`, 'success');
+            showToast(`Import job submitted successfully!`, 'success');
             
             // Refresh the data after a short delay
             setTimeout(() => {
@@ -363,36 +363,36 @@ async function submitExportJob(exportRequestID) {
         } else {
             // Handle cases where the API call succeeded but the operation failed
             const errorMessage = parsedResponse?.message || parsedResponse?.Message || 'Submission failed';
-            showToast(`Failed to submit export job: ${errorMessage}`, 'error');
+            showToast(`Failed to submit import job: ${errorMessage}`, 'error');
         }
         
     } catch (error) {
-        console.error('Error submitting export job:', error);
-        showToast('Failed to submit export job. Please try again.', 'error');
+        console.error('Error submitting import job:', error);
+        showToast('Failed to submit import job. Please try again.', 'error');
     }
 }
 
 /**
- * Handles the delete action for export jobs
+ * Handles the delete action for import jobs
  */
-async function deleteExportJob(exportRequestID) {
+async function deleteImportJob(importRequestID) {
     try {
-        const confirmed = confirm(`Are you sure you want to delete the export job? This action cannot be undone.`);
+        const confirmed = confirm(`Are you sure you want to delete the import job? This action cannot be undone.`);
         if (!confirmed) return;
 
-        showToast('Deleting export job...', 'info');
+        showToast('Deleting import job...', 'info');
         
         // API call to delete the job
-        const params = { ExportRequestID: exportRequestID };
-        const response = await window.loomeApi.runApiRequest(CANCEL_EXPORT_REQUEST, params);
+        const params = { ImportRequestID: importRequestID };
+        const response = await window.loomeApi.runApiRequest(CANCEL_IMPORT_REQUEST, params);
         
         // Parse and validate the response
         const parsedResponse = safeParseJson(response);
-        // console.log('Delete export job response:', parsedResponse);
+        // console.log('Delete import job response:', parsedResponse);
         
         // Check if the deletion was successful
         if (parsedResponse) {
-            showToast(`Export job deleted successfully!`, 'success');
+            showToast(`Import job deleted successfully!`, 'success');
             
             // Refresh the data after a short delay
             setTimeout(() => {
@@ -401,12 +401,12 @@ async function deleteExportJob(exportRequestID) {
         } else {
             // Handle cases where the API call succeeded but the operation failed
             const errorMessage = parsedResponse?.message || parsedResponse?.Message || 'Deletion failed';
-            showToast(`Failed to delete export job: ${errorMessage}`, 'error');
+            showToast(`Failed to delete import job: ${errorMessage}`, 'error');
         }
         
     } catch (error) {
-        console.error('Error deleting export job:', error);
-        showToast('Failed to delete export job. Please try again.', 'error');
+        console.error('Error deleting import job:', error);
+        showToast('Failed to delete import job. Please try again.', 'error');
     }
 }
 
@@ -422,11 +422,11 @@ async function populateAssistProjectsDropdown() {
     dropdown.innerHTML = '<option value="">Loading...</option>';
 
     try {
-        const response = await window.loomeApi.runApiRequest(EXPORT_REQUEST_API_ID, {});
+        const response = await window.loomeApi.runApiRequest(IMPORT_REQUEST_API_ID, {});
         const data = safeParseJson(response);
         const assistProjects = data.Results;
 
-        dropdown.innerHTML = '<option value="">Select Source Assist Project...</option>';
+        dropdown.innerHTML = '<option value="">Select Target Assist Project...</option>';
 
         if (assistProjects && assistProjects.length > 0) {
             assistProjects.forEach(type => {
@@ -491,8 +491,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     
     if (!data || data.length === 0) {
         const message = searchTerm.trim() ? 
-            'No export jobs found. Please review your search term.' : 
-            'No export jobs found.';
+            'No import jobs found. Please review your search term.' : 
+            'No import jobs found.';
         container.innerHTML = `<p class="text-center text-gray-500">${message}</p>`;
         return;
     }
@@ -509,9 +509,9 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     chevronTh.innerHTML = '';
     headerRow.appendChild(chevronTh);
     
-    // Define headers - only include Status for Pending Approval filter
-    const headers = ['Export Request Name', 'Requested On', 'Export Project Name'];
-    if (selectedStatus === 'Pending Approval') {
+    // Define headers - only include Status for Awaiting Submission filter
+    const headers = ['Import Request Name', 'Requested On', 'Import Project Name'];
+    if (selectedStatus === 'Awaiting Submission') {
         headers.push('Status');
     } else if (selectedStatus === 'Approved') {
         headers.push('Approved by');
@@ -537,7 +537,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     
     data.forEach((item, index) => {
         const statusId = item.StatusID ?? 0;
-        const itemStatus = statusIdToNameMap[statusId] !== undefined ? statusIdToNameMap[statusId] : (statusIdToNameMap[String(statusId)] || 'Pending Approval');
+        const itemStatus = statusIdToNameMap[statusId] !== undefined ? statusIdToNameMap[statusId] : (statusIdToNameMap[String(statusId)] || 'Awaiting Submission');
         
         // Main row
         const row = document.createElement('tr');
@@ -560,11 +560,11 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     </svg>
                 </button>
             </td>
-            <td class="${tdClasses}">${item.ExportRequestName || 'N/A'}</td>
+            <td class="${tdClasses}">${item.ImportRequestName || 'N/A'}</td>
             <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
-            <td class="${tdClasses}">${item.ExportProjectName || 'N/A'}</td>
+            <td class="${tdClasses}">${item.ImportProjectName || 'N/A'}</td>
             ${statusSpecificCols}
-            ${selectedStatus === 'Pending Approval' ? `
+            ${selectedStatus === 'Awaiting Submission' ? `
                 <td class="${tdClasses}">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusChipColor(itemStatus)}">
                         ${itemStatus}
@@ -589,8 +589,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 <div class="bg-gray-50 p-4 m-2 rounded">
                     <div class="grid grid-cols-1 gap-4">
                         <div class="flex justify-end mb-1">
-                            ${itemStatus === 'Pending Approval' || itemStatus === 'Working' || itemStatus === 'Failed' ? `
-                                <button onclick="deleteExportJob('${item.ExportRequestID}')" 
+                            ${itemStatus === 'Awaiting Submission' || itemStatus === 'Working' || itemStatus === 'Failed' ? `
+                                <button onclick="deleteImportJob('${item.ImportRequestID}')" 
                                         class="btn btn-danger px-3 py-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -598,11 +598,20 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                                     Delete
                                 </button>
                             ` : ''}
+                            ${itemStatus === 'Awaiting Submission' && config.showActions ? `
+                                <button onclick="submitImportJob('${item.ImportRequestID}')" 
+                                        class="btn btn-primary px-3 py-1 ms-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Submit Import
+                                </button>
+                            ` : ''}
                         </div>
                         
                         <!-- Details Card -->
                         <div class="bg-white p-5 rounded-md shadow-sm">
-                            <div id="combined-details-${item.ExportRequestID}" class="combined-content">
+                            <div id="combined-details-${item.ImportRequestID}" class="combined-content">
                                 <p class="text-center text-gray-500">Loading details...</p>
                             </div>
                         </div>
@@ -614,7 +623,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
         
         // Add click event to load details dynamically
         row.addEventListener('click', async () => {
-            const detailsContainer = detailRow.querySelector(`#combined-details-${item.ExportRequestID}`);
+            const detailsContainer = detailRow.querySelector(`#combined-details-${item.ImportRequestID}`);
             
             // Toggle visibility
             detailRow.classList.toggle('hidden');
@@ -632,7 +641,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 try {
                     let requestDetails;
                     try {
-                        requestDetails = await fetchRequestDetails(item.ExportRequestID);
+                        requestDetails = await fetchRequestDetails(item.ImportRequestID);
                     } catch (requestError) {
                         console.error('Error fetching request details:', requestError);
                         requestDetails = null;
@@ -727,17 +736,17 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
 
 function renderUI() {
     const activeChip = document.querySelector('.chip.active');
-    const selectedStatus = activeChip ? activeChip.dataset.status : 'Pending Approval';
+    const selectedStatus = activeChip ? activeChip.dataset.status : 'Awaiting Submission';
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     const config = configMap[selectedStatus];
 
     // Filter allJobs by selected status
     let filteredJobs = allJobs.filter(job => {
         const statusId = job.StatusID ?? 0;
-        const jobStatus = statusIdToNameMap[statusId] || 'Pending Approval';
+        const jobStatus = statusIdToNameMap[statusId] || 'Awaiting Submission';
         
-        if (selectedStatus === 'Pending Approval') {
-            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Pending Approval';
+        if (selectedStatus === 'Awaiting Submission') {
+            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Awaiting Submission';
         }
         return jobStatus === selectedStatus;
     });
@@ -745,14 +754,14 @@ function renderUI() {
     // Apply pagination
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    const exportRequests = filteredJobs.slice(startIndex, endIndex);
+    const importRequests = filteredJobs.slice(startIndex, endIndex);
 
-    const exportRequestsWithStatus = exportRequests.map(item => ({
+    const importRequestsWithStatus = importRequests.map(item => ({
         ...item,
         status: statusIdToNameMap[item.StatusID] || 'Unknown'
     }));
 
-    renderTable(TABLE_CONTAINER_ID, exportRequestsWithStatus, config, selectedStatus, searchTerm);
+    renderTable(TABLE_CONTAINER_ID, importRequestsWithStatus, config, selectedStatus, searchTerm);
     renderPagination('pagination-controls', filteredJobs.length, rowsPerPage, currentPage);
 }
 
@@ -762,13 +771,13 @@ function renderUI() {
 
 async function getCounts(status) {
     // Count jobs by status from the full allJobs array
-    // "Pending Approval" includes Working (-1), Failed (-2), and Pending Approval (0)
+    // "Awaiting Submission" includes Working (-1), Failed (-2), and Awaiting Submission (0)
     const count = allJobs.filter(job => {
         const statusId = job.StatusID ?? 0;
-        const jobStatus = statusIdToNameMap[statusId] || 'Pending Approval';
+        const jobStatus = statusIdToNameMap[statusId] || 'Awaiting Submission';
         
-        if (status === 'Pending Approval') {
-            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Pending Approval';
+        if (status === 'Awaiting Submission') {
+            return jobStatus === 'Failed' || jobStatus === 'Working' || jobStatus === 'Awaiting Submission';
         }
         return jobStatus === status;
     }).length;
@@ -811,30 +820,23 @@ async function initializePage() {
     const container = document.getElementById(TABLE_CONTAINER_ID);
     if (!container) return;
 
-    container.innerHTML = '<p class="text-center text-gray-500">Loading Export Jobs...</p>';
+    container.innerHTML = '<p class="text-center text-gray-500">Loading Import Jobs...</p>';
 
     try {
-        const initialResponse = await window.loomeApi.runApiRequest(GET_DATAEXPORT_FROM_DB, { page: 1, pageSize: 1, search: '' });
+        const initialResponse = await window.loomeApi.runApiRequest(GET_DATAIMPORT_FROM_DB, { page: 1, pageSize: 1, search: '' });
         const initialData = safeParseJson(initialResponse);
         const totalJobs = initialData.RowCount;
         allJobs = []; // Clear previous data
 
         if (totalJobs > 0) {
-            const allDataResponse = await window.loomeApi.runApiRequest(GET_DATAEXPORT_FROM_DB, { page: 1, pageSize: totalJobs, search: ''   });
+            const allDataResponse = await window.loomeApi.runApiRequest(GET_DATAIMPORT_FROM_DB, { page: 1, pageSize: totalJobs, search: ''   });
             const allData = safeParseJson(allDataResponse);
-            // Populate allJobs and sort by request creation date descending (most recent first)
+            // Populate allJobs and sort by dateCreated descending (most recent first)
             allJobs = (allData.Results || []).slice();
             allJobs.sort((a, b) => {
-                const ta = a && (a.CreateDate || a.dateCreated) ? new Date(a.CreateDate || a.dateCreated).getTime() : 0;
-                const tb = b && (b.CreateDate || b.dateCreated) ? new Date(b.CreateDate || b.dateCreated).getTime() : 0;
-
-                if (tb !== ta) {
-                    return tb - ta;
-                }
-
-                const idA = Number.parseInt(a?.ExportRequestID, 10) || 0;
-                const idB = Number.parseInt(b?.ExportRequestID, 10) || 0;
-                return idB - idA;
+                const ta = a && a.dateCreated ? new Date(a.dateCreated).getTime() : 0;
+                const tb = b && b.dateCreated ? new Date(b.dateCreated).getTime() : 0;
+                return tb - ta; // newest first
             });
         }
         
@@ -917,7 +919,7 @@ function setupEventListeners() {
     const openBtn = document.getElementById(OPEN_MODAL_BTN_ID);
     const closeBtn = document.getElementById(CLOSE_MODAL_BTN_ID);
     const modal = document.getElementById(MODAL_ID);
-    const form = document.getElementById(EXPORT_FORM_ID);
+    const form = document.getElementById(IMPORT_FORM_ID);
     const dropdown = document.getElementById(DROPDOWN_ID);
     const submitButton = document.getElementById(SUBMIT_MODAL_BTN_ID);
 
@@ -940,11 +942,11 @@ function setupEventListeners() {
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
 
-            const exportNameInput = document.getElementById('export-request-name');
-            const exportName = exportNameInput ? exportNameInput.value.trim() : '';
+            const importNameInput = document.getElementById('import-request-name');
+            const importName = importNameInput ? importNameInput.value.trim() : '';
             
-            if (!exportName) {
-                showToast('Please enter an Export Request Name.');
+            if (!importName) {
+                showToast('Please enter an Import Request Name.');
                 return;
             }
 
@@ -964,21 +966,21 @@ function setupEventListeners() {
 
             try {
                 const params = { 
-                    "ExportRequestName": exportName,
+                    "ImportRequestName": importName,
                     "LoomeAssistProjectID": parseInt(selectedAssistProjectID, 10),
                     "LoomeAssistName": selectedName,
                     "LoomeAssistTenantsID": selectedTenantsID
                 };
 
-                // console.log('Submitting export request with params:', params);
-                await window.loomeApi.runApiRequest(SUBMIT_EXPORT_API_ID, params);
-                showToast('Export request submitted successfully! Refreshing page in 5 seconds...', "success");
+                // console.log('Submitting import request with params:', params);
+                await window.loomeApi.runApiRequest(SUBMIT_IMPORT_API_ID, params);
+                showToast('Import request submitted successfully! Refreshing page in 5 seconds...', "success");
                 closeModal();
                 // Wait a moment before refreshing to allow backend processing to start
                 await new Promise(resolve => setTimeout(resolve, 5000));
                 await initializePage(); 
             } catch (error) {
-                console.error('Failed to submit export request:', error);
+                console.error('Failed to submit import request:', error);
                 showToast('An error occurred while submitting the request. Please try again.', "error");
             } finally {
                 submitButton.disabled = false;

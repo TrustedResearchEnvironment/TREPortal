@@ -5,10 +5,10 @@ const API_UPDATE_DATASOURCE_ID = 'UpdateDataSource';
 const API_DBCONNECTION_ID = 'GetDatabaseConnection';
 
 const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
-const API__DATASOURCE_FIELDVALUE_ID = 'GetDataSourceFieldValues';
-const API__DATASOURCE_FOLDER_ID = 'GetFolderConnection';
+const API_DATASOURCE_FIELDVALUE_ID = 'GetDataSourceFieldValues';
+const API_DATASOURCE_FOLDER_ID = 'GetFolderConnection';
 const API_ADD_DATASOURCE_ID = 'AddDataSource';
-const API_DELETE_DATASOURCE_ID = 'DeleteDataSource';
+const API_CANCEL_DATASOURCE_ID = 'CancelDataSource';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -124,7 +124,7 @@ async function createDbConnectionMap() {
  */
 async function createFolderConnectionMap() {
     try {
-        const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID, {});
+        const response = await window.loomeApi.runApiRequest(API_DATASOURCE_FOLDER_ID, {});
         const connections = safeParseJson(response);
 
         if (!connections || connections.length === 0) {
@@ -162,9 +162,9 @@ function getDataSourceFormData(formElement) {
 
     // --- 1. Get values from the STATIC fields ---
     // We use .value for text inputs/textareas and .checked for checkboxes.
-    const name = formElement.querySelector('#dataSourceName').value;
-    const description = formElement.querySelector('#dataSourceDescription').value;
-    const isActive = formElement.querySelector('#dataSourceActive').checked;
+    const name = sanitizeInput(formElement.querySelector('#dataSourceName').value);
+    const description = sanitizeInput(formElement.querySelector('#dataSourceDescription').value);
+    const isActive = formElement.querySelector('#dataSourceActive').checked ? 1 : 0;
 
     // For the <select>, we get the value of the selected <option>.
     // Parse it as an integer to match the type used in comparisons (e.g. === 2)
@@ -201,7 +201,7 @@ function getDataSourceFormData(formElement) {
 function AddDataSource(typeNamesList, allFields, allTypesArray) {
     // Get the modal's body element
     const modalBody = document.getElementById('addDatasourceModalBody');
-    console.log("IN add data source")
+    // console.log("IN add data source")
 
     // This can now support multiple fields per type if needed.
     const typeIdToFieldIdMap = {
@@ -222,12 +222,12 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
                 <form id="addDataSourceForm">
                   <div class="mb-3">
                     <label for="dataSourceName" class="form-label">Name</label>
-                    <input type="text" class="form-control" id="dataSourceName" placeholder="Name for this Data Source" required>
+                    <input type="text" class="form-control" id="dataSourceName" placeholder="Name for this Data Source" maxlength="100" required>
                   </div>
                   
                   <div class="mb-3">
                     <label for="dataSourceDescription" class="form-label">Description</label>
-                    <textarea class="form-control" id="dataSourceDescription" rows="2" placeholder="Description of this Data Source"></textarea>
+                    <textarea class="form-control" id="dataSourceDescription" rows="2" placeholder="Description of this Data Source" maxlength="700"></textarea>
                   </div>
 
                   <div class="mb-3">
@@ -259,6 +259,9 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
     // --- 4. FIND the elements we need to work with ---
     const typeSelect = modalBody.querySelector('#dataSourceType');
     const fieldsContainer = modalBody.querySelector('#dataSourceFieldsContainer');
+
+    attachCharCounter(modalBody.querySelector('#dataSourceName'), 100);
+    attachCharCounter(modalBody.querySelector('#dataSourceDescription'), 700);
 
     // --- 5. CREATE the event handler function ---
     const handleTypeChange = async (event) => {
@@ -370,7 +373,7 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
         // Special handling for Folder type (ID = 3)
         else if (selectedTypeId === 3) {
             try {
-                const response = await window.loomeApi.runApiRequest(API__DATASOURCE_FOLDER_ID);
+                const response = await window.loomeApi.runApiRequest(API_DATASOURCE_FOLDER_ID);
                 const folders = safeParseJson(response);
 
                 if (!folders || folders.length === 0) {
@@ -546,7 +549,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
         const parsedInitial = safeParseJson(initialResponse);
 
         if (!parsedInitial || parsedInitial.RowCount === 0) {
-            console.log("No data source types found.");
+            // console.log("No data source types found.");
             return []; // Return an empty array if there's no data
         }
 
@@ -560,7 +563,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
 
         // --- 2. Loop for remaining pages ---
         for (let page = 2; page <= totalPages; page++) {
-            console.log(`Fetching page ${page} of ${totalPages}...`);
+            // console.log(`Fetching page ${page} of ${totalPages}...`);
             const params = { "page": page, "pageSize": pageSize, "search": '' };
             // FIXED BUG: Use the correct API ID in the loop
             const response = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, params);
@@ -570,7 +573,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
             }
         }
 
-        console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
+        // console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
         return allResults;
 
     } catch (error) {
@@ -639,7 +642,7 @@ async function fetchApiData(apiId, params = {}, context = 'data') {
  */
 async function getAllFields(fieldID) {
     // Call the generic helper
-    return fetchApiData(API__DATASOURCE_FIELDVALUE_ID, {});
+    return fetchApiData(API_DATASOURCE_FIELDVALUE_ID, {});
 }
 
 /**
@@ -729,15 +732,15 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
             "page": page,
             "pageSize": rowsPerPage,
             "search": searchTerm,
-            "activeStatus": 2 // 2 means "All" (Active + Inactive)
+            "activeStatus": 3 // 3 means "All" (Active + Inactive)
         };
-        console.log(apiParams)
+        // console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_DATASOURCE_ID, apiParams);
 
 
         const parsedResponse = safeParseJson(response);
-        console.log(parsedResponse)
+        // console.log(parsedResponse)
 
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
@@ -865,11 +868,11 @@ const renderAccordionDetails = (item) => {
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.DataSourceID}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-name">${item.Name}</span>
-                            <input type="text" value="${item.Name}" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-description">${item.Description || ''}</span>
-                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${item.Description || ''}</textarea>
+                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-isactive">${item.IsActive ? 'Yes' : 'No'}</span>
@@ -1049,7 +1052,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 if (!confirm('Are you sure you want to delete this Data Source? This action cannot be undone.')) return;
                 try {
                     const params = { id: parseInt(dataSourceId, 10) };
-                    const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASOURCE_ID, params);
+                    const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASOURCE_ID, params);
                     const parsed = safeParseJson(raw);
                     if (parsed && parsed.detail) {
                         showToast(parsed.detail, 'error');
@@ -1093,7 +1096,11 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 parentAccordion.querySelectorAll('.edit-state').forEach(el => el.classList.toggle('hidden', !isEditing));
             };
 
-            if (editButton) toggleEditState(true);
+            if (editButton) {
+                toggleEditState(true);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-name'), 100);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-description'), 500);
+            }
 
             if (saveButton) {
 
@@ -1112,8 +1119,22 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 try {
 
                     // --- 1. Gather Data from the Form ---
-                    const updatedName = accordionBody.querySelector('.edit-state-name').value;
-                    const updatedDescription = accordionBody.querySelector('.edit-state-description').value;
+                    const rawName = accordionBody.querySelector('.edit-state-name').value;
+                    const rawDesc = accordionBody.querySelector('.edit-state-description').value;
+                    if (containsInvalidChars(rawName)) {
+                        showToast('Special characters are not allowed in the Name.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (!rawName.trim()) {
+                        showToast('Name is required.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (containsInvalidChars(rawDesc)) {
+                        showToast('Special characters are not allowed in the Description.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    const updatedName = sanitizeInput(rawName);
+                    const updatedDescription = sanitizeInput(rawDesc);
                     const updatedIsActive = accordionBody.querySelector('.edit-state-isactive').checked;
 
                     // Gather all dynamic field values into a dictionary
@@ -1138,7 +1159,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                         Fields: updatedFields
                     };
 
-                    console.log('Update Params:', payload);
+                    // console.log('Update Params:', payload);
 
                     const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, {data_source_id: dataSourceId, payload });
 
@@ -1156,7 +1177,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                         // Handle cases where the API might return an empty or null response on success
                         throw new Error("API call succeeded but returned no data.");
                     }
-                    console.log(updatedDataSource)
+                    // console.log(updatedDataSource)
                     showToast('Data Source updated successfully!\nPlease wait while the data refreshes.', 'success');
 
                     // --- 4. Update the UI with the New Data ---
@@ -1202,7 +1223,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -1265,6 +1286,43 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
 
 async function renderPlatformAdminDataSourcePage() {
     // --- 1. Define the table configuration ---
@@ -1279,8 +1337,8 @@ async function renderPlatformAdminDataSourcePage() {
     const typeNamesList = allTypesArray.map(item => item.Name);
 
     const fields = await getAllFields();
-    console.log('Fields:');
-    console.log(fields);
+    // console.log('Fields:');
+    // console.log(fields);
 
     const tableConfig = {
         headers: [
@@ -1351,10 +1409,28 @@ async function renderPlatformAdminDataSourcePage() {
     });
 
 
-    const addDataSrcButton = document.querySelector('#addDatasourceBtn');;
+    const addDataSrcButton = document.querySelector('#addDatasourceBtn');
     if (addDataSrcButton) {
         addDataSrcButton.addEventListener('click', () => {
             AddDataSource(typeNamesList, fields, allTypesArray);
+        });
+    }
+
+    const refreshBtn = document.getElementById('refreshDatasourceBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            const originalHtml = refreshBtn.innerHTML;
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing…`;
+            try {
+                await fetchAndRenderPage(tableConfig, currentPage, searchInput?.value || '');
+                showToast('Data refreshed.', 'success');
+            } catch (e) {
+                showToast('Failed to refresh data.', 'error');
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = originalHtml;
+            }
         });
     }
 
@@ -1371,12 +1447,27 @@ async function renderPlatformAdminDataSourcePage() {
 
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
-            console.log("Form is invalid. Aborting save.");
+            // console.log("Form is invalid. Aborting save.");
             return;
         }
 
         const payload = getDataSourceFormData(form);
-        console.log("Data gathered from form:", payload);
+        // console.log("Data gathered from form:", payload);
+
+        const rawName = form.querySelector('#dataSourceName')?.value || '';
+        const rawDesc = form.querySelector('#dataSourceDescription')?.value || '';
+        if (containsInvalidChars(rawName)) {
+            showToast('Special characters are not allowed in the Name.', 'error');
+            return;
+        }
+        if (!payload.name || !payload.name.trim()) {
+            showToast('Name is required.', 'error');
+            return;
+        }
+        if (containsInvalidChars(rawDesc)) {
+            showToast('Special characters are not allowed in the Description.', 'error');
+            return;
+        }
 
         saveButton.disabled = true;
         saveButton.innerHTML = `
@@ -1386,7 +1477,7 @@ async function renderPlatformAdminDataSourcePage() {
 
         try {
             const response = await window.loomeApi.runApiRequest(API_ADD_DATASOURCE_ID, payload);
-            console.log("RESPONSE: ", response)
+            // console.log("RESPONSE: ", response)
 
             // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
             const parsed = safeParseJson(response);

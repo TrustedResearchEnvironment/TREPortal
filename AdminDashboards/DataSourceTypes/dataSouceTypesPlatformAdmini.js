@@ -12,11 +12,48 @@ let rowsPerPage = 5; // Default, will be updated by API response
 let tableConfig = {}; // Will hold your headers configuration
 const searchInput = document.getElementById('searchRequests');
 
+/**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
 
 function AddDataSrcType() {
     // Get the modal's body element
     const modalBody = document.getElementById('addDataSrcTypeModalBody');
-    console.log("IN add datasrctype")
+    // console.log("IN add datasrctype")
 
     // Populate the modal body with the provided HTML content (your markup)
     modalBody.innerHTML = `
@@ -24,13 +61,13 @@ function AddDataSrcType() {
                         <!-- Name Field -->
                         <div class="mb-3">
                             <label for="Name" class="form-label">Name</label>
-                            <input id="dataSrcTypeName" placeholder="Name for this Meta Data" class="form-control">
+                            <input id="dataSrcTypeName" placeholder="Name for this Meta Data" class="form-control" maxlength="100">
                         </div>
 
                         <!-- Description Field -->
                         <div class="mb-3">
                             <label for="Description" class="form-label">Description</label>
-                            <textarea rows="2" id="dataSrcTypeDescription" placeholder="Description of this Meta Data" class="form-control"></textarea>
+                            <textarea rows="2" id="dataSrcTypeDescription" placeholder="Description of this Meta Data" class="form-control" maxlength="500"></textarea>
                         </div>
 
                         <!-- Active Checkbox -->
@@ -42,7 +79,9 @@ function AddDataSrcType() {
                     </form>
             
     `;
-    
+
+    attachCharCounter(modalBody.querySelector('#dataSrcTypeName'), 100);
+    attachCharCounter(modalBody.querySelector('#dataSrcTypeDescription'), 500);
 }
 
 /**
@@ -60,8 +99,8 @@ function getDataSrcTypeFormData(formElement) {
 
     // --- 1. Get values from the STATIC fields ---
     // We use .value for text inputs/textareas and .checked for checkboxes.
-    const name = formElement.querySelector('#dataSrcTypeName').value;
-    const description = formElement.querySelector('#dataSrcTypeDescription').value;
+    const name = sanitizeInput(formElement.querySelector('#dataSrcTypeName').value);
+    const description = sanitizeInput(formElement.querySelector('#dataSrcTypeDescription').value);
     const isActive = formElement.querySelector('#dataSrcTypeActive').checked;
 
     // --- 3. Combine everything into a final payload object ---
@@ -89,11 +128,11 @@ const renderAccordionDetails = (item) => {
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.DataSourceTypeID}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-name">${item.Name}</span>
-                            <input type="text" value="${item.Name}" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-description">${item.Description || ''}</span>
-                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${item.Description || ''}</textarea>
+                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-isactive">${item.IsActive ? 'Yes' : 'No'}</span>
@@ -196,13 +235,13 @@ async function fetchAndRenderPage(page, searchTerm = '') {
             "pageSize": rowsPerPage,
             "search": searchTerm
         };
-        console.log(apiParams)
+        // console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_DATASRCTYPES_ID, apiParams);
 
         
         const parsedResponse = safeParseJson(response);
-        console.log(parsedResponse)
+        // console.log(parsedResponse)
 
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
@@ -223,7 +262,7 @@ async function fetchAndRenderPage(page, searchTerm = '') {
 
         // --- 4. Render the UI Components ---
         // Render the table with only the data for the current page
-        console.log("before renderTable headers: ",tableConfig.headers)
+        // console.log("before renderTable headers: ",tableConfig.headers)
         renderTable(TABLE_CONTAINER_ID, tableConfig.headers, filteredData);
         // renderTable(TABLE_CONTAINER_ID, tableConfig.headers, filteredData, {
         //     renderAccordionContent: renderAccordionDetails 
@@ -265,7 +304,7 @@ function renderTable(containerId, headers, data, config = {}) {
     const thead = document.createElement('thead');
     thead.className = 'bg-gray-50';
     const headerRow = document.createElement('tr');
-    console.log("headers forEach: ",headers)
+    // console.log("headers forEach: ",headers)
     headers.forEach(headerConfig => {
         const th = document.createElement('th');
         th.scope = 'col';
@@ -284,7 +323,7 @@ function renderTable(containerId, headers, data, config = {}) {
     const tbody = document.createElement('tbody');
     tbody.className = 'bg-white divide-y divide-gray-200';
 
-    console.log("data forEach: ",data)
+    // console.log("data forEach: ",data)
     if (data.length === 0) {
         // ... (no data message is the same) ...
         const colSpan = headers.length || 1;
@@ -447,7 +486,7 @@ function renderTable(containerId, headers, data, config = {}) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -552,8 +591,8 @@ async function renderPlatformAdminDataSourceTypesPage() {
                 return;
             }
             const newPage = parseInt(button.dataset.page, 10);
-            console.log('newPage')
-            console.log(newPage)
+            // console.log('newPage')
+            // console.log(newPage)
             // Fetch the new page, preserving the current search term
             fetchAndRenderPage(newPage, searchInput.value);
         });
@@ -590,13 +629,28 @@ async function renderPlatformAdminDataSourceTypesPage() {
             
             if (!form.checkValidity()) {
                 form.classList.add('was-validated');
-                console.log("Form is invalid. Aborting save.");
+                // console.log("Form is invalid. Aborting save.");
                 return;
             }
 
             const payload = getDataSrcTypeFormData(form);
-            console.log("Data gathered from form:", payload);
-            
+            // console.log("Data gathered from form:", payload);
+
+            const rawName = form.querySelector('#dataSrcTypeName')?.value || '';
+            const rawDesc = form.querySelector('#dataSrcTypeDescription')?.value || '';
+            if (containsInvalidChars(rawName)) {
+                showToast('Special characters are not allowed in the Name.', 'error');
+                return;
+            }
+            if (!payload.name || !payload.name.trim()) {
+                showToast('Name is required.', 'error');
+                return;
+            }
+            if (containsInvalidChars(rawDesc)) {
+                showToast('Special characters are not allowed in the Description.', 'error');
+                return;
+            }
+
             saveButton.disabled = true;
             saveButton.innerHTML = `
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -606,7 +660,7 @@ async function renderPlatformAdminDataSourceTypesPage() {
             try {
                 
                 const response = await window.loomeApi.runApiRequest(API_ADD_METADATA, payload);
-                console.log("RESPONSE: ", response)
+                // console.log("RESPONSE: ", response)
                 
                 showToast('Data Source Type created successfully!');
                 
@@ -631,7 +685,7 @@ async function renderPlatformAdminDataSourceTypesPage() {
 
         // --- 3. Initial Page Load ---
         // Make the first call to fetch page 1 with no search term.
-        console.log("Initial fetchAndRenderPage call: ", tableConfig)
+        // console.log("Initial fetchAndRenderPage call: ", tableConfig)
         await fetchAndRenderPage(1, '');
             
         
