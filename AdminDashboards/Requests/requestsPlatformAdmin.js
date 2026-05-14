@@ -58,7 +58,7 @@ async function refreshPageData() {
 function ViewRequest(request) {
     // Get the modal's body element
     const modalBody = document.getElementById('viewRequestModalBody');
-    console.log("IN VIEW REQ")
+    // console.log("IN VIEW REQ")
     // Populate the modal body with the provided HTML content (your markup)
     modalBody.innerHTML = `
         <form>
@@ -245,7 +245,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         // Early exit if the response is null, undefined, etc.
         if (!parsedInitial) {
-            console.log("API returned no data.");
+            // console.log("API returned no data.");
             return [];
         }
 
@@ -255,18 +255,18 @@ async function getFromAPI(API_ID, initialParams) {
         if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
 
             // --- PAGINATED PATH ---
-            console.log("Detected a paginated response.");
+            // console.log("Detected a paginated response.");
 
             allResults = parsedInitial.Results;
             const totalPages = parsedInitial.PageCount;
 
             if (totalPages > 1) {
                 for (let page = 2; page <= totalPages; page++) {
-                    console.log(`Fetching page ${page} of ${totalPages}...`);
+                    // console.log(`Fetching page ${page} of ${totalPages}...`);
 
                     // Construct params for the next page, preserving other initial params
                     const params = { ...initialParams, "page": page };
-                    console.log(params)
+                    // console.log(params)
                     const response = await window.loomeApi.runApiRequest(API_ID, params);
                     const parsed = safeParseJson(response);
 
@@ -279,7 +279,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         } else {
             // --- NON-PAGINATED PATH ---
-            console.log("Detected a non-paginated response.");
+            // console.log("Detected a non-paginated response.");
 
             if (Array.isArray(parsedInitial)) {
                 allResults = parsedInitial;
@@ -288,7 +288,7 @@ async function getFromAPI(API_ID, initialParams) {
             }
         }
 
-        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        // console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
         return allResults;
 
     } catch (error) {
@@ -372,7 +372,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -451,7 +451,7 @@ function RejectRequest(request) {
 
     if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
-            console.log('Reject button clicked for request:', request.RequestID);
+            // console.log('Reject button clicked for request:', request.RequestID);
             const reason = reasonEl ? (reasonEl.value || '').trim() : '';
             if (!reason) {
                 if (reasonValidation) reasonValidation.classList.remove('d-none');
@@ -469,7 +469,7 @@ async function rejectRequestFromAPI(requestId, reason) {
     let loadingToast = null;
     
     try {
-        console.log('Rejecting request ID:', requestId, 'reason:', reason);
+        // console.log('Rejecting request ID:', requestId, 'reason:', reason);
         
         // Show loading state
         loadingToast = showToast('Rejecting request...', 'info');
@@ -489,10 +489,10 @@ async function rejectRequestFromAPI(requestId, reason) {
             const rejectModal = bootstrap.Modal.getInstance(document.getElementById('rejectRequestModal'));
             if (rejectModal) {
                 rejectModal.hide();
-                console.log('Reject modal hidden');
-            } else {
-                console.log('Reject modal not found or already hidden');
-            }
+                // console.log('Reject modal hidden');
+            } // else {
+                // console.log('Reject modal not found or already hidden');
+            // }
         } catch (modalError) {
             console.error('Error hiding modal:', modalError);
         }
@@ -539,7 +539,7 @@ async function getProjectsMapping() {
         // Fetch projects data
         const initialParams = { "page": 1, "page_size": 100, "search": '' };
         const data = await getFromAPI(API_GET_ALL_ASSIST_PROJECTS, initialParams);
-        console.log("Projects data fetched:", data);
+        // console.log("Projects data fetched:", data);
         // Create a mapping from project ID to project name
         const mapping = {};
         if (data ) {
@@ -550,7 +550,7 @@ async function getProjectsMapping() {
                 };
             });
         }
-        console.log("Projects mapping created:", mapping);
+        // console.log("Projects mapping created:", mapping);
         // Cache the mapping
         projectsCache = mapping;
         return mapping;
@@ -718,7 +718,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             }            
             // Add click event to toggle accordion
             row.addEventListener('click', async () => {
-                console.log('Row clicked:', item.RequestID);
+                // console.log('Row clicked:', item.RequestID);
                 // Toggle the accordion visibility
                 accordionRow.classList.toggle('hidden');
                 
@@ -736,14 +736,14 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     combinedDetailsContainer.innerHTML = '<p class="text-center">Loading details...</p>';
                     
                     try {
-                        console.log(`Fetching details for RequestID: ${item.RequestID}, DataSetID: ${item.DataSetID}`);
+                        // console.log(`Fetching details for RequestID: ${item.RequestID}, DataSetID: ${item.DataSetID}`);
                         
                         // Try fetching request details first
                         let requestDetails;
                         try {
-                            console.log('Fetching request details...');
+                            // console.log('Fetching request details...');
                             requestDetails = await fetchRequestDetails(item.RequestID);
-                            console.log('Request details received:', requestDetails);
+                            // console.log('Request details received:', requestDetails);
                         } catch (requestError) {
                             console.error('Error fetching request details:', requestError);
                             requestDetails = null;
@@ -752,9 +752,9 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         // Then try fetching dataset detailsTa
                         let datasetDetails;
                         try {
-                            console.log('Fetching dataset details...');
+                            // console.log('Fetching dataset details...');
                             datasetDetails = await fetchDatasetDetails(item.DataSetID);
-                            console.log('Dataset details received:', datasetDetails);
+                            // console.log('Dataset details received:', datasetDetails);
                         } catch (datasetError) {
                             console.error('Error fetching dataset details:', datasetError);
                             datasetDetails = null;
@@ -766,7 +766,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         }
                         
                         // Display whatever details we have
-                        console.log('Displaying combined details');
+                        // console.log('Displaying combined details');
                         displayCombinedDetails(combinedDetailsContainer, requestDetails, datasetDetails);
                         
                     } catch (error) {
@@ -806,9 +806,9 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             tbody.appendChild(accordionRow);
             
             // Only add event listeners for the action buttons if they exist (Pending Approval status = 1)
-            if (item.StatusID === 'Pending Approval') {
-                console.log(`Status ID: ${item.StatusID}`);
-            }
+            // if (item.StatusID === 'Pending Approval') {
+                // console.log(`Status ID: ${item.StatusID}`);
+            // }
             // if (item.StatusID === 'Pending Approval') {
             accordionRow.querySelector('.action-approve')?.addEventListener('click', (e) => {
                 e.stopPropagation(); // Prevent event from bubbling up to row
@@ -958,17 +958,17 @@ function showToast(message, type = 'info') {
 
 function hideToast(toast) {
     if (toast && toast.parentNode) {
-        console.log('Hiding toast');
+        // console.log('Hiding toast');
         toast.style.opacity = '0';
         setTimeout(() => {
             if (toast && toast.parentNode) {
                 toast.remove();
-                console.log('Toast removed');
+                // console.log('Toast removed');
             }
         }, 300); // Wait for fade out
-    } else {
-        console.log('Toast not found or already removed');
-    }
+    } //else {
+        // console.log('Toast not found or already removed');
+    //}
 }
 
 function createToastContainer() {
@@ -1003,7 +1003,7 @@ async function getCounts(status) {
         "statusId": parseInt(Object.keys(statusIdToNameMap).find(key => statusIdToNameMap[key] === status))
     }
     
-    console.log(apiParams)
+    // console.log(apiParams)
     const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
     const parsedResponse = safeParseJson(response);
 
@@ -1031,12 +1031,12 @@ async function renderUI() {
         "statusId": parseInt(Object.keys(statusIdToNameMap).find(key => statusIdToNameMap[key] === selectedStatus))
     }
     
-    console.log(apiParams)
+    // console.log(apiParams)
     const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
     const parsedResponse = safeParseJson(response)
     const rawData = parsedResponse.Results;
     const totalItems = parsedResponse.RowCount;
-    console.log(rawData)
+    // console.log(rawData)
 
     // --- 2. PREPARE THE MASTER DATA ARRAY ---
     // Transform the raw data just once into the format our UI needs.
@@ -1044,7 +1044,7 @@ async function renderUI() {
         ...item,
         status: statusIdToNameMap[item.StatusID] || 'Unknown'
     }));
-    console.log(allRequests)
+    // console.log(allRequests)
 
     // --- Render the components ---
     const configForTable = configMap[selectedStatus];
@@ -1068,7 +1068,7 @@ async function renderMyRequestsPage() {
         const chipsContainer = document.getElementById('status-chips-container');
         for (const chip of chipsContainer.querySelectorAll('.chip')) {
             const status = chip.dataset.status;
-            console.log(status)
+            // console.log(status)
             // Await the asynchronous getCounts function for each chip
             const count = await getCounts(status);
             chip.querySelector('.chip-count').textContent = count;

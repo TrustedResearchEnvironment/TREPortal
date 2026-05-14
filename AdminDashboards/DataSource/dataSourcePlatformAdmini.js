@@ -201,7 +201,7 @@ function getDataSourceFormData(formElement) {
 function AddDataSource(typeNamesList, allFields, allTypesArray) {
     // Get the modal's body element
     const modalBody = document.getElementById('addDatasourceModalBody');
-    console.log("IN add data source")
+    // console.log("IN add data source")
 
     // This can now support multiple fields per type if needed.
     const typeIdToFieldIdMap = {
@@ -549,7 +549,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
         const parsedInitial = safeParseJson(initialResponse);
 
         if (!parsedInitial || parsedInitial.RowCount === 0) {
-            console.log("No data source types found.");
+            // console.log("No data source types found.");
             return []; // Return an empty array if there's no data
         }
 
@@ -563,7 +563,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
 
         // --- 2. Loop for remaining pages ---
         for (let page = 2; page <= totalPages; page++) {
-            console.log(`Fetching page ${page} of ${totalPages}...`);
+            // console.log(`Fetching page ${page} of ${totalPages}...`);
             const params = { "page": page, "pageSize": pageSize, "search": '' };
             // FIXED BUG: Use the correct API ID in the loop
             const response = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, params);
@@ -573,7 +573,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
             }
         }
 
-        console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
+        // console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
         return allResults;
 
     } catch (error) {
@@ -734,13 +734,13 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
             "search": searchTerm,
             "activeStatus": 3 // 3 means "All" (Active + Inactive)
         };
-        console.log(apiParams)
+        // console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_DATASOURCE_ID, apiParams);
 
 
         const parsedResponse = safeParseJson(response);
-        console.log(parsedResponse)
+        // console.log(parsedResponse)
 
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
@@ -1159,7 +1159,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                         Fields: updatedFields
                     };
 
-                    console.log('Update Params:', payload);
+                    // console.log('Update Params:', payload);
 
                     const updatedDataSource = await window.loomeApi.runApiRequest(API_UPDATE_DATASOURCE_ID, {data_source_id: dataSourceId, payload });
 
@@ -1177,7 +1177,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                         // Handle cases where the API might return an empty or null response on success
                         throw new Error("API call succeeded but returned no data.");
                     }
-                    console.log(updatedDataSource)
+                    // console.log(updatedDataSource)
                     showToast('Data Source updated successfully!\nPlease wait while the data refreshes.', 'success');
 
                     // --- 4. Update the UI with the New Data ---
@@ -1223,7 +1223,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -1337,8 +1337,8 @@ async function renderPlatformAdminDataSourcePage() {
     const typeNamesList = allTypesArray.map(item => item.Name);
 
     const fields = await getAllFields();
-    console.log('Fields:');
-    console.log(fields);
+    // console.log('Fields:');
+    // console.log(fields);
 
     const tableConfig = {
         headers: [
@@ -1447,12 +1447,12 @@ async function renderPlatformAdminDataSourcePage() {
 
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
-            console.log("Form is invalid. Aborting save.");
+            // console.log("Form is invalid. Aborting save.");
             return;
         }
 
         const payload = getDataSourceFormData(form);
-        console.log("Data gathered from form:", payload);
+        // console.log("Data gathered from form:", payload);
 
         const rawName = form.querySelector('#dataSourceName')?.value || '';
         const rawDesc = form.querySelector('#dataSourceDescription')?.value || '';
@@ -1477,7 +1477,7 @@ async function renderPlatformAdminDataSourcePage() {
 
         try {
             const response = await window.loomeApi.runApiRequest(API_ADD_DATASOURCE_ID, payload);
-            console.log("RESPONSE: ", response)
+            // console.log("RESPONSE: ", response)
 
             // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
             const parsed = safeParseJson(response);

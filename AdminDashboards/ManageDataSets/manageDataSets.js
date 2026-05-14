@@ -258,7 +258,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
 
 
     } else if (dataSetTypeId == 2) { // REDCap type
-        console.log("Data for REDCap columns:", data);
+        // console.log("Data for REDCap columns:", data);
         rowsHtml = data.map((row) => {
             // For REDCap, always use ColumnName as the unique id
             return `
@@ -499,7 +499,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     const actual = Array.isArray(parsedCols) ? parsedCols.map(c => String(c.ColumnName || '').trim()) : [];
     const dataSetId = metaRow && metaRow.DataSetID ? String(metaRow.DataSetID) : 'new';
     const dsType = Number(metaRow && metaRow.DataSourceTypeID  || 0);
-    console.log("DataSourceTypeID for validation:", dsType);
+    // console.log("DataSourceTypeID for validation:", dsType);
     let expected = [];
 
     try {
@@ -509,12 +509,12 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                     return { valid: false, message: 'DataSourceID required for REDCap crosscheck.' };
                 }
 
-                console.log("REDCap New")
+                // console.log("REDCap New")
 
                 // For NEW REDCap: call the REDCap sync endpoint to get expected columns
                 // using existing helper; adapt if your endpoint differs.
                 const rc = await syncREDCapDataSetColumns(parseInt(metaRow.DataSourceID, 10));
-                console.log("syncREDCapDataSetColumns returned:", rc);
+                // console.log("syncREDCapDataSetColumns returned:", rc);
                 // syncREDCapDataSetColumns may return an object like { status, metadata }
                 // where `metadata` is an array of fields with properties such as
                 // 'field_name', 'field_label', 'field_type', 'select_choices_or_calculations'.
@@ -526,7 +526,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                     rcList = rc.metadata;
                 }
 
-                console.log("REDCap sync returned metadata:", rcList);
+                // console.log("REDCap sync returned metadata:", rcList);
 
                 expected = Array.isArray(rcList)
                     ? rcList.map(r => String(
@@ -534,17 +534,17 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                       ).trim()).filter(Boolean)
                     : [];
                 
-                console.log("Expected columns from REDCap sync:", expected);
+                // console.log("Expected columns from REDCap sync:", expected);
             } else {
                 // For EXISTING REDCap dataset: fetch expected columns via REDCap dataset endpoint
-                console.log("REDCap Existing - fetching columns for dataset ID:", dataSetId);
+                // console.log("REDCap Existing - fetching columns for dataset ID:", dataSetId);
                 const rcList = await fetchSQLorREDCAPDataSetColumns(dataSetId);
-                console.log("Fetched columns for existing REDCap dataset (raw response):", rcList);
+                // console.log("Fetched columns for existing REDCap dataset (raw response):", rcList);
                 
                 expected = Array.isArray(rcList)
                     ? rcList.map(r => String((r && r.ColumnName) || '').trim()).filter(Boolean)
                     : [];
-                console.log("Expected columns for existing REDCap dataset:", expected);
+                // console.log("Expected columns for existing REDCap dataset:", expected);
             }
         } else if (dsType === 1) { // Database
             if (dataSetId === 'new') {
@@ -554,25 +554,25 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                 const validJsonString = metaRow.DataSetFieldValues.replace(/'/g, '"');
                 const tableId = JSON.parse(validJsonString)[0]?.Value;
                 
-                console.log("Extracted Table ID from DataSetFieldValues:", tableId);
+                // console.log("Extracted Table ID from DataSetFieldValues:", tableId);
                 const tables = await fetchSqlTables(metaRow.DataSourceID) || [];
                 
                 const dataSetTable = tables.find(obj => obj.Id == tableId);
                 const columnListStr = (dataSetTable && (dataSetTable.ColumnList || '')) || '';
                 
-                console.log('dataSetTable:', dataSetTable);
-                console.log('columnListStr:', columnListStr);
+                // console.log('dataSetTable:', dataSetTable);
+                // console.log('columnListStr:', columnListStr);
                 expected = columnListStr.split(',').map(s => String(s || '').trim()).filter(Boolean);
-                console.log('expected (from ColumnList):', expected);
+                // console.log('expected (from ColumnList):', expected);
             } else {
                 // EXISTING-Database: source of truth is dbo.DataSetColumns (API)
                 const colsList = await fetchSQLorREDCAPDataSetColumns(dataSetId) || [];
-                console.log('fetchSQLorREDCAPDataSetColumns returned for existing Database dataset ID', dataSetId);
-                console.log('Fetched columns for existing Database dataset:', colsList);
+                // console.log('fetchSQLorREDCAPDataSetColumns returned for existing Database dataset ID', dataSetId);
+                // console.log('Fetched columns for existing Database dataset:', colsList);
                 expected = Array.isArray(colsList)
                     ? colsList.map(r => String((r && r.ColumnName) || '').trim()).filter(Boolean)
                     : [];
-                console.log('expected (from DataSetColumns):', expected);
+                // console.log('expected (from DataSetColumns):', expected);
             }
         } else {
             return { valid: false, message: 'Unknown DataSourceTypeID; cannot validate columns.' };
@@ -585,14 +585,14 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     const normalize = arr => Array.from(new Set((arr || []).map(s => String(s || '').trim().toLowerCase())));
     const actualNorm = normalize(actual);
     const expectedNorm = normalize(expected);
-    console.log('Normalized Actual Columns:', actualNorm);
-    console.log('Normalized Expected Columns:', expectedNorm);
+    // console.log('Normalized Actual Columns:', actualNorm);
+    // console.log('Normalized Expected Columns:', expectedNorm);
 
     const missing = expectedNorm.filter(x => !actualNorm.includes(x));
     const extra = actualNorm.filter(x => !expectedNorm.includes(x));
 
-    console.log('Missing Columns:', missing);
-    console.log('Extra Columns:', extra);
+    // console.log('Missing Columns:', missing);
+    // console.log('Extra Columns:', extra);
 
     if (missing.length || extra.length) {
         return {
@@ -609,7 +609,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     for (let i = 0; i < parsedCols.length; i++) {
         const row = parsedCols[i];
         const rowNum = i + 2; // +1 for 1-based index, +1 for header row
-        console.log(row)
+        // console.log(row)
         
         const isValidFlag = (val) => {
             if (typeof val === 'boolean') return true;
@@ -681,7 +681,7 @@ async function fetchDataSetFolderValue(data_set_id) {
     }
 
     const result = resultsArray[0];
-    console.log("Fetched Folder Value:", result.Value);
+    // console.log("Fetched Folder Value:", result.Value);
 
     return {
         id: null, // Folders don't have a separate ID, just the name
@@ -699,13 +699,13 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
     tbody.innerHTML = `<tr><td>Folder Name</td><td>Loading folders...</td></tr>`;
 
     try {
-        console.log("DataSource in Folder Selector:", dataSource);
+        // console.log("DataSource in Folder Selector:", dataSource);
         const folders = await fetchSubFolders(dataSource.DataSourceID);
-        console.log("Fetched folders:", folders);
+        // console.log("Fetched folders:", folders);
 
         // Await the result from your function
         const fetchedData = await fetchDataSetFolderValue(dataSetID);
-        console.log("Fetched DataSet Field Value 2:", fetchedData);
+        // console.log("Fetched DataSet Field Value 2:", fetchedData);
         let folderId = fetchedData.id;
         let folderName = fetchedData.name;
 
@@ -819,7 +819,7 @@ async function fetchDataSetFieldValue(data_set_id) {
     const initialParams = { "data_set_id": data_set_id };
 
     const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
-    console.log("Fetched DataSet Field Value (as array):", resultsArray);
+    // console.log("Fetched DataSet Field Value (as array):", resultsArray);
     if (!resultsArray || resultsArray.length === 0) {
         console.warn("API returned no data for data_set_id:", data_set_id);
         return { id: null, name: null }; // Return a default value
@@ -827,20 +827,20 @@ async function fetchDataSetFieldValue(data_set_id) {
 
     // --- KEY CHANGE: Get the first object from the array ---
     const result = resultsArray[0];
-    console.log("Fetched DataSet Field Value 1:", result);
-    console.log("Result FieldID:", result.FieldID);
+    // console.log("Fetched DataSet Field Value 1:", result);
+    // console.log("Result FieldID:", result.FieldID);
     // If Field Value is a Table Name, the result is the ID of the table
     // Get the actual table name from another endpoint
     // Case 1: The value is a table ID, so we need to fetch the name
     if (result.FieldID == 3) {
-        console.log("FieldID indicates a table reference. Fetching table name...");
+        // console.log("FieldID indicates a table reference. Fetching table name...");
         const tableIdAsString = result.Value; // The value is a string, e.g., "9"
 
         // --- CONVERT TO INTEGER HERE ---
         const tableId = parseInt(tableIdAsString, 10);
 
         const tableInfo = await fetchLoomeDataSourceTablesByTableId(tableId);
-        console.log("Fetched Table Info:", tableId, tableInfo[0]);
+        // console.log("Fetched Table Info:", tableId, tableInfo[0]);
         // Return an object with BOTH the ID and the fetched name
         return {
             id: tableId,
@@ -849,7 +849,7 @@ async function fetchDataSetFieldValue(data_set_id) {
 
         // Case 2: The value is just a simple value, not a reference to another table
     } else {
-        console.log("FieldID indicates a direct value. Using value as-is.");
+        // console.log("FieldID indicates a direct value. Using value as-is.");
         // Return an object with the same shape for consistency.
         // The ID can be null as it doesn't apply, and the 'name' is the value itself.
         return {
@@ -869,10 +869,10 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
 
     try {
         const tables = await fetchSqlTables(dataSource.DataSourceID);
-        console.log("Fetched tables:", tables);
+        // console.log("Fetched tables:", tables);
 
         const fetchedData = await fetchDataSetFieldValue(dataSetID);
-        console.log("Fetched DataSet Field Value 2:", fetchedData);
+        // console.log("Fetched DataSet Field Value 2:", fetchedData);
         let tableId = fetchedData.id;
         let tableName = fetchedData.name;
 
@@ -932,7 +932,7 @@ async function fetchSqlTables(data_source_id) {
  */
 async function updateDataSetFieldsTable(dataSource, dataSetID) {
 
-    console.log("Updating fields for DataSource:", dataSource);
+    // console.log("Updating fields for DataSource:", dataSource);
 
     const fieldsTable = document.getElementById('dataSetFieldsTable');
     const fieldsPlaceholder = document.getElementById('fieldsPlaceholder');
@@ -952,7 +952,7 @@ async function updateDataSetFieldsTable(dataSource, dataSetID) {
     fieldsPlaceholder.style.display = 'none';
     fieldsTable.style.display = 'table';
 
-    console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
+    // console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
 
     // Use a switch to decide which content to render
     switch (dataSource.DataSourceTypeID) {
@@ -1121,7 +1121,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         // Early exit if the response is null, undefined, etc.
         if (!parsedInitial) {
-            console.log("API returned no data.");
+            // console.log("API returned no data.");
             return [];
         }
 
@@ -1131,18 +1131,18 @@ async function getFromAPI(API_ID, initialParams) {
         if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
 
             // --- PAGINATED PATH ---
-            console.log("Detected a paginated response.");
+            // console.log("Detected a paginated response.");
 
             allResults = parsedInitial.Results;
             const totalPages = parsedInitial.PageCount;
 
             if (totalPages > 1) {
                 for (let page = 2; page <= totalPages; page++) {
-                    console.log(`Fetching page ${page} of ${totalPages}...`);
+                    // console.log(`Fetching page ${page} of ${totalPages}...`);
 
                     // Construct params for the next page, preserving other initial params
                     const params = { ...initialParams, "page": page };
-                    console.log(params)
+                    // console.log(params)
                     const response = await window.loomeApi.runApiRequest(API_ID, params);
                     const parsed = safeParseJson(response);
 
@@ -1155,7 +1155,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         } else {
             // --- NON-PAGINATED PATH ---
-            console.log("Detected a non-paginated response.");
+            // console.log("Detected a non-paginated response.");
 
             if (Array.isArray(parsedInitial)) {
                 allResults = parsedInitial;
@@ -1164,7 +1164,7 @@ async function getFromAPI(API_ID, initialParams) {
             }
         }
 
-        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        // console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
         return allResults;
 
     } catch (error) {
@@ -1313,10 +1313,10 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
         // --- SCENARIO 1: Editing an EXISTING Data Set ---
         if (dataSetId && dataSetId !== 'new') {
             try {
-                console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
+                // console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
                 newColumnsData = await fetchSQLorREDCAPDataSetColumns(dataSetId);
 
-                console.log("newColumnsData:", newColumnsData)
+                // console.log("newColumnsData:", newColumnsData)
             } catch (error) {
                 console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
             }
@@ -1326,7 +1326,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             const tableNameSelector = document.getElementById('tableNameSelector');
             if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
                 const tableId = tableNameSelector.value;
-                console.log(`FETCHING schema for new Data Set from Table ID: ${tableId}...`);
+                // console.log(`FETCHING schema for new Data Set from Table ID: ${tableId}...`);
                 newColumnsData = await formatSQLColumnsFromSchema(tableId);
             }
         }
@@ -1334,10 +1334,10 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
         // --- SCENARIO 1: Editing an EXISTING Data Set ---
         if (dataSetId && dataSetId !== 'new') {
             try {
-                console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
+                // console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
                 newColumnsData = await fetchSQLorREDCAPDataSetColumns(dataSetId);
 
-                console.log("newColumnsData:", newColumnsData)
+                // console.log("newColumnsData:", newColumnsData)
             } catch (error) {
                 console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
             }
@@ -1347,7 +1347,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             const redCapResult= await syncREDCapDataSetColumns(currentDataSourceID);
             const redCapResultStatus = redCapResult.status;
             const redCapColumns = redCapResult.metadata || [];
-            console.log(redCapColumns);
+            // console.log(redCapColumns);
 
             // Supports this response shapes:
             // { status: 'success', metadata: [ { }, { }, ... ] }
@@ -1388,7 +1388,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 });
 
             }  else {
-                console.log(`Error fetching columns for Data Set ID ${dataSetId}: Pull from REDCap server did not succeed`);
+                // console.log(`Error fetching columns for Data Set ID ${dataSetId}: Pull from REDCap server did not succeed`);
             }
         }
     } else if (dataSourceTypeId === 3) { // Folder Type
@@ -1414,7 +1414,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 // Apply the consistent mapping
                 newColumnsData = originalData.map(mapFolderData);
 
-                console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
+                // console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
             }
         } else if (dataSetId && dataSetId !== 'new') {
             try {
@@ -1424,7 +1424,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 // 2. Apply the SAME consistent mapping
                 newColumnsData = fetchedData.map(mapFolderData);
 
-                console.log("Fetched and Mapped EXISTING (saved) folder columns:", newColumnsData);
+                // console.log("Fetched and Mapped EXISTING (saved) folder columns:", newColumnsData);
 
             } catch (error) {
                 console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
@@ -1470,9 +1470,9 @@ function renderTablePage(dataSetTypeId) {
 
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    console.log(startIndex, endIndex)
+    // console.log(startIndex, endIndex)
     const pageData = sourceData.slice(startIndex, endIndex);
-    console.log("pageData: ", pageData, sourceData)
+    // console.log("pageData: ", pageData, sourceData)
 
     const emptyMessage = columnSearchTerm.trim() && totalItems === 0
         ? 'No columns match your search term. Clear the search to view all columns.'
@@ -1480,7 +1480,7 @@ function renderTablePage(dataSetTypeId) {
 
     displayColumnsTable(pageData, dataSetTypeId, emptyMessage);
 
-    console.log(totalItems, pageSize, currentPage)
+    // console.log(totalItems, pageSize, currentPage)
     renderPagination('pagination-controls', totalItems, pageSize, currentPage);
 }
 
@@ -1620,7 +1620,7 @@ function gatherFormData(allColumnsData) {
             DataSetFolderFiles: []
         };
     } else if (currentDataSourceTypeID === 3) {
-        console.log("Gathering form data for Folder type with columns:", columns);
+        // console.log("Gathering form data for Folder type with columns:", columns);
         // Remove 'Id' since that ID is from LoomeDataSourceFolders 
         const columnsWithoutId = columns.map(({ Id, ...rest }) => rest);
 
@@ -1646,7 +1646,7 @@ async function createDataSet(data) {
         DataSourceTypeID: currentDataSourceTypeID
     };
 
-    console.log("Sending this payload to the API:", payload);
+    // console.log("Sending this payload to the API:", payload);
 
     try {
         // Send the new 'payload' object to the API instead of the original 'data'
@@ -1742,7 +1742,7 @@ async function updateDataSet(data_set_id, data) {
     }
 
 
-    console.log("Sending this payload to the API:", payload);
+    // console.log("Sending this payload to the API:", payload);
 
 
     try {
@@ -2060,7 +2060,7 @@ async function renderManageDataSetPage() {
                 DataSourceTypeID: currentDataSourceTypeID
             };
             
-            console.log("Export Payload:", payload);
+            // console.log("Export Payload:", payload);
 
             exportLoading.style.display = 'inline-block';
             exportBtn.disabled = true;
@@ -2076,12 +2076,12 @@ async function renderManageDataSetPage() {
                     "payload": payload 
                 });
 
-                console.log("--- DEBUG START ---");
-                console.log("Constructor:", response.constructor.name);
-                console.log("Keys:", Object.keys(response));
-                console.log("Full Object:", response);
-                console.log("Typeof:", typeof response);
-                console.log("--- DEBUG END ---");
+                // console.log("--- DEBUG START ---");
+                // console.log("Constructor:", response.constructor.name);
+                // console.log("Keys:", Object.keys(response));
+                // console.log("Full Object:", response);
+                // console.log("Typeof:", typeof response);
+                // console.log("--- DEBUG END ---");
                 
                 // 1. Get the base64 string from the object
                 const base64String = response.fileData;
@@ -2129,7 +2129,7 @@ async function renderManageDataSetPage() {
             const stateRowsCount = (allColumnsData && allColumnsData.length) || 0;
             const tableHasRows = tableRowsCount > 0 || stateRowsCount > 0;
 
-            console.log("Checking export button state:", { dsSelected, dataSourceSelected, tableRowsCount, stateRowsCount });
+            // console.log("Checking export button state:", { dsSelected, dataSourceSelected, tableRowsCount, stateRowsCount });
 
             // Export: existing dataset OR a new dataset with imported/loaded columns
             const showExport = (dsSelected || dataSourceSelected) && tableHasRows;
@@ -2204,7 +2204,7 @@ async function renderManageDataSetPage() {
                 // Wait for verification to complete before proceeding
                 try {
                     const response = await window.loomeApi.runApiRequest(API_VERIFY_UPLOAD_SHEET, { "payload": payload });
-                    console.log('Verification response:', response);
+                    // console.log('Verification response:', response);
                     const result = response;
                     if (!result || result.valid !== true) {
                         console.error('Tampering Detected:', result && result.message ? result.message : 'Unknown verification failure');
@@ -2213,7 +2213,7 @@ async function renderManageDataSetPage() {
                         uploadInput.value = '';
                         return;
                     }
-                    console.log('Verification successful:', result.message);
+                    // console.log('Verification successful:', result.message);
                 } catch (error) {
                     console.error('Network or Parsing Error during verification:', error);
                     showToast('Could not verify file integrity. Please try again.', 'error');
@@ -2292,7 +2292,7 @@ async function renderManageDataSetPage() {
                         // show detailed feedback to the user
                         showToast(validation.message || 'Column validation failed.', 'error');
                         // Optionally surface missing/extra in console or UI
-                        console.log('Column validation details:', validation);
+                        // console.log('Column validation details:', validation);
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return; // abort import
@@ -2469,8 +2469,8 @@ async function renderManageDataSetPage() {
                     }
 
                     showToast('Upload validated and imported successfully.', 'success');
-                    console.log('Imported columns:', importedColumns);
-                    console.log('Imported metadata rows:', parsedMeta);
+                    // console.log('Imported columns:', importedColumns);
+                    // console.log('Imported metadata rows:', parsedMeta);
 
                 } catch (err) {
                     console.error('Failed to parse uploaded workbook:', err);
@@ -2520,7 +2520,7 @@ async function renderManageDataSetPage() {
                     const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
                         assetId: asset.id, token: token.access_token 
                     });
-                    console.log('Deleted catalogue asset:', deletedDataSet);
+                    // console.log('Deleted catalogue asset:', deletedDataSet);
                 } else {
                     showToast(`No matching catalogue asset found for "${datasetName}" (${dataSourceTypeLabel}). Database was not modified.`, 'error');
                     deleteBtn.disabled = false;
@@ -2585,7 +2585,7 @@ async function renderManageDataSetPage() {
         activeCheckbox.checked = true; // A sensible default
         owner.value = '';
         approver.value = '';
-        console.log("Form cleared for new data source.");
+        // console.log("Form cleared for new data source.");
     }
 
     /**
@@ -2601,7 +2601,7 @@ async function renderManageDataSetPage() {
         owner.value = dataSet.Owner;
         approver.value = dataSet.Approvers;
 
-        console.log("Form populated with:", dataSet, dataSource);
+        // console.log("Form populated with:", dataSet, dataSource);
     }
 
 
@@ -2664,7 +2664,7 @@ async function renderManageDataSetPage() {
                 return;
             }
 
-            console.log("Selected Data Set and Data Source:", selectedDataSet, dataSource);
+            // console.log("Selected Data Set and Data Source:", selectedDataSet, dataSource);
             // 1. Populate the main form fields
             populateForm(selectedDataSet, dataSource);
 
@@ -2704,7 +2704,7 @@ async function renderManageDataSetPage() {
             let allDataSources = await getAllDataSources();
 
             // 2. Now, allResults is the actual array of data.
-            console.log('Data has arrived:', allDataSets);
+            // console.log('Data has arrived:', allDataSets);
 
             // 3. The rest of your code can now run in the correct order.
             populateExistingDataSets(optgroup, allDataSets);
@@ -2762,7 +2762,7 @@ async function renderManageDataSetPage() {
                 if (event.target.id === 'tableNameSelector') {
                     // Always load the FIRST page when the table changes
                     //await updateColumnsForTable(1);
-                    console.log("Table Name Selector Changed");
+                    // console.log("Table Name Selector Changed");
                     await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
                     try { if (typeof updateExportButtonState === 'function') updateExportButtonState(); } catch (e) { /* ignore */ }
 
@@ -2916,7 +2916,7 @@ async function renderManageDataSetPage() {
                     return;
                 }
 
-                console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
+                // console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
 
                 const columnToUpdate = allColumnsData.find(col => {
                     // Match by DataSetColumnID (for existing datasets)
@@ -2933,8 +2933,8 @@ async function renderManageDataSetPage() {
 
                 if (columnToUpdate) {
                     columnToUpdate[field] = value;
-                    console.log("✓ Updated successfully. Object now:", columnToUpdate);
-                    console.log("✓ Full allColumnsData:", allColumnsData);
+                    // console.log("✓ Updated successfully. Object now:", columnToUpdate);
+                    // console.log("✓ Full allColumnsData:", allColumnsData);
                 } else {
                     console.error("✗ Could not find matching object for uniqueId:", uniqueId);
                     console.error("Available objects:", allColumnsData.map(col => `${col.FolderName}-${col.FileType}`));
@@ -3058,7 +3058,7 @@ async function renderManageDataSetPage() {
                 try {
                     // 3. Gather all data from the form into a structured object
                     const formData = gatherFormData(allColumnsData);
-                    console.log("Form Data to Submit:", formData);
+                    // console.log("Form Data to Submit:", formData);
                     
                     // --- Client-side validation ---
                     if (containsInvalidChars(formData._rawName)) {
@@ -3122,12 +3122,12 @@ async function renderManageDataSetPage() {
                             const dataSetId = document.getElementById('dataSetSelection').value;
 
                             if (dataSetId === 'new') {
-                                console.log("Creating new Data Set with payload:", formData);
+                                // console.log("Creating new Data Set with payload:", formData);
                                 const newDataSet = await createDataSet(formData);
                                 const newDataSetId = newDataSet.DataSetID;
                                 showToast('Data Set created successfully!');
                             } else {
-                                console.log(`Updating Data Set ID ${dataSetId} with payload:`, formData);
+                                // console.log(`Updating Data Set ID ${dataSetId} with payload:`, formData);
                                 await updateDataSet(dataSetId, formData);
                                 showToast('Dataset updated successfully!');
                             }

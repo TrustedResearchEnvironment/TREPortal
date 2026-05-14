@@ -53,7 +53,7 @@ function attachCharCounter(inputEl, max) {
 function AddDataSrcType() {
     // Get the modal's body element
     const modalBody = document.getElementById('addDataSrcTypeModalBody');
-    console.log("IN add datasrctype")
+    // console.log("IN add datasrctype")
 
     // Populate the modal body with the provided HTML content (your markup)
     modalBody.innerHTML = `
@@ -235,13 +235,13 @@ async function fetchAndRenderPage(page, searchTerm = '') {
             "pageSize": rowsPerPage,
             "search": searchTerm
         };
-        console.log(apiParams)
+        // console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_DATASRCTYPES_ID, apiParams);
 
         
         const parsedResponse = safeParseJson(response);
-        console.log(parsedResponse)
+        // console.log(parsedResponse)
 
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
@@ -262,7 +262,7 @@ async function fetchAndRenderPage(page, searchTerm = '') {
 
         // --- 4. Render the UI Components ---
         // Render the table with only the data for the current page
-        console.log("before renderTable headers: ",tableConfig.headers)
+        // console.log("before renderTable headers: ",tableConfig.headers)
         renderTable(TABLE_CONTAINER_ID, tableConfig.headers, filteredData);
         // renderTable(TABLE_CONTAINER_ID, tableConfig.headers, filteredData, {
         //     renderAccordionContent: renderAccordionDetails 
@@ -304,7 +304,7 @@ function renderTable(containerId, headers, data, config = {}) {
     const thead = document.createElement('thead');
     thead.className = 'bg-gray-50';
     const headerRow = document.createElement('tr');
-    console.log("headers forEach: ",headers)
+    // console.log("headers forEach: ",headers)
     headers.forEach(headerConfig => {
         const th = document.createElement('th');
         th.scope = 'col';
@@ -323,7 +323,7 @@ function renderTable(containerId, headers, data, config = {}) {
     const tbody = document.createElement('tbody');
     tbody.className = 'bg-white divide-y divide-gray-200';
 
-    console.log("data forEach: ",data)
+    // console.log("data forEach: ",data)
     if (data.length === 0) {
         // ... (no data message is the same) ...
         const colSpan = headers.length || 1;
@@ -486,7 +486,7 @@ function renderTable(containerId, headers, data, config = {}) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -591,8 +591,8 @@ async function renderPlatformAdminDataSourceTypesPage() {
                 return;
             }
             const newPage = parseInt(button.dataset.page, 10);
-            console.log('newPage')
-            console.log(newPage)
+            // console.log('newPage')
+            // console.log(newPage)
             // Fetch the new page, preserving the current search term
             fetchAndRenderPage(newPage, searchInput.value);
         });
@@ -629,12 +629,12 @@ async function renderPlatformAdminDataSourceTypesPage() {
             
             if (!form.checkValidity()) {
                 form.classList.add('was-validated');
-                console.log("Form is invalid. Aborting save.");
+                // console.log("Form is invalid. Aborting save.");
                 return;
             }
 
             const payload = getDataSrcTypeFormData(form);
-            console.log("Data gathered from form:", payload);
+            // console.log("Data gathered from form:", payload);
 
             const rawName = form.querySelector('#dataSrcTypeName')?.value || '';
             const rawDesc = form.querySelector('#dataSrcTypeDescription')?.value || '';
@@ -660,7 +660,7 @@ async function renderPlatformAdminDataSourceTypesPage() {
             try {
                 
                 const response = await window.loomeApi.runApiRequest(API_ADD_METADATA, payload);
-                console.log("RESPONSE: ", response)
+                // console.log("RESPONSE: ", response)
                 
                 showToast('Data Source Type created successfully!');
                 
@@ -685,7 +685,7 @@ async function renderPlatformAdminDataSourceTypesPage() {
 
         // --- 3. Initial Page Load ---
         // Make the first call to fetch page 1 with no search term.
-        console.log("Initial fetchAndRenderPage call: ", tableConfig)
+        // console.log("Initial fetchAndRenderPage call: ", tableConfig)
         await fetchAndRenderPage(1, '');
             
         

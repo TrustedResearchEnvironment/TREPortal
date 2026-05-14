@@ -190,7 +190,7 @@ async function getFromAPI(API_ID, initialParams) {
         const parsedInitial = safeParseJson(initialResponse);
 
         if (!parsedInitial) {
-            console.log("API returned no data.");
+            // console.log("API returned no data.");
             return [];
         }
 
@@ -350,7 +350,7 @@ async function submitExportJob(exportRequestID) {
         
         // Parse and validate the response
         const parsedResponse = safeParseJson(response);
-        console.log('Submit export job response:', parsedResponse);
+        // console.log('Submit export job response:', parsedResponse);
         
         // Check if the submission was successful and the StatusID was successfully changed
         if (parsedResponse && ( parsedResponse.StatusID === 1)) {
@@ -388,7 +388,7 @@ async function deleteExportJob(exportRequestID) {
         
         // Parse and validate the response
         const parsedResponse = safeParseJson(response);
-        console.log('Delete export job response:', parsedResponse);
+        // console.log('Delete export job response:', parsedResponse);
         
         // Check if the deletion was successful
         if (parsedResponse) {
@@ -970,7 +970,7 @@ function setupEventListeners() {
                     "LoomeAssistTenantsID": selectedTenantsID
                 };
 
-                console.log('Submitting export request with params:', params);
+                // console.log('Submitting export request with params:', params);
                 await window.loomeApi.runApiRequest(SUBMIT_EXPORT_API_ID, params);
                 showToast('Export request submitted successfully! Refreshing page in 5 seconds...', "success");
                 closeModal();

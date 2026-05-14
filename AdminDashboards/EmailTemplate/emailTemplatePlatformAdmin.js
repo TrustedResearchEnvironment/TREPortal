@@ -258,13 +258,13 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
             "pageSize": rowsPerPage,
             "search": searchTerm
         };
-        console.log(apiParams)
+        // console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
 
         
         const parsedResponse = safeParseJson(response);
-        console.log(parsedResponse)
+        // console.log(parsedResponse)
 
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
@@ -478,7 +478,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                         // Handle cases where the API might return an empty or null response on success
                         throw new Error("API call succeeded but returned no data.");
                     }
-                    console.log(updatedEmailTemplate)
+                    // console.log(updatedEmailTemplate)
                     showToast('Email Template edited successfully!\nPlease wait while the data refreshes.', 'success');
 
                     // --- 4. Update the UI with the New Data ---
@@ -512,7 +512,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""

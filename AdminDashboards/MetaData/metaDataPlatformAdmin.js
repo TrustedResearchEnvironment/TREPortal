@@ -500,13 +500,13 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
             "pageSize": rowsPerPage,
             "search": searchTerm
         };
-        console.log(apiParams)
+        // console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_GET_ALL_METADATA, apiParams);
 
         
         const parsedResponse = safeParseJson(response);
-        console.log(parsedResponse)
+        // console.log(parsedResponse)
 
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
@@ -838,7 +838,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     const updateParsed = safeParseJson(updatedMetaData);
                     const updateApiErr = extractApiError(updateParsed);
                     if (updateApiErr) throw new Error(updateApiErr);
-                    console.log(updatedMetaData)
+                    // console.log(updatedMetaData)
                     showToast('MetaData edited successfully!\nPlease wait while the data refreshes.', 'success');
 
                     // --- 4. Update the UI with the New Data ---
@@ -916,7 +916,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -1023,7 +1023,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
         const parsedInitial = safeParseJson(initialResponse);
 
         if (!parsedInitial || parsedInitial.RowCount === 0) {
-            console.log("No data source types found.");
+            // console.log("No data source types found.");
             return []; // Return an empty array if there's no data
         }
 
@@ -1037,7 +1037,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
 
         // --- 2. Loop for remaining pages ---
         for (let page = 2; page <= totalPages; page++) {
-            console.log(`Fetching page ${page} of ${totalPages}...`);
+            // console.log(`Fetching page ${page} of ${totalPages}...`);
             const params = { "page": page, "pageSize": pageSize, "search": '' };
             // FIXED BUG: Use the correct API ID in the loop
             const response = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, params);
@@ -1047,7 +1047,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
             }
         }
 
-        console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
+        // console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
         return allResults;
 
     } catch (error) {
@@ -1109,8 +1109,8 @@ async function renderPlatformAdminMetaDataPage() {
             return;
         }
         const newPage = parseInt(button.dataset.page, 10);
-        console.log('newPage')
-        console.log(newPage)
+        // console.log('newPage')
+        // console.log(newPage)
         // Fetch the new page, preserving the current search term
         fetchAndRenderPage(tableConfig, newPage, searchInput.value);
     });
@@ -1150,7 +1150,7 @@ async function renderPlatformAdminMetaDataPage() {
         
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
-            console.log("Form is invalid. Aborting save.");
+            // console.log("Form is invalid. Aborting save.");
             return;
         }
 
@@ -1171,7 +1171,7 @@ async function renderPlatformAdminMetaDataPage() {
             showToast('Special characters are not allowed in the Description.', 'error');
             return;
         }
-        console.log("Data gathered from form:", payload);
+        // console.log("Data gathered from form:", payload);
         
         saveButton.disabled = true;
         saveButton.innerHTML = `
@@ -1182,7 +1182,7 @@ async function renderPlatformAdminMetaDataPage() {
         try {
 
             const response = await window.loomeApi.runApiRequest(API_ADD_METADATA, payload);
-            console.log("RESPONSE: ", response)
+            // console.log("RESPONSE: ", response)
 
             // Check for error response (e.g. 400 Bad Request)
             const parsed = safeParseJson(response);
