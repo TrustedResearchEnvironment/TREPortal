@@ -143,11 +143,22 @@ function openActionModal(type, tab, id, name, projectId, createUser) {
             let approveCounter = approveDiv.querySelector('.char-counter');
             if (!approveCounter) {
                 approveCounter = document.createElement('div');
-                approveCounter.className = 'char-counter text-muted small text-end mt-1';
+                approveCounter.className = 'char-counter small text-end mt-1';
                 msgTa.insertAdjacentElement('afterend', approveCounter);
             }
-            approveCounter.textContent = '0 / 500';
-            msgTa.oninput = () => { approveCounter.textContent = `${msgTa.value.length} / 500`; };
+            approveCounter.textContent = '';
+            approveCounter.style.display = 'none';
+            msgTa.oninput = () => {
+                const len = msgTa.value.length;
+                const threshold = Math.floor(500 * 0.8);
+                if (len >= threshold) {
+                    approveCounter.textContent = `${len} / 500`;
+                    approveCounter.style.display = '';
+                    approveCounter.style.color = '#dc3545';
+                } else {
+                    approveCounter.style.display = 'none';
+                }
+            };
         }
         document.getElementById('approveMessageError')?.classList.add('d-none');
         confirmBtn.className = 'btn btn-success';
@@ -163,11 +174,22 @@ function openActionModal(type, tab, id, name, projectId, createUser) {
             let rejectCounter = rejectDiv.querySelector('.char-counter');
             if (!rejectCounter) {
                 rejectCounter = document.createElement('div');
-                rejectCounter.className = 'char-counter text-muted small text-end mt-1';
+                rejectCounter.className = 'char-counter small text-end mt-1';
                 reasonTa.insertAdjacentElement('afterend', rejectCounter);
             }
-            rejectCounter.textContent = '0 / 500';
-            reasonTa.oninput = () => { rejectCounter.textContent = `${reasonTa.value.length} / 500`; };
+            rejectCounter.textContent = '';
+            rejectCounter.style.display = 'none';
+            reasonTa.oninput = () => {
+                const len = reasonTa.value.length;
+                const threshold = Math.floor(500 * 0.8);
+                if (len >= threshold) {
+                    rejectCounter.textContent = `${len} / 500`;
+                    rejectCounter.style.display = '';
+                    rejectCounter.style.color = '#dc3545';
+                } else {
+                    rejectCounter.style.display = 'none';
+                }
+            };
         }
         if (reasonErr) reasonErr.classList.add('d-none');
         confirmBtn.className = 'btn btn-danger';
