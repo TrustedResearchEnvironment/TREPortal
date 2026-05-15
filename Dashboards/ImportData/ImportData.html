@@ -13,10 +13,10 @@
         <div class="bg-gray-50 min-h-screen p-6">
             <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
                 <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                    <h1 class="text-2xl font-bold text-black">My Data Export Requests</h1>
+                    <h1 class="text-2xl font-bold text-black">My Data Import Requests</h1>
                     
-                    <button id="request-export-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg hover:bg-[#3da59d] transition-colors">
-                        Request Data Export
+                    <button id="request-import-btn" class="bg-[#4ec4bc] text-white px-4 py-2 rounded-lg hover:bg-[#3da59d] transition-colors">
+                        Request Data Import
                     </button>
                 </div>
 
@@ -24,11 +24,11 @@
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
                             <div id="status-chips-container" class="chip-container mb-4">
                                 <!-- Using a data-status attribute is the key to linking the chip to the data -->
-                                <!-- <button class="chip active" data-status="Awaiting Submission">
+                                <button class="chip active" data-status="Awaiting Submission">
                                     Awaiting Submission
                                     <span id="count-awaiting" class="chip-count"></span>
-                                </button> -->
-                                <button class="chip active" data-status="Pending Approval">
+                                </button>
+                                <button class="chip" data-status="Pending Approval">
                                     Pending Approval
                                     <span id="count-pending" class="chip-count"></span>
                                 </button>
@@ -48,7 +48,7 @@
                             
                             <div class="flex items-center mt-3 md:mt-0 gap-2">
                                 <div class="relative">
-                                    <input id="searchExports" type="text" placeholder="Search export jobs..." class="px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                                    <input id="searchImports" type="text" placeholder="Search import jobs..." class="px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
                                     <span class="material-symbols-outlined absolute right-3 top-2.5 text-gray-400">search</span>
                                 </div>
                                 <button id="refresh-data-btn" class="btn btn-outline-primary" title="Refresh data">
@@ -57,7 +57,7 @@
                             </div>
                     </div>
 
-                    <div id="export-jobs-table-area">
+                    <div id="import-jobs-table-area">
                     </div>
 
                     <div id="pagination-controls" class="flex justify-between items-center mt-4 px-2">
@@ -67,21 +67,21 @@
         </div>
     </div>
 
-    <div id="export-modal" class="modal-overlay hidden">
+    <div id="import-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold">New Data Export Request</h2>
+                <h2 class="text-xl font-semibold">New Data Import Request</h2>
                 <button id="modal-close-btn" class="text-gray-500 hover:text-gray-800">&times;</button>
             </div>
-            <form id="export-form">
+            <form id="import-form">
                 <div class="form-group">
-                    <label for="export-request-name" class="form-label">Export Request Name <span class="text-danger">*</span></label>
-                    <input id="export-request-name" type="text" class="form-control" placeholder="Enter a name for this export request" required>
+                    <label for="import-request-name" class="form-label">Import Request Name <span class="text-danger">*</span></label>
+                    <input id="import-request-name" type="text" class="form-control" placeholder="Enter a name for this import request" required>
                 </div>
                 <div class="mb-4">
-                    <label for="export-type" class="block text-sm font-medium text-gray-700 mb-2">Source Assist Project</label>
-                    <select id="export-type" name="export-type" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#4ec4bc] focus:border-[#4ec4bc]">
-                        <option value="">Select Source Assist Project...</option>
+                    <label for="import-type" class="block text-sm font-medium text-gray-700 mb-2">Target Assist Project</label>
+                    <select id="import-type" name="import-type" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#4ec4bc] focus:border-[#4ec4bc]">
+                        <option value="">Select Target Assist Project...</option>
                     </select>
                 </div>
                 <div class="flex justify-end">
@@ -93,6 +93,6 @@
         </div>
     </div>
 
-    <script src="exportData.js"></script>
+    <script src="importData.js"></script>
 </body>
 </html>

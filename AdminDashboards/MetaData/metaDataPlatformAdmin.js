@@ -5,7 +5,7 @@ const API_GET_ALL_METADATA = 'GetMetadata';
 const API_ADD_METADATA = 'AddMetaData';
 const API_UPDATE_METADATA = 'UpdateMetaData';
 const API_DATASOURCETYPE_ID = 'GetDataSourceTypes';
-const API_DELETE_METADATA = 'DeleteMetaData';
+const API_CANCEL_METADATA = 'CancelMetaData';
 
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
@@ -76,14 +76,14 @@ function AddMetadata(typeNamesList) {
             return item.name || item.Name//) !== 'Folder';
         })
         .map((item, index) => {
-            const id = item && (item.id || item.DataSourceTypeID) !== undefined ? (item.id || item.DataSourceTypeID) : index;
-            const name = typeof item === 'string' ? item : (item.name || item.Name || String(item));
+            const id = (item && (item.DataSourceTypeID !== undefined || item.id !== undefined)) ? (item.DataSourceTypeID ?? item.id) : index;
+            const name = typeof item === 'string' ? item : (item.Name || item.name || String(item));
             const checkboxId = `dataSourceType-checkbox-${index}`;
             return `
                 <li>
                     <a class="dropdown-item" href="#">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="${id}" id="${checkboxId}" onclick="event.stopPropagation()">
+                            <input class="form-check-input data-source-type-checkbox" type="checkbox" value="${id}" id="${checkboxId}" onclick="event.stopPropagation()">
                             <label class="form-check-label" for="${checkboxId}">
                                 ${name}
                             </label>
@@ -99,11 +99,11 @@ function AddMetadata(typeNamesList) {
             <!-- Name, Description, Active fields... -->
             <div class="mb-3">
                 <label for="metaDataName" class="form-label">Name</label>
-                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control">
+                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control" maxlength="100" required>
             </div>
             <div class="mb-3">
                 <label for="metaDataDescription" class="form-label">Description</label>
-                <textarea rows="2" id="metaDataDescription" placeholder="Description of this Meta Data" class="form-control"></textarea>
+                <textarea rows="2" id="metaDataDescription" placeholder="Description of this Meta Data" class="form-control" maxlength="500"></textarea>
             </div>
             <div class="mb-3 form-check">
                 <input type="checkbox" id="metaDataActive" class="form-check-input" checked>
@@ -124,6 +124,9 @@ function AddMetadata(typeNamesList) {
             </div>
         </form>
     `;
+
+    attachCharCounter(modalBody.querySelector('#metaDataName'), 100);
+    attachCharCounter(modalBody.querySelector('#metaDataDescription'), 500);
 
     // 3. Add JavaScript to make the dropdown interactive (THIS PART IS REVISED)
     const dropdownButton = document.getElementById('dataSourceTypeDropdown');
@@ -191,6 +194,62 @@ function sanitizeStringForJson(input) {
 }
 
 /**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
+
+/**
+ * Extracts a human-readable error message from an API response.
+ * Handles: plain string, { detail: string }, { detail: [{field,message}] },
+ * and top-level [{field,message}] arrays.
+ */
+function extractApiError(parsed) {
+    if (!parsed) return null;
+    // Top-level array of validation errors: [{field, message}, ...]
+    if (Array.isArray(parsed)) {
+        return parsed.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (typeof parsed.detail === 'string') return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+        return parsed.detail.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    return null;
+}
+
+/**
  * Gathers all data from the "Add Data Source" modal form.
  * It handles both static fields and dynamically generated fields.
  *
@@ -205,17 +264,21 @@ function getMetaDataFormData(formElement) {
 
     // --- 1. Get values from the STATIC fields ---
     // We use .value for text inputs/textareas and .checked for checkboxes.
-    const name = sanitizeStringForJson(formElement.querySelector('#metaDataName').value);
-    const description = sanitizeStringForJson(formElement.querySelector('#metaDataDescription').value);
-    const isActive = !!formElement.querySelector('#metaDataActive').checked;
+    const name = sanitizeInput(sanitizeStringForJson(formElement.querySelector('#metaDataName').value));
+    const description = sanitizeInput(sanitizeStringForJson(formElement.querySelector('#metaDataDescription').value));
+    const isActive = formElement.querySelector('#metaDataActive').checked ? 1 : 0;
     // Capture multiple selected Data Source Type IDs (if any)
-    const dataSourceTypeSelectCheckedBoxes = document.querySelectorAll('#dataSourceTypeMenu .form-check-input:checked');
+    // Target only the data source type checkboxes using specific class
+    const dataSourceTypeSelectCheckedBoxes = formElement.querySelectorAll('.data-source-type-checkbox:checked');
     
     let dataSourceTypeIDs = [];
     dataSourceTypeSelectCheckedBoxes.forEach(box => {
         const v = parseInt(box.value, 10);
-        if (!Number.isNaN(v)) dataSourceTypeIDs.push(v);
+        if (!Number.isNaN(v)) {
+            dataSourceTypeIDs.push(v);
+        }
     });
+    
 
     // --- 3. Combine everything into a final payload object ---
     // This structure is designed to match your Pydantic "Create" model.
@@ -289,11 +352,11 @@ const renderAccordionDetails = (item) => {
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.MetaDataID}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-name">${item.Name}</span>
-                            <input type="text" value="${item.Name}" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-description">${item.Description || ''}</span>
-                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${item.Description || ''}</textarea>
+                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-isactive">${item.IsActive ? 'Yes' : 'No'}</span>
@@ -437,13 +500,13 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
             "pageSize": rowsPerPage,
             "search": searchTerm
         };
-        console.log(apiParams)
+        // console.log(apiParams)
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_GET_ALL_METADATA, apiParams);
 
         
         const parsedResponse = safeParseJson(response);
-        console.log(parsedResponse)
+        // console.log(parsedResponse)
 
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
@@ -610,7 +673,48 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             event.stopPropagation();
             
             const parentAccordion = event.target.closest('.accordion-body');
-            const toggleEditState = (isEditing) => {
+            
+            // const toggleEditState = (isEditing) => {
+            //     parentAccordion.querySelectorAll('.view-state').forEach(el => el.classList.toggle('hidden', isEditing));
+            //     parentAccordion.querySelectorAll('.edit-state').forEach(el => el.classList.toggle('hidden', !isEditing));
+
+            //     // Enable/disable the accordion dropdown and its checkboxes based on editing state
+            //     const menuButton = parentAccordion.querySelector('.accordion-dataSourceTypeDropdown');
+            //     const inputs = parentAccordion.querySelectorAll('.accordion-dataSourceTypeMenu input[type="checkbox"]');
+            //     if (isEditing) {
+            //         if (menuButton) menuButton.removeAttribute('disabled');
+            //         inputs.forEach(i => i.removeAttribute('disabled'));
+            //     } else {
+            //         if (menuButton) menuButton.setAttribute('disabled', '');
+            //         inputs.forEach(i => i.setAttribute('disabled', ''));
+            //     }
+            // };
+            
+            // toggleEditState now accepts an optional `isCancel` flag. When entering edit mode
+// we store original values on the accordion element; when cancelling we restore them.
+            const toggleEditState = (isEditing, isCancel = false) => {
+                // If entering edit mode, persist current view values so Cancel can restore them
+                if (isEditing) {
+                    const nameSpan = parentAccordion.querySelector('.view-state-name');
+                    const descSpan = parentAccordion.querySelector('.view-state-description');
+                    const isActiveSpan = parentAccordion.querySelector('.view-state-isactive');
+                    parentAccordion.dataset.origName = nameSpan ? nameSpan.textContent : '';
+                    parentAccordion.dataset.origDescription = descSpan ? descSpan.textContent : '';
+                    parentAccordion.dataset.origIsActive = isActiveSpan ? isActiveSpan.textContent : '';
+
+                    const menu = parentAccordion.querySelector('.accordion-dataSourceTypeMenu');
+                    if (menu) {
+                        const selected = Array.from(menu.querySelectorAll('input[type="checkbox"]'))
+                            .filter(cb => cb.checked)
+                            .map(cb => cb.value)
+                            .join(',');
+                        parentAccordion.dataset.origSelectedTypes = selected;
+                    } else {
+                        parentAccordion.dataset.origSelectedTypes = '';
+                    }
+                }
+
+                // Toggle view/edit UI
                 parentAccordion.querySelectorAll('.view-state').forEach(el => el.classList.toggle('hidden', isEditing));
                 parentAccordion.querySelectorAll('.edit-state').forEach(el => el.classList.toggle('hidden', !isEditing));
 
@@ -621,12 +725,57 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     if (menuButton) menuButton.removeAttribute('disabled');
                     inputs.forEach(i => i.removeAttribute('disabled'));
                 } else {
+                    // If this transition is due to Cancel, restore original values
+                    if (isCancel) {
+                        const origName = parentAccordion.dataset.origName || '';
+                        const origDescription = parentAccordion.dataset.origDescription || '';
+                        const origIsActive = parentAccordion.dataset.origIsActive || 'No';
+                        const origSelectedTypes = parentAccordion.dataset.origSelectedTypes || '';
+
+                        // Restore view-state text
+                        const nameSpan = parentAccordion.querySelector('.view-state-name');
+                        if (nameSpan) nameSpan.textContent = origName;
+                        const descSpan = parentAccordion.querySelector('.view-state-description');
+                        if (descSpan) descSpan.textContent = origDescription;
+                        const isActiveSpan = parentAccordion.querySelector('.view-state-isactive');
+                        if (isActiveSpan) isActiveSpan.textContent = origIsActive;
+
+                        // Restore edit inputs values
+                        const nameInput = parentAccordion.querySelector('.edit-state-name');
+                        if (nameInput) nameInput.value = origName;
+                        const descInput = parentAccordion.querySelector('.edit-state-description');
+                        if (descInput) descInput.value = origDescription;
+                        const isActiveInput = parentAccordion.querySelector('.edit-state-isactive');
+                        if (isActiveInput) isActiveInput.checked = (origIsActive === 'Yes');
+
+                        // Restore types checkboxes
+                        if (inputs && inputs.length) {
+                            const selectedSet = new Set(origSelectedTypes.split(',').filter(Boolean));
+                            inputs.forEach(cb => { cb.checked = selectedSet.has(cb.value); });
+                            // Trigger change so button text updates
+                            const menu = parentAccordion.querySelector('.accordion-dataSourceTypeMenu');
+                            if (menu) menu.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+
                     if (menuButton) menuButton.setAttribute('disabled', '');
                     inputs.forEach(i => i.setAttribute('disabled', ''));
+
+                    // Clear saved originals when leaving edit mode after a Save (not Cancel)
+                    if (!isCancel) {
+                        delete parentAccordion.dataset.origName;
+                        delete parentAccordion.dataset.origDescription;
+                        delete parentAccordion.dataset.origIsActive;
+                        delete parentAccordion.dataset.origSelectedTypes;
+                    }
                 }
             };
-            
-            if (editButton) toggleEditState(true);
+
+            if (editButton) {
+                toggleEditState(true);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-name'), 100);
+                attachCharCounter(parentAccordion.querySelector('.edit-state-description'), 500);
+            }
 
             if (saveButton) {
                 // Stop the click from propagating and closing the accordion
@@ -644,15 +793,34 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 try {
                     // --- 1. Gather Data from the Form ---
                     // Use document.querySelector to find elements within the accordionBody
-                    const updatedName = sanitizeStringForJson(accordionBody.querySelector('.edit-state-name').value);
-                    const updatedDescription = sanitizeStringForJson(accordionBody.querySelector('.edit-state-description').value);
-                    const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked;
+                    const rawName = accordionBody.querySelector('.edit-state-name').value;
+                    const rawDesc = accordionBody.querySelector('.edit-state-description').value;
+                    if (containsInvalidChars(rawName)) {
+                        showToast('Special characters are not allowed in the Name.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (!rawName.trim()) {
+                        showToast('Name is required.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    if (containsInvalidChars(rawDesc)) {
+                        showToast('Special characters are not allowed in the Description.', 'error');
+                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                    }
+                    const updatedName = sanitizeInput(sanitizeStringForJson(rawName));
+                    const updatedDescription = sanitizeInput(sanitizeStringForJson(rawDesc));
+                    const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked ? 1 : 0;
 
 
                     // --- 2. Send Request to the Endpoint using fetch ---
                     // Collect selected types from the accordion dropdown (if any)
                     const selectedTypes = Array.from(accordionBody.querySelectorAll('.accordion-dataSourceTypeMenu input[type="checkbox"]:checked'))
                         .map(cb => parseInt(cb.value, 10)).filter(v => !Number.isNaN(v));
+
+                    // Validate required fields before sending
+                    if (!updatedName || String(updatedName).trim() === '') {
+                        throw new Error('Name is required.');
+                    }
 
                     const updateParams = {
                         "meta_data_id": parseInt(metaDataId, 10),
@@ -665,10 +833,12 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     
                     // --- 3. Handle the Server's Response ---
                     if (!updatedMetaData) {
-                        // Handle cases where the API might return an empty or null response on success
-                        throw new Error("API call succeeded but returned no data.");
+                        throw new Error('API call succeeded but returned no data.');
                     }
-                    console.log(updatedMetaData)
+                    const updateParsed = safeParseJson(updatedMetaData);
+                    const updateApiErr = extractApiError(updateParsed);
+                    if (updateApiErr) throw new Error(updateApiErr);
+                    // console.log(updatedMetaData)
                     showToast('MetaData edited successfully!\nPlease wait while the data refreshes.', 'success');
 
                     // --- 4. Update the UI with the New Data ---
@@ -695,7 +865,8 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 }
             }
 
-            if (cancelButton) toggleEditState(false);
+            // if (cancelButton) toggleEditState(false);
+            if (cancelButton) toggleEditState(false, true);
 
             if (deleteButton) {
                 // Implement delete functionality here, similar to save but with a confirmation step
@@ -706,7 +877,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     const metaDataID = deleteButton?.dataset?.metaid || accordionBody?.dataset?.id;
                     const params = { meta_data_id : parseInt(metaDataID, 10) };
                     // Use the low-level runApiRequest so we can inspect error payloads directly
-                    const raw = await window.loomeApi.runApiRequest(API_DELETE_METADATA, params);
+                    const raw = await window.loomeApi.runApiRequest(API_CANCEL_METADATA, params);
                     const parsed = safeParseJson(raw);
 
                     // If the API responded with a detail message, treat it as an error
@@ -745,7 +916,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -852,7 +1023,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
         const parsedInitial = safeParseJson(initialResponse);
 
         if (!parsedInitial || parsedInitial.RowCount === 0) {
-            console.log("No data source types found.");
+            // console.log("No data source types found.");
             return []; // Return an empty array if there's no data
         }
 
@@ -866,7 +1037,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
 
         // --- 2. Loop for remaining pages ---
         for (let page = 2; page <= totalPages; page++) {
-            console.log(`Fetching page ${page} of ${totalPages}...`);
+            // console.log(`Fetching page ${page} of ${totalPages}...`);
             const params = { "page": page, "pageSize": pageSize, "search": '' };
             // FIXED BUG: Use the correct API ID in the loop
             const response = await window.loomeApi.runApiRequest(API_DATASOURCETYPE_ID, params);
@@ -876,7 +1047,7 @@ async function getAllDataSourceTypes(pageSize = 100) {
             }
         }
 
-        console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
+        // console.log(`Successfully fetched a total of ${allResults.length} data source types.`);
         return allResults;
 
     } catch (error) {
@@ -938,8 +1109,8 @@ async function renderPlatformAdminMetaDataPage() {
             return;
         }
         const newPage = parseInt(button.dataset.page, 10);
-        console.log('newPage')
-        console.log(newPage)
+        // console.log('newPage')
+        // console.log(newPage)
         // Fetch the new page, preserving the current search term
         fetchAndRenderPage(tableConfig, newPage, searchInput.value);
     });
@@ -955,7 +1126,7 @@ async function renderPlatformAdminMetaDataPage() {
                 fetchAndRenderPage(tableConfig, newPage, searchInput.value);
             } else {
                 // If invalid, show a message and reset the input to the current page
-                alert(`Please enter a page number between 1 and ${totalPages}.`);
+                showToast(`Please enter a page number between 1 and ${totalPages}.`, 'error');
                 inputElement.value = currentPage; 
             }
         }
@@ -979,12 +1150,28 @@ async function renderPlatformAdminMetaDataPage() {
         
         if (!form.checkValidity()) {
             form.classList.add('was-validated');
-            console.log("Form is invalid. Aborting save.");
+            // console.log("Form is invalid. Aborting save.");
             return;
         }
 
         const payload = getMetaDataFormData(form);
-        console.log("Data gathered from form:", payload);
+        
+        // Validate required fields: Name and at least one Data Source Type
+        const rawName = form.querySelector('#metaDataName')?.value || '';
+        const rawDesc = form.querySelector('#metaDataDescription')?.value || '';
+        if (containsInvalidChars(rawName)) {
+            showToast('Special characters are not allowed in the Name.', 'error');
+            return;
+        }
+        if (!payload || !payload.name || String(payload.name).trim() === '') {
+            showToast('Name is required.', 'error');
+            return;
+        }
+        if (containsInvalidChars(rawDesc)) {
+            showToast('Special characters are not allowed in the Description.', 'error');
+            return;
+        }
+        // console.log("Data gathered from form:", payload);
         
         saveButton.disabled = true;
         saveButton.innerHTML = `
@@ -995,7 +1182,18 @@ async function renderPlatformAdminMetaDataPage() {
         try {
 
             const response = await window.loomeApi.runApiRequest(API_ADD_METADATA, payload);
-            console.log("RESPONSE: ", response)
+            // console.log("RESPONSE: ", response)
+
+            // Check for error response (e.g. 400 Bad Request)
+            const parsed = safeParseJson(response);
+            const apiErr = extractApiError(parsed);
+            if (apiErr) {
+                console.error('API error:', apiErr);
+                throw new Error(apiErr);
+            }
+            if (parsed && parsed.status && parsed.status >= 400) {
+                throw new Error(parsed.message || 'Server returned an error.');
+            }
 
             showToast('Meta Data created successfully!');
             

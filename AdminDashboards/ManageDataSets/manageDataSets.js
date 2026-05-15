@@ -10,7 +10,7 @@ const API_GET_DATASOURCES = 'GetDataSource';
 const API_GET_DATASOURCE_BY_ID = 'GetDataSourceByID';
 const API_CREATE_DATASET = 'CreateDataSet';
 const API_UPDATE_DATASET = 'UpdateDataSet';
-const API_DELETE_DATASET = 'DeleteDataSet';
+const API_CANCEL_DATASET = 'CancelDataSet';
 const API_GET_DATASOURCE_SUBFOLDERS = 'GetLoomeDataSourceFirstSubFolders';
 const API_GET_DATASOURCE_SUBFOLDERS_WITH_FILES = 'GetLoomeDataSourceSubFoldersWithFiles';
 const API_GET_DATASET_FOLDERFILE = 'GetDataSetFolderFileByDataSetID';
@@ -18,6 +18,65 @@ const API_GET_REDCAP_DATA = 'SyncREDCapData';
 const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
 const API_GET_METADATA = 'GetMetadata';
 const API_VERIFY_UPLOAD_SHEET = 'VerifyUploadedSheet';
+
+const API_GET_PORTAL_TOKEN = 'Portal - GetToken';
+const API_GET_ASSET_BY_NAME = 'Portal - GetAssetByName';
+const API_DELETE_ASSET_BY_ASSET_ID = 'Portal - DeleteByAssetId';
+
+/**
+ * Strips characters outside the safe whitelist to guard against injection.
+ * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
+ */
+function sanitizeInput(value) {
+    return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
+/**
+ * Attaches a progressive character counter to an input/textarea.
+ * The counter only appears when the user has used ≥80% of the character limit.
+ */
+function attachCharCounter(inputEl, max) {
+    if (!inputEl || inputEl.dataset.charCounterAttached) return;
+    inputEl.dataset.charCounterAttached = 'true';
+    const counter = document.createElement('span');
+    counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    inputEl.insertAdjacentElement('afterend', counter);
+    const threshold = Math.floor(max * 0.8);
+    const update = () => {
+        const len = inputEl.value.length;
+        if (len >= threshold) {
+            counter.textContent = `${len}/${max}`;
+            counter.style.display = 'inline';
+            counter.style.color = len >= max ? '#dc3545' : '#fd7e14';
+        } else {
+            counter.style.display = 'none';
+        }
+    };
+    inputEl.addEventListener('input', update);
+    update();
+}
+
+/**
+ * Extracts a human-readable error message from an API response.
+ * Handles: plain string, { detail: string }, { detail: [{field,message}] },
+ * and top-level [{field,message}] arrays.
+ */
+function extractApiError(parsed) {
+    if (!parsed) return null;
+    if (Array.isArray(parsed)) {
+        return parsed.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (typeof parsed.detail === 'string') return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+        return parsed.detail.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    return null;
+}
 
 const pageSize = 10;
 let currentPage = 1;
@@ -171,6 +230,13 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
     }
 
     // --- DATA EXISTS ---
+    // Enforce mutual exclusivity: if both Redact and Deidentify are set, Redact takes priority.
+    data.forEach(col => {
+        if (col.Redact && col.Deidentify) {
+            col.Deidentify = false;
+        }
+    });
+
     let rowsHtml = '';
     if (dataSetTypeId == 1) { // Database type
 
@@ -185,14 +251,14 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                     <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
                 </td>
                 <td class="checkbox-cell">
-                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${col.Tokenise ? 'checked' : ''}>
+                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${col.Deidentify ? 'checked' : ''}>
                 </td>
             </tr>
         `).join('');
 
 
     } else if (dataSetTypeId == 2) { // REDCap type
-        console.log("Data for REDCap columns:", data);
+        // console.log("Data for REDCap columns:", data);
         rowsHtml = data.map((row) => {
             // For REDCap, always use ColumnName as the unique id
             return `
@@ -206,7 +272,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                         <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
                     </td>
                     <td class="checkbox-cell">
-                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${row.Tokenise ? 'checked' : ''}>
+                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${row.Deidentify ? 'checked' : ''}>
                     </td>
                 </tr>
             `;
@@ -232,7 +298,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                 const fileExtension = col.FileType || col.FileExtensions || '';
                 const fileDescription = col.FileDescription || '';
                 const isRedacted = col.Redact ? 1 : 0;  // Convert to 1/0
-                const isTokenised = col.Tokenise ? 1 : 0;  // Convert to 1/0
+                const isDeidentified = col.Deidentify ? 1 : 0;  // Convert to 1/0
 
                 if (index === 0) {
                     rowsHtml += `
@@ -244,7 +310,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised === 1 ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${isDeidentified === 1 ? 'checked' : ''}>
                             </td>
                         </tr>
                     `;
@@ -257,7 +323,7 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
                             <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Tokenise" ${isTokenised === 1 ? 'checked' : ''}>
+                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${isDeidentified === 1 ? 'checked' : ''}>
                             </td>
                         </tr>
                     `;
@@ -433,7 +499,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     const actual = Array.isArray(parsedCols) ? parsedCols.map(c => String(c.ColumnName || '').trim()) : [];
     const dataSetId = metaRow && metaRow.DataSetID ? String(metaRow.DataSetID) : 'new';
     const dsType = Number(metaRow && metaRow.DataSourceTypeID  || 0);
-    console.log("DataSourceTypeID for validation:", dsType);
+    // console.log("DataSourceTypeID for validation:", dsType);
     let expected = [];
 
     try {
@@ -443,12 +509,12 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                     return { valid: false, message: 'DataSourceID required for REDCap crosscheck.' };
                 }
 
-                console.log("REDCap New")
+                // console.log("REDCap New")
 
                 // For NEW REDCap: call the REDCap sync endpoint to get expected columns
                 // using existing helper; adapt if your endpoint differs.
                 const rc = await syncREDCapDataSetColumns(parseInt(metaRow.DataSourceID, 10));
-                console.log("syncREDCapDataSetColumns returned:", rc);
+                // console.log("syncREDCapDataSetColumns returned:", rc);
                 // syncREDCapDataSetColumns may return an object like { status, metadata }
                 // where `metadata` is an array of fields with properties such as
                 // 'field_name', 'field_label', 'field_type', 'select_choices_or_calculations'.
@@ -460,7 +526,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                     rcList = rc.metadata;
                 }
 
-                console.log("REDCap sync returned metadata:", rcList);
+                // console.log("REDCap sync returned metadata:", rcList);
 
                 expected = Array.isArray(rcList)
                     ? rcList.map(r => String(
@@ -468,17 +534,17 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                       ).trim()).filter(Boolean)
                     : [];
                 
-                console.log("Expected columns from REDCap sync:", expected);
+                // console.log("Expected columns from REDCap sync:", expected);
             } else {
                 // For EXISTING REDCap dataset: fetch expected columns via REDCap dataset endpoint
-                console.log("REDCap Existing - fetching columns for dataset ID:", dataSetId);
+                // console.log("REDCap Existing - fetching columns for dataset ID:", dataSetId);
                 const rcList = await fetchSQLorREDCAPDataSetColumns(dataSetId);
-                console.log("Fetched columns for existing REDCap dataset (raw response):", rcList);
+                // console.log("Fetched columns for existing REDCap dataset (raw response):", rcList);
                 
                 expected = Array.isArray(rcList)
                     ? rcList.map(r => String((r && r.ColumnName) || '').trim()).filter(Boolean)
                     : [];
-                console.log("Expected columns for existing REDCap dataset:", expected);
+                // console.log("Expected columns for existing REDCap dataset:", expected);
             }
         } else if (dsType === 1) { // Database
             if (dataSetId === 'new') {
@@ -488,25 +554,25 @@ async function validateDataSetColumns(parsedCols, metaRow) {
                 const validJsonString = metaRow.DataSetFieldValues.replace(/'/g, '"');
                 const tableId = JSON.parse(validJsonString)[0]?.Value;
                 
-                console.log("Extracted Table ID from DataSetFieldValues:", tableId);
+                // console.log("Extracted Table ID from DataSetFieldValues:", tableId);
                 const tables = await fetchSqlTables(metaRow.DataSourceID) || [];
                 
                 const dataSetTable = tables.find(obj => obj.Id == tableId);
                 const columnListStr = (dataSetTable && (dataSetTable.ColumnList || '')) || '';
                 
-                console.log('dataSetTable:', dataSetTable);
-                console.log('columnListStr:', columnListStr);
+                // console.log('dataSetTable:', dataSetTable);
+                // console.log('columnListStr:', columnListStr);
                 expected = columnListStr.split(',').map(s => String(s || '').trim()).filter(Boolean);
-                console.log('expected (from ColumnList):', expected);
+                // console.log('expected (from ColumnList):', expected);
             } else {
                 // EXISTING-Database: source of truth is dbo.DataSetColumns (API)
                 const colsList = await fetchSQLorREDCAPDataSetColumns(dataSetId) || [];
-                console.log('fetchSQLorREDCAPDataSetColumns returned for existing Database dataset ID', dataSetId);
-                console.log('Fetched columns for existing Database dataset:', colsList);
+                // console.log('fetchSQLorREDCAPDataSetColumns returned for existing Database dataset ID', dataSetId);
+                // console.log('Fetched columns for existing Database dataset:', colsList);
                 expected = Array.isArray(colsList)
                     ? colsList.map(r => String((r && r.ColumnName) || '').trim()).filter(Boolean)
                     : [];
-                console.log('expected (from DataSetColumns):', expected);
+                // console.log('expected (from DataSetColumns):', expected);
             }
         } else {
             return { valid: false, message: 'Unknown DataSourceTypeID; cannot validate columns.' };
@@ -519,14 +585,14 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     const normalize = arr => Array.from(new Set((arr || []).map(s => String(s || '').trim().toLowerCase())));
     const actualNorm = normalize(actual);
     const expectedNorm = normalize(expected);
-    console.log('Normalized Actual Columns:', actualNorm);
-    console.log('Normalized Expected Columns:', expectedNorm);
+    // console.log('Normalized Actual Columns:', actualNorm);
+    // console.log('Normalized Expected Columns:', expectedNorm);
 
     const missing = expectedNorm.filter(x => !actualNorm.includes(x));
     const extra = actualNorm.filter(x => !expectedNorm.includes(x));
 
-    console.log('Missing Columns:', missing);
-    console.log('Extra Columns:', extra);
+    // console.log('Missing Columns:', missing);
+    // console.log('Extra Columns:', extra);
 
     if (missing.length || extra.length) {
         return {
@@ -543,7 +609,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     for (let i = 0; i < parsedCols.length; i++) {
         const row = parsedCols[i];
         const rowNum = i + 2; // +1 for 1-based index, +1 for header row
-        console.log(row)
+        // console.log(row)
         
         const isValidFlag = (val) => {
             if (typeof val === 'boolean') return true;
@@ -557,10 +623,10 @@ async function validateDataSetColumns(parsedCols, metaRow) {
             return false;
         };
 
-        if (!isValidFlag(row.Tokenise)) {
+        if (!isValidFlag(row.Deidentify)) {
             return {
                 valid: false,
-                message: `Row ${rowNum}: 'Tokenise' must be boolean (found '${row.Tokenise}')`
+                message: `Row ${rowNum}: 'Deidentify' must be boolean (found '${row.Deidentify}')`
             };
         }
         if (!isValidFlag(row.Redact)) {
@@ -589,7 +655,8 @@ function handlePageChange(newPage) {
         if (pageInput) {
             pageInput.value = currentPage;
         }
-        console.warn(`Invalid page number entered: ${newPage}`);
+        showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
+                
     }
 }
 
@@ -614,7 +681,7 @@ async function fetchDataSetFolderValue(data_set_id) {
     }
 
     const result = resultsArray[0];
-    console.log("Fetched Folder Value:", result.Value);
+    // console.log("Fetched Folder Value:", result.Value);
 
     return {
         id: null, // Folders don't have a separate ID, just the name
@@ -632,13 +699,13 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
     tbody.innerHTML = `<tr><td>Folder Name</td><td>Loading folders...</td></tr>`;
 
     try {
-        console.log("DataSource in Folder Selector:", dataSource);
+        // console.log("DataSource in Folder Selector:", dataSource);
         const folders = await fetchSubFolders(dataSource.DataSourceID);
-        console.log("Fetched folders:", folders);
+        // console.log("Fetched folders:", folders);
 
         // Await the result from your function
         const fetchedData = await fetchDataSetFolderValue(dataSetID);
-        console.log("Fetched DataSet Field Value 2:", fetchedData);
+        // console.log("Fetched DataSet Field Value 2:", fetchedData);
         let folderId = fetchedData.id;
         let folderName = fetchedData.name;
 
@@ -649,11 +716,11 @@ async function renderFolderSelectorDataSetFields(tbody, dataSource, dataSetID) {
             <tr>
                 <td>Folder Name <input type="text" hidden="true"></td>
                 <td width="70%">
-                    <select id="tableNameSelector" class="form-control selectpicker bg-white">
-                        <option value="-1">Select a Folder</option>
+                    <select id="tableNameSelector" class="form-control selectpicker bg-white" required style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}"> 
+                        <option value="">Select a Folder</option>
                         ${optionsHtml}
                     </select>
-                    <div class="validation-message"></div>
+                    <div class="validation-message" style="color:#f97316;font-size:0.8rem;margin-top:0.25rem;">⚠ A folder must be selected before saving.</div>
                 </td>
             </tr>`;
         } else {
@@ -752,7 +819,7 @@ async function fetchDataSetFieldValue(data_set_id) {
     const initialParams = { "data_set_id": data_set_id };
 
     const resultsArray = await getFromAPI(API_GET_DATASET_FIELD_VALUE, initialParams);
-    console.log("Fetched DataSet Field Value (as array):", resultsArray);
+    // console.log("Fetched DataSet Field Value (as array):", resultsArray);
     if (!resultsArray || resultsArray.length === 0) {
         console.warn("API returned no data for data_set_id:", data_set_id);
         return { id: null, name: null }; // Return a default value
@@ -760,20 +827,20 @@ async function fetchDataSetFieldValue(data_set_id) {
 
     // --- KEY CHANGE: Get the first object from the array ---
     const result = resultsArray[0];
-    console.log("Fetched DataSet Field Value 1:", result);
-    console.log("Result FieldID:", result.FieldID);
+    // console.log("Fetched DataSet Field Value 1:", result);
+    // console.log("Result FieldID:", result.FieldID);
     // If Field Value is a Table Name, the result is the ID of the table
     // Get the actual table name from another endpoint
     // Case 1: The value is a table ID, so we need to fetch the name
     if (result.FieldID == 3) {
-        console.log("FieldID indicates a table reference. Fetching table name...");
+        // console.log("FieldID indicates a table reference. Fetching table name...");
         const tableIdAsString = result.Value; // The value is a string, e.g., "9"
 
         // --- CONVERT TO INTEGER HERE ---
         const tableId = parseInt(tableIdAsString, 10);
 
         const tableInfo = await fetchLoomeDataSourceTablesByTableId(tableId);
-        console.log("Fetched Table Info:", tableId, tableInfo[0]);
+        // console.log("Fetched Table Info:", tableId, tableInfo[0]);
         // Return an object with BOTH the ID and the fetched name
         return {
             id: tableId,
@@ -782,7 +849,7 @@ async function fetchDataSetFieldValue(data_set_id) {
 
         // Case 2: The value is just a simple value, not a reference to another table
     } else {
-        console.log("FieldID indicates a direct value. Using value as-is.");
+        // console.log("FieldID indicates a direct value. Using value as-is.");
         // Return an object with the same shape for consistency.
         // The ID can be null as it doesn't apply, and the 'name' is the value itself.
         return {
@@ -802,10 +869,10 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
 
     try {
         const tables = await fetchSqlTables(dataSource.DataSourceID);
-        console.log("Fetched tables:", tables);
+        // console.log("Fetched tables:", tables);
 
         const fetchedData = await fetchDataSetFieldValue(dataSetID);
-        console.log("Fetched DataSet Field Value 2:", fetchedData);
+        // console.log("Fetched DataSet Field Value 2:", fetchedData);
         let tableId = fetchedData.id;
         let tableName = fetchedData.name;
 
@@ -819,11 +886,11 @@ async function renderSqlTableSelectorDataSetFields(tbody, dataSource, dataSetID)
             <tr>
                 <td>Table Name <input type="text" hidden="true"></td>
                 <td width="70%">
-                    <select id="tableNameSelector" class="form-control selectpicker bg-white">
-                        <option value="-1">Select a Table</option>
+                    <select id="tableNameSelector" class="form-control selectpicker bg-white" required style="border:2px solid #f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.15);" onchange="var msg=this.closest('td').querySelector('.validation-message');if(this.value){this.style.border='';this.style.boxShadow='';msg.style.display='none';}else{this.style.border='2px solid #f97316';this.style.boxShadow='0 0 0 3px rgba(249,115,22,0.15)';msg.style.display='';}">
+                        <option value="">Select a Table</option>
                         ${optionsHtml}
                     </select>
-                    <div class="validation-message"></div>
+                    <div class="validation-message" style="color:#f97316;font-size:0.8rem;margin-top:0.25rem;">⚠ A table must be selected before saving.</div>
                 </td>
             </tr>`;
 
@@ -865,7 +932,7 @@ async function fetchSqlTables(data_source_id) {
  */
 async function updateDataSetFieldsTable(dataSource, dataSetID) {
 
-    console.log("Updating fields for DataSource:", dataSource);
+    // console.log("Updating fields for DataSource:", dataSource);
 
     const fieldsTable = document.getElementById('dataSetFieldsTable');
     const fieldsPlaceholder = document.getElementById('fieldsPlaceholder');
@@ -885,7 +952,7 @@ async function updateDataSetFieldsTable(dataSource, dataSetID) {
     fieldsPlaceholder.style.display = 'none';
     fieldsTable.style.display = 'table';
 
-    console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
+    // console.log("DataSourceTypeID:", dataSource.DataSourceTypeID);
 
     // Use a switch to decide which content to render
     switch (dataSource.DataSourceTypeID) {
@@ -1054,7 +1121,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         // Early exit if the response is null, undefined, etc.
         if (!parsedInitial) {
-            console.log("API returned no data.");
+            // console.log("API returned no data.");
             return [];
         }
 
@@ -1064,18 +1131,18 @@ async function getFromAPI(API_ID, initialParams) {
         if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
 
             // --- PAGINATED PATH ---
-            console.log("Detected a paginated response.");
+            // console.log("Detected a paginated response.");
 
             allResults = parsedInitial.Results;
             const totalPages = parsedInitial.PageCount;
 
             if (totalPages > 1) {
                 for (let page = 2; page <= totalPages; page++) {
-                    console.log(`Fetching page ${page} of ${totalPages}...`);
+                    // console.log(`Fetching page ${page} of ${totalPages}...`);
 
                     // Construct params for the next page, preserving other initial params
                     const params = { ...initialParams, "page": page };
-                    console.log(params)
+                    // console.log(params)
                     const response = await window.loomeApi.runApiRequest(API_ID, params);
                     const parsed = safeParseJson(response);
 
@@ -1088,7 +1155,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         } else {
             // --- NON-PAGINATED PATH ---
-            console.log("Detected a non-paginated response.");
+            // console.log("Detected a non-paginated response.");
 
             if (Array.isArray(parsedInitial)) {
                 allResults = parsedInitial;
@@ -1097,7 +1164,7 @@ async function getFromAPI(API_ID, initialParams) {
             }
         }
 
-        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        // console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
         return allResults;
 
     } catch (error) {
@@ -1196,7 +1263,7 @@ async function formatSQLColumnsFromSchema(tableId) {
             "LogicalColumnName": '',
             "BusinessDescription": '',
             "ExampleValue": '',
-            "Tokenise": false,
+            "Deidentify": false,
             "TokenIdentifierType": 0,
             "Redact": false,
             "DisplayOrder": index + 1,
@@ -1246,10 +1313,10 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
         // --- SCENARIO 1: Editing an EXISTING Data Set ---
         if (dataSetId && dataSetId !== 'new') {
             try {
-                console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
+                // console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
                 newColumnsData = await fetchSQLorREDCAPDataSetColumns(dataSetId);
 
-                console.log("newColumnsData:", newColumnsData)
+                // console.log("newColumnsData:", newColumnsData)
             } catch (error) {
                 console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
             }
@@ -1259,7 +1326,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             const tableNameSelector = document.getElementById('tableNameSelector');
             if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== '-1') {
                 const tableId = tableNameSelector.value;
-                console.log(`FETCHING schema for new Data Set from Table ID: ${tableId}...`);
+                // console.log(`FETCHING schema for new Data Set from Table ID: ${tableId}...`);
                 newColumnsData = await formatSQLColumnsFromSchema(tableId);
             }
         }
@@ -1267,10 +1334,10 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
         // --- SCENARIO 1: Editing an EXISTING Data Set ---
         if (dataSetId && dataSetId !== 'new') {
             try {
-                console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
+                // console.log(`FETCHING columns for existing Data Set ID: ${dataSetId}...`);
                 newColumnsData = await fetchSQLorREDCAPDataSetColumns(dataSetId);
 
-                console.log("newColumnsData:", newColumnsData)
+                // console.log("newColumnsData:", newColumnsData)
             } catch (error) {
                 console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
             }
@@ -1280,7 +1347,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
             const redCapResult= await syncREDCapDataSetColumns(currentDataSourceID);
             const redCapResultStatus = redCapResult.status;
             const redCapColumns = redCapResult.metadata || [];
-            console.log(redCapColumns);
+            // console.log(redCapColumns);
 
             // Supports this response shapes:
             // { status: 'success', metadata: [ { }, { }, ... ] }
@@ -1292,7 +1359,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                     let logicalName = '';
                     let businessDesc = '';
                     let example = '';
-                    let tokenise = false;
+                    let deidentify = false;
                     let tokenIdentifierType = 0;
                     let redact = false;
 
@@ -1301,7 +1368,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                     columnType = String(item.field_type).trim() || '';
                     logicalName =  String(item.field_name).trim() || '';
                     example = String(item.select_choices_or_calculations).trim() || '';
-                    tokenise = normalizeBooleanFlag(item.Tokenise ?? item.tokenise ?? item.Tokenize ?? false);
+                    deidentify = normalizeBooleanFlag(item.Deidentify ?? item.deidentify ?? item.Deidentify ?? false);
                     tokenIdentifierType = item.TokenIdentifierType || item.token_identifier_type || 0;
                     redact = normalizeBooleanFlag(item.Redact ?? item.redact ?? false);
                     
@@ -1312,7 +1379,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                         LogicalColumnName: logicalName,
                         BusinessDescription: businessDesc,
                         ExampleValue: example,
-                        Tokenise: tokenise,
+                        Deidentify: deidentify,
                         TokenIdentifierType: tokenIdentifierType,
                         Redact: redact,
                         DisplayOrder: idx + 1,
@@ -1321,7 +1388,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 });
 
             }  else {
-                console.log(`Error fetching columns for Data Set ID ${dataSetId}: Pull from REDCap server did not succeed`);
+                // console.log(`Error fetching columns for Data Set ID ${dataSetId}: Pull from REDCap server did not succeed`);
             }
         }
     } else if (dataSourceTypeId === 3) { // Folder Type
@@ -1333,7 +1400,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 FileType: item.FileType || item.FileExtensions || '',
                 FileDescription: item.FileDescription || '',
                 Redact: item.Redact || 0,
-                Tokenise: item.Tokenise || 0
+                Deidentify: item.Deidentify || 0
             };
         };
         if (dataSetId === 'new') {
@@ -1347,7 +1414,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 // Apply the consistent mapping
                 newColumnsData = originalData.map(mapFolderData);
 
-                console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
+                // console.log("Mapped NEW Folder Columns Data: ", newColumnsData);
             }
         } else if (dataSetId && dataSetId !== 'new') {
             try {
@@ -1357,7 +1424,7 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
                 // 2. Apply the SAME consistent mapping
                 newColumnsData = fetchedData.map(mapFolderData);
 
-                console.log("Fetched and Mapped EXISTING (saved) folder columns:", newColumnsData);
+                // console.log("Fetched and Mapped EXISTING (saved) folder columns:", newColumnsData);
 
             } catch (error) {
                 console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
@@ -1403,9 +1470,9 @@ function renderTablePage(dataSetTypeId) {
 
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
-    console.log(startIndex, endIndex)
+    // console.log(startIndex, endIndex)
     const pageData = sourceData.slice(startIndex, endIndex);
-    console.log("pageData: ", pageData, sourceData)
+    // console.log("pageData: ", pageData, sourceData)
 
     const emptyMessage = columnSearchTerm.trim() && totalItems === 0
         ? 'No columns match your search term. Clear the search to view all columns.'
@@ -1413,7 +1480,7 @@ function renderTablePage(dataSetTypeId) {
 
     displayColumnsTable(pageData, dataSetTypeId, emptyMessage);
 
-    console.log(totalItems, pageSize, currentPage)
+    // console.log(totalItems, pageSize, currentPage)
     renderPagination('pagination-controls', totalItems, pageSize, currentPage);
 }
 
@@ -1432,9 +1499,9 @@ function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
 
         let matchesDeidentify = true;
         if (columnDeidentifyFilter === 'yes') {
-            matchesDeidentify = normalizeBooleanFlag(column?.Tokenise);
+            matchesDeidentify = normalizeBooleanFlag(column?.Deidentify);
         } else if (columnDeidentifyFilter === 'no') {
-            matchesDeidentify = !normalizeBooleanFlag(column?.Tokenise);
+            matchesDeidentify = !normalizeBooleanFlag(column?.Deidentify);
         }
 
         return matchesTerm && matchesRedact && matchesDeidentify;
@@ -1460,14 +1527,28 @@ function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
 }
 
 /**
+ * Validates email format
+ * @param {string} email - The email to validate
+ * @returns {boolean} True if email is valid
+ */
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+/**
  * Gathers all data from the form fields and tables into a structured object.
  * @returns {object} An object containing mainDetails and columns arrays.
  */
 function gatherFormData(allColumnsData) {
     // --- Part A: Gather Main Form Details ---
+    const rawName = document.getElementById('dataSetName').value;
+    const rawDescription = document.getElementById('dataSetDescription').value;
     const mainDetails = {
-        Name: document.getElementById('dataSetName').value,
-        Description: document.getElementById('dataSetDescription').value,
+        Name: sanitizeInput(rawName),
+        _rawName: rawName,
+        Description: sanitizeInput(rawDescription),
+        _rawDescription: rawDescription,
         DataSourceID: parseInt(document.getElementById('dataSource').value, 10),
         Owner: document.getElementById('dataSetOwner').value,
         Approvers: document.getElementById('dataSetApprover').value,
@@ -1498,7 +1579,7 @@ function gatherFormData(allColumnsData) {
     const scrapeFieldsTable = (tbody) => {
         // --- PATH 1: Check for the specific SQL Table Name selector first ---
         const tableNameSelector = tbody.querySelector('#tableNameSelector');
-        if (tableNameSelector && tableNameSelector.value && tableNameSelector.value !== "-1") {
+        if (tableNameSelector && tableNameSelector.value) {
             if (currentDataSourceTypeID === 1) { // SQL Database
                 // The FieldID for "Table Name" is 3.
                 dataSetFieldValues.push({
@@ -1539,7 +1620,7 @@ function gatherFormData(allColumnsData) {
             DataSetFolderFiles: []
         };
     } else if (currentDataSourceTypeID === 3) {
-        console.log("Gathering form data for Folder type with columns:", columns);
+        // console.log("Gathering form data for Folder type with columns:", columns);
         // Remove 'Id' since that ID is from LoomeDataSourceFolders 
         const columnsWithoutId = columns.map(({ Id, ...rest }) => rest);
 
@@ -1565,7 +1646,7 @@ async function createDataSet(data) {
         DataSourceTypeID: currentDataSourceTypeID
     };
 
-    console.log("Sending this payload to the API:", payload);
+    // console.log("Sending this payload to the API:", payload);
 
     try {
         // Send the new 'payload' object to the API instead of the original 'data'
@@ -1574,9 +1655,15 @@ async function createDataSet(data) {
         
         // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
         const parsed = safeParseJson(response);
-        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
-            const error = new Error(parsed.detail || parsed.message || 'Server error');
-            error.detail = parsed.detail;
+        const apiErr = extractApiError(parsed);
+        if (apiErr) {
+            const error = new Error(apiErr);
+            error.detail = apiErr;
+            error.response = response;
+            throw error;
+        }
+        if (parsed && parsed.status && parsed.status >= 400) {
+            const error = new Error(parsed.message || 'Server error');
             error.response = response;
             throw error;
         }
@@ -1623,7 +1710,7 @@ async function updateDataSet(data_set_id, data) {
                 FileExtensions: file.FileExtensions,
                 // TokeniseRule: "",
                 Redact: file.Redact ? 1 : 0,
-                Tokenise: file.Tokenise ? 1 : 0,
+                Deidentify: file.Deidentify ? 1 : 0,
             });
         });
 
@@ -1655,7 +1742,7 @@ async function updateDataSet(data_set_id, data) {
     }
 
 
-    console.log("Sending this payload to the API:", payload);
+    // console.log("Sending this payload to the API:", payload);
 
 
     try {
@@ -1669,9 +1756,15 @@ async function updateDataSet(data_set_id, data) {
 
         // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
         const parsed = safeParseJson(response);
-        if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
-            const error = new Error(parsed.detail || parsed.message || 'Server error');
-            error.detail = parsed.detail;
+        const apiErr = extractApiError(parsed);
+        if (apiErr) {
+            const error = new Error(apiErr);
+            error.detail = apiErr;
+            error.response = response;
+            throw error;
+        }
+        if (parsed && parsed.status && parsed.status >= 400) {
+            const error = new Error(parsed.message || 'Server error');
             error.response = response;
             throw error;
         }
@@ -1954,7 +2047,7 @@ async function renderManageDataSetPage() {
         async function createAndDownloadExcelFile() {
             const formData = gatherFormData(allColumnsData);
             if (!formData.Name || !formData.Owner || !formData.Approvers) {
-                showToast('Please fill in Name, Owner, and Approver before exporting.', 'warning');
+                showToast('Please fill in Name, Owner, and Approver before exporting.', 'error');
                 return;
             }
 
@@ -1967,7 +2060,7 @@ async function renderManageDataSetPage() {
                 DataSourceTypeID: currentDataSourceTypeID
             };
             
-            console.log("Export Payload:", payload);
+            // console.log("Export Payload:", payload);
 
             exportLoading.style.display = 'inline-block';
             exportBtn.disabled = true;
@@ -1983,12 +2076,12 @@ async function renderManageDataSetPage() {
                     "payload": payload 
                 });
 
-                console.log("--- DEBUG START ---");
-                console.log("Constructor:", response.constructor.name);
-                console.log("Keys:", Object.keys(response));
-                console.log("Full Object:", response);
-                console.log("Typeof:", typeof response);
-                console.log("--- DEBUG END ---");
+                // console.log("--- DEBUG START ---");
+                // console.log("Constructor:", response.constructor.name);
+                // console.log("Keys:", Object.keys(response));
+                // console.log("Full Object:", response);
+                // console.log("Typeof:", typeof response);
+                // console.log("--- DEBUG END ---");
                 
                 // 1. Get the base64 string from the object
                 const base64String = response.fileData;
@@ -2018,7 +2111,7 @@ async function renderManageDataSetPage() {
 
             } catch (error) {
                 console.error("Export Error:", error);
-                showToast(error.message || 'Failed to export. Please try again.', 'warning');
+                showToast(error.message || 'Failed to export. Please try again.', 'error');
             } finally {
                 exportLoading.style.display = 'none';
                 updateExportButtonState();
@@ -2036,7 +2129,7 @@ async function renderManageDataSetPage() {
             const stateRowsCount = (allColumnsData && allColumnsData.length) || 0;
             const tableHasRows = tableRowsCount > 0 || stateRowsCount > 0;
 
-            console.log("Checking export button state:", { dsSelected, dataSourceSelected, tableRowsCount, stateRowsCount });
+            // console.log("Checking export button state:", { dsSelected, dataSourceSelected, tableRowsCount, stateRowsCount });
 
             // Export: existing dataset OR a new dataset with imported/loaded columns
             const showExport = (dsSelected || dataSourceSelected) && tableHasRows;
@@ -2067,7 +2160,7 @@ async function renderManageDataSetPage() {
                 // 1) Validate extension (basic client-side check)
                 const name = (file.name || '').toLowerCase();
                 if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
-                    showToast('Please choose an Excel file (.xls or .xlsx).', 'warning');
+                    showToast('Please choose an Excel file (.xls or .xlsx).', 'error');
                     uploadInput.value = '';
                     return;
                 }
@@ -2111,7 +2204,7 @@ async function renderManageDataSetPage() {
                 // Wait for verification to complete before proceeding
                 try {
                     const response = await window.loomeApi.runApiRequest(API_VERIFY_UPLOAD_SHEET, { "payload": payload });
-                    console.log('Verification response:', response);
+                    // console.log('Verification response:', response);
                     const result = response;
                     if (!result || result.valid !== true) {
                         console.error('Tampering Detected:', result && result.message ? result.message : 'Unknown verification failure');
@@ -2120,7 +2213,7 @@ async function renderManageDataSetPage() {
                         uploadInput.value = '';
                         return;
                     }
-                    console.log('Verification successful:', result.message);
+                    // console.log('Verification successful:', result.message);
                 } catch (error) {
                     console.error('Network or Parsing Error during verification:', error);
                     showToast('Could not verify file integrity. Please try again.', 'error');
@@ -2138,7 +2231,7 @@ async function renderManageDataSetPage() {
                     const names = workbook.SheetNames || [];
                     const missing = requiredSheets.filter(s => !names.includes(s));
                     if (missing.length) {
-                        showToast(`Missing required sheets: ${missing.join(', ')}`, 'warning');
+                        showToast(`Missing required sheets: ${missing.join(', ')}`, 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
@@ -2150,7 +2243,7 @@ async function renderManageDataSetPage() {
                     const colsRows = XLSX.utils.sheet_to_json(colsSheet, { header: 1, defval: '' });
                     const metaRows = XLSX.utils.sheet_to_json(metaSheet, { header: 1, defval: '' });
 
-                    const expectedColsHeader = ['ColumnName','ColumnType','LogicalColumnName','BusinessDescription','ExampleValue','Tokenise','Redact',]; //,'TokenIdentifierType', 'DisplayOrder','IsFilter'
+                    const expectedColsHeader = ['ColumnName','ColumnType','LogicalColumnName','BusinessDescription','ExampleValue','Redact','Deidentify']; //,'TokenIdentifierType', 'DisplayOrder','IsFilter'
                     const expectedMetaHeader = ['Name','Description','DataSourceID','IsActive','Approvers','OptOutMessage','OptOutList','Owner','OptOutColumn','DataSetFieldValues','DataSetMetaDataValues','DataSetFolders','DataSetFolderFiles','DataSourceTypeID','DataSetID', '_VerificationHash'];
 
                     const actualColsHeader = (colsRows[0] || []).map(c => String(c).trim());
@@ -2166,14 +2259,14 @@ async function renderManageDataSetPage() {
                     };
 
                     if (!arrayEquals(actualColsHeader, expectedColsHeader)) {
-                        showToast('Invalid header in DataSetColumns sheet. Ensure columns match the required header and order.', 'warning');
+                        showToast('Invalid header in DataSetColumns sheet. Ensure columns match the required header and order.', 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
                     }
 
                     if (!arrayEquals(actualMetaHeader, expectedMetaHeader)) {
-                        showToast('Invalid header in DataSetMetadata sheet. Ensure columns match the required header and order.', 'warning');
+                        showToast('Invalid header in DataSetMetadata sheet. Ensure columns match the required header and order.', 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
@@ -2185,7 +2278,7 @@ async function renderManageDataSetPage() {
 
                     // Enforce exactly one metadata row
                     if (!Array.isArray(parsedMeta) || parsedMeta.length !== 1) {
-                        showToast('DataSetMetadata must contain exactly one data row.', 'warning');
+                        showToast('DataSetMetadata must contain exactly one data row.', 'error');
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return;
@@ -2199,7 +2292,7 @@ async function renderManageDataSetPage() {
                         // show detailed feedback to the user
                         showToast(validation.message || 'Column validation failed.', 'error');
                         // Optionally surface missing/extra in console or UI
-                        console.log('Column validation details:', validation);
+                        // console.log('Column validation details:', validation);
                         hideColumnsLoader();
                         uploadInput.value = '';
                         return; // abort import
@@ -2213,7 +2306,7 @@ async function renderManageDataSetPage() {
                         LogicalColumnName: r.LogicalColumnName || '',
                         BusinessDescription: r.BusinessDescription || '',
                         ExampleValue: r.ExampleValue || '',
-                        Tokenise: normalizeBooleanFlag(r.Tokenise),
+                        Deidentify: normalizeBooleanFlag(r.Deidentify),
                         TokenIdentifierType: Number(r.TokenIdentifierType) || 0,
                         Redact: normalizeBooleanFlag(r.Redact),
                         DisplayOrder: Number(r.DisplayOrder) || (idx + 1),
@@ -2376,8 +2469,8 @@ async function renderManageDataSetPage() {
                     }
 
                     showToast('Upload validated and imported successfully.', 'success');
-                    console.log('Imported columns:', importedColumns);
-                    console.log('Imported metadata rows:', parsedMeta);
+                    // console.log('Imported columns:', importedColumns);
+                    // console.log('Imported metadata rows:', parsedMeta);
 
                 } catch (err) {
                     console.error('Failed to parse uploaded workbook:', err);
@@ -2402,17 +2495,53 @@ async function renderManageDataSetPage() {
 
             if (!confirm('Are you sure you want to delete this Data Set? This action cannot be undone.')) return;
 
+            // --- Show "Deleting..." state ---
+            const originalHtml = deleteBtn.innerHTML;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = `
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                Deleting…`;
+
             try {
+
+                // These API calls update the Portal Catalogue list
+                const datasetName = nameInput.value.trim();
+                const dataSourceTypeLabels = { 1: 'Database', 2: 'REDCap', 3: 'Folder' };
+                const dataSourceTypeLabel = dataSourceTypeLabels[currentDataSourceTypeID] || 'Dataset';
+                const token = await window.loomeApi.runApiRequest(API_GET_PORTAL_TOKEN);
+                const returnedAssets = await window.loomeApi.runApiRequest(API_GET_ASSET_BY_NAME, { 
+                        assetName: datasetName,
+                        entityTypes: dataSourceTypeLabel,
+                        token: token.access_token
+                    }
+                );
+                const asset = returnedAssets?.items?.[0];
+                if (asset && asset.id) {
+                    const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
+                        assetId: asset.id, token: token.access_token 
+                    });
+                    // console.log('Deleted catalogue asset:', deletedDataSet);
+                } else {
+                    showToast(`No matching catalogue asset found for "${datasetName}" (${dataSourceTypeLabel}). Database was not modified.`, 'error');
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalHtml;
+                    return;
+                }
+
                 const params = { id: parseInt(selectedId, 10) };
                 // Use the low-level runApiRequest so we can inspect error payloads directly
-                const raw = await window.loomeApi.runApiRequest(API_DELETE_DATASET, params);
+                // This API call updates the database
+                const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);
                 const parsed = safeParseJson(raw);
 
                 // If the API responded with a detail message, treat it as an error
                 if (parsed && parsed.detail) {
                     showToast(parsed.detail, 'error');
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalHtml;
                     return;
                 }
+
 
                 // Some APIs may return a truthy success value or empty array; consider that success
                 showToast('Data Set deleted successfully.', 'success');
@@ -2436,6 +2565,9 @@ async function renderManageDataSetPage() {
                     detailMsg = 'Failed to delete Data Set.';
                 }
                 showToast(detailMsg, 'error');
+                // Restore button on failure so the user can retry
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalHtml;
             }
         });
     }
@@ -2453,7 +2585,7 @@ async function renderManageDataSetPage() {
         activeCheckbox.checked = true; // A sensible default
         owner.value = '';
         approver.value = '';
-        console.log("Form cleared for new data source.");
+        // console.log("Form cleared for new data source.");
     }
 
     /**
@@ -2469,7 +2601,7 @@ async function renderManageDataSetPage() {
         owner.value = dataSet.Owner;
         approver.value = dataSet.Approvers;
 
-        console.log("Form populated with:", dataSet, dataSource);
+        // console.log("Form populated with:", dataSet, dataSource);
     }
 
 
@@ -2523,7 +2655,7 @@ async function renderManageDataSetPage() {
 
                 submitButton.disabled = true;
                 submitButton.textContent = 'Saving Disabled';
-                showToast('This dataset is based on an inactive data source. It is not available for requests or edits. Please contact the platform administrator for assistance.', 'warning');
+                showToast('This dataset is based on an inactive data source. It is not available for requests or edits. Please contact the platform administrator for assistance.', 'error');
             }
 
             // The data source might still be missing if the API call failed or if the ID is invalid. In that case, we should log a warning and avoid trying to populate the form with undefined data.
@@ -2532,7 +2664,7 @@ async function renderManageDataSetPage() {
                 return;
             }
 
-            console.log("Selected Data Set and Data Source:", selectedDataSet, dataSource);
+            // console.log("Selected Data Set and Data Source:", selectedDataSet, dataSource);
             // 1. Populate the main form fields
             populateForm(selectedDataSet, dataSource);
 
@@ -2562,6 +2694,9 @@ async function renderManageDataSetPage() {
     // For example, if it's inside a DOMContentLoaded listener:
     document.addEventListener('DOMContentLoaded', async () => {
 
+        attachCharCounter(document.getElementById('dataSetName'), 100);
+        attachCharCounter(document.getElementById('dataSetDescription'), 700);
+
         try {
             // 1. Use 'await' to wait for the data to arrive.
             // The code will pause here until getAllDataSources() resolves.
@@ -2569,7 +2704,7 @@ async function renderManageDataSetPage() {
             let allDataSources = await getAllDataSources();
 
             // 2. Now, allResults is the actual array of data.
-            console.log('Data has arrived:', allDataSets);
+            // console.log('Data has arrived:', allDataSets);
 
             // 3. The rest of your code can now run in the correct order.
             populateExistingDataSets(optgroup, allDataSets);
@@ -2627,7 +2762,7 @@ async function renderManageDataSetPage() {
                 if (event.target.id === 'tableNameSelector') {
                     // Always load the FIRST page when the table changes
                     //await updateColumnsForTable(1);
-                    console.log("Table Name Selector Changed");
+                    // console.log("Table Name Selector Changed");
                     await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
                     try { if (typeof updateExportButtonState === 'function') updateExportButtonState(); } catch (e) { /* ignore */ }
 
@@ -2750,8 +2885,20 @@ async function renderManageDataSetPage() {
                 const target = event.target;
                 if (target.classList.contains('editable-checkbox')) {
                     const field = target.dataset.field;
+                    const row = target.closest('tr');
+
+                    // Mutual exclusivity: Redact and Deidentify cannot both be checked
+                    if (target.checked && (field === 'Redact' || field === 'Deidentify')) {
+                        const oppositeField = field === 'Redact' ? 'Deidentify' : 'Redact';
+                        const oppositeCheckbox = row.querySelector(`.editable-checkbox[data-field="${oppositeField}"]`);
+                        if (oppositeCheckbox && oppositeCheckbox.checked) {
+                            oppositeCheckbox.checked = false;
+                            updateInMemoryData(row, oppositeField, 0);
+                        }
+                    }
+
                     const value = target.checked ? 1 : 0;
-                    updateInMemoryData(target.closest('tr'), field, value);
+                    updateInMemoryData(row, field, value);
                 }
             });
 
@@ -2769,7 +2916,7 @@ async function renderManageDataSetPage() {
                     return;
                 }
 
-                console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
+                // console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
 
                 const columnToUpdate = allColumnsData.find(col => {
                     // Match by DataSetColumnID (for existing datasets)
@@ -2786,8 +2933,8 @@ async function renderManageDataSetPage() {
 
                 if (columnToUpdate) {
                     columnToUpdate[field] = value;
-                    console.log("✓ Updated successfully. Object now:", columnToUpdate);
-                    console.log("✓ Full allColumnsData:", allColumnsData);
+                    // console.log("✓ Updated successfully. Object now:", columnToUpdate);
+                    // console.log("✓ Full allColumnsData:", allColumnsData);
                 } else {
                     console.error("✗ Could not find matching object for uniqueId:", uniqueId);
                     console.error("Available objects:", allColumnsData.map(col => `${col.FolderName}-${col.FileType}`));
@@ -2801,7 +2948,101 @@ async function renderManageDataSetPage() {
             // =================================================================
 
             const manageDataSetForm = document.getElementById('manageDataSetForm');
-            
+
+            // --- Confirmation modal elements ---
+            const confirmModal = document.getElementById('confirm-save-modal');
+            const confirmBody = document.getElementById('confirm-save-body');
+            const confirmOkBtn = document.getElementById('confirm-save-ok-btn');
+            const confirmCancelBtn = document.getElementById('confirm-save-cancel-btn');
+            const confirmBackdrop = document.getElementById('confirm-save-backdrop');
+
+            // Stash for the pending save so the confirm button can execute it
+            let pendingSave = null;
+
+            function showConfirmModal() { confirmModal.style.display = ''; }
+            function hideConfirmModal() { confirmModal.style.display = 'none'; }
+
+            function buildConfirmModalBody(columns) {
+                const included = columns.filter(c => !c.Redact);
+                const deidentified = columns.filter(c => c.Deidentify);
+                const redacted = columns.filter(c => c.Redact);
+                const nameKey = currentDataSourceTypeID === 3 ? 'FolderName' : 'ColumnName';
+                const plural = (n) => n !== 1 ? 's' : '';
+
+                const warningBanner = (redacted.length === 0 && deidentified.length === 0) ? `
+                    <div style="display:flex;align-items:center;gap:0.75rem;padding:1rem;background:#fefce8;border:1px solid #fde68a;border-radius:0.5rem;">
+                        <span style="font-size:1.25rem;">⚠️</span>
+                        <p style="margin:0;font-size:0.875rem;color:#854d0e;">No columns are marked for <strong>Redact</strong> or <strong>Deidentify</strong>. The data will be saved as-is.</p>
+                    </div>` : '';
+
+                const buildSection = (items, label, headerBg, headerColor, badgeBg) => {
+                    const count = items.length;
+                    const badge = `<span style="display:inline-block;background:${badgeBg};color:#fff;font-size:0.75rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">${count}</span>`;
+
+                    if (count === 0) {
+                        return `
+                            <div style="border:1px solid #e5e7eb;border-radius:0.5rem;overflow:hidden;">
+                                <div style="padding:0.625rem 0.75rem;background:${headerBg};color:${headerColor};font-size:0.8125rem;font-weight:600;display:flex;align-items:center;">
+                                    ${label} ${badge}
+                                    <span style="margin-left:auto;font-size:0.75rem;font-weight:400;color:#9ca3af;font-style:italic;">None</span>
+                                </div>
+                            </div>`;
+                    }
+
+                    const rows = items.map(c => {
+                        const name = c[nameKey] || 'Unknown';
+                        const extra = currentDataSourceTypeID === 3 && c.FileType ? `<span style="color:#9ca3af;font-size:0.75rem;margin-left:0.5rem;">(${escapeHtml(c.FileType)})</span>` : '';
+                        return `<tr><td style="padding:0.375rem 0.75rem;font-size:0.8125rem;color:#374151;border-bottom:1px solid #f3f4f6;">${escapeHtml(name)}${extra}</td></tr>`;
+                    }).join('');
+
+                    return `
+                        <div style="border:1px solid #e5e7eb;border-radius:0.5rem;overflow:hidden;">
+                            <div onclick="(function(el){var b=el.nextElementSibling;var a=el.querySelector('[data-arrow]');if(b.style.display==='none'){b.style.display='block';a.textContent='▾';}else{b.style.display='none';a.textContent='▸';}})(this)"
+                                 style="padding:0.625rem 0.75rem;background:${headerBg};color:${headerColor};font-size:0.8125rem;font-weight:600;display:flex;align-items:center;cursor:pointer;user-select:none;">
+                                <span data-arrow style="margin-right:0.5rem;font-size:0.75rem;">▸</span>
+                                ${label} ${badge}
+                                <span style="margin-left:auto;font-size:0.75rem;font-weight:400;color:${headerColor};opacity:0.7;">Show details</span>
+                            </div>
+                            <div style="display:none;max-height:200px;overflow-y:auto;">
+                                <table style="width:100%;"><tbody>${rows}</tbody></table>
+                            </div>
+                        </div>`;
+                };
+
+                return `
+                    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                        ${warningBanner}
+                        ${buildSection(included, 'Included', '#f0fdf4', '#15803d', '#16a34a')}
+                        ${buildSection(deidentified, 'Deidentified', '#eff6ff', '#1d4ed8', '#2563eb')}
+                        ${buildSection(redacted, 'Redacted', '#fef2f2', '#b91c1c', '#dc2626')}
+                    </div>`;
+            }
+
+            // Close modal on Cancel / backdrop click / Escape
+            confirmCancelBtn.addEventListener('click', () => {
+                hideConfirmModal();
+                pendingSave = null;
+                submitButton.disabled = false;
+                submitButton.textContent = 'Save Data Set';
+            });
+            confirmBackdrop.addEventListener('click', () => {
+                confirmCancelBtn.click();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && confirmModal.style.display !== 'none') {
+                    confirmCancelBtn.click();
+                }
+            });
+
+            // Confirm button — execute the stashed save
+            confirmOkBtn.addEventListener('click', async () => {
+                hideConfirmModal();
+                if (typeof pendingSave === 'function') {
+                    await pendingSave();
+                    pendingSave = null;
+                }
+            });
+
             /**
              * The main submit handler for the entire form.
              */
@@ -2817,66 +3058,138 @@ async function renderManageDataSetPage() {
                 try {
                     // 3. Gather all data from the form into a structured object
                     const formData = gatherFormData(allColumnsData);
-                    console.log("Form Data to Submit:", formData);
-                    // --- Client-side validation (optional but recommended) ---
-                    if (!formData.Name) {
-                        showToast('Data Set Name is required.', 'warning');
-                        throw new Error('Validation failed: Name is required.');
+                    // console.log("Form Data to Submit:", formData);
+                    
+                    // --- Client-side validation ---
+                    if (containsInvalidChars(formData._rawName)) {
+                        const msg = 'Special characters are not allowed in the Dataset Name.';
+                        showToast(msg, 'error');
+                        const err = new Error(msg); err.handled = true; throw err;
+                    }
+                    if (!formData.Name || !formData.Name.trim()) {
+                        const msg = 'Data Set Name is required.';
+                        showToast(msg, 'error');
+                        const err = new Error(msg); err.handled = true; throw err;
+                    }
+                    if (containsInvalidChars(formData._rawDescription)) {
+                        const msg = 'Special characters are not allowed in the Dataset Description.';
+                        showToast(msg, 'error');
+                        const err = new Error(msg); err.handled = true; throw err;
                     }
 
-                    // 4. Determine if this is a CREATE or UPDATE operation
-                    const dataSetId = document.getElementById('dataSetSelection').value;
-
-                    if (dataSetId === 'new') {
-                        // --- CREATE (POST) LOGIC ---
-
-                        // Create the main data set record first
-                        console.log("Creating new Data Set with payload:", formData);
-                        const newDataSet = await createDataSet(formData); // Assume this returns the new object with its ID
-                        const newDataSetId = newDataSet.DataSetID;
-
-                        showToast('Data Set created successfully!');
-
-                    } else {
-                        // --- UPDATE (PUT/PATCH) LOGIC ---
-                        console.log(`Updating Data Set ID ${dataSetId} with payload:`, formData);
-
-                        // Update the main data set record;
-                        await updateDataSet(dataSetId, formData);
-
-                        showToast('Dataset updated successfully!');
+                    // Validate Owner field
+                    if (!formData.Owner || formData.Owner.trim() === '') {
+                        showToast('Owner email is required.', 'error');
+                        throw new Error('Validation failed: Owner is required.');
                     }
 
-                    // Clear the forms
-                    clearForm();
-                    updateDataSetFieldsTable(null, null);
-                    updateMetaDataTable(null, null);
-                    displayColumnsTable(null);
-                    populateExistingDataSets(optgroup, await getAllDataSets());
+                    if (!isValidEmail(formData.Owner)) {
+                        showToast('Owner email is not in a valid format.', 'error');
+                        throw new Error('Validation failed: Owner email format is invalid.');
+                    }
 
+                    // Validate Approver field
+                    if (!formData.Approvers || formData.Approvers.trim() === '') {
+                        showToast('Approver email is required.', 'error');
+                        throw new Error('Validation failed: Approver is required.');
+                    }
+
+                    if (!isValidEmail(formData.Approvers)) {
+                        showToast('Approver email is not in a valid format.', 'error');
+                        throw new Error('Validation failed: Approver email format is invalid.');
+                    }
+
+                    // Validate Data Set Field (Table/Folder selection) for types that require it
+                    if (currentDataSourceTypeID === 1 || currentDataSourceTypeID === 3) {
+                        const fieldLabel = currentDataSourceTypeID === 1 ? 'Table' : 'Folder';
+                        const selector = document.getElementById('tableNameSelector');
+                        if (!selector || !selector.value) {
+                            const msg = `A ${fieldLabel} must be selected before saving.`;
+                            showToast(msg, 'error');
+                            const err = new Error(msg); err.handled = true; throw err;
+                        }
+                    }
+
+                    // --- Show confirmation modal before saving ---
+                    confirmBody.innerHTML = buildConfirmModalBody(allColumnsData);
+
+                    // Stash the actual save as a function the Confirm button will call
+                    pendingSave = async () => {
+                        submitButton.disabled = true;
+                        submitButton.textContent = 'Saving...';
+                        try {
+                            // 4. Determine if this is a CREATE or UPDATE operation
+                            const dataSetId = document.getElementById('dataSetSelection').value;
+
+                            if (dataSetId === 'new') {
+                                // console.log("Creating new Data Set with payload:", formData);
+                                const newDataSet = await createDataSet(formData);
+                                const newDataSetId = newDataSet.DataSetID;
+                                showToast('Data Set created successfully!');
+                            } else {
+                                // console.log(`Updating Data Set ID ${dataSetId} with payload:`, formData);
+                                await updateDataSet(dataSetId, formData);
+                                showToast('Dataset updated successfully!');
+                            }
+
+                            // Clear the forms
+                            clearForm();
+                            updateDataSetFieldsTable(null, null);
+                            updateMetaDataTable(null, null);
+                            displayColumnsTable(null);
+                            populateExistingDataSets(optgroup, await getAllDataSets());
+
+                        } catch (error) {
+                            console.error('An error occurred during submission:', error);
+                            let detailMsg = 'Failed to save the Data Set.';
+                            try {
+                                if (error && typeof error === 'object') {
+                                    if (error.detail) detailMsg = error.detail;
+                                    else if (error.response) {
+                                        const parsed = safeParseJson(error.response);
+                                        detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
+                                    } else {
+                                        detailMsg = error.message || JSON.stringify(error);
+                                    }
+                                } else if (typeof error === 'string') {
+                                    detailMsg = error;
+                                }
+                            } catch (e) {
+                                detailMsg = 'Failed to save the Data Set.';
+                            }
+                            showToast(detailMsg, 'error');
+                        } finally {
+                            submitButton.disabled = false;
+                            submitButton.textContent = originalButtonText;
+                        }
+                    };
+
+                    // Show the modal and return — save will happen via confirmOkBtn
+                    showConfirmModal();
+                    return;
 
                 } catch (error) {
                     console.error('An error occurred during submission:', error);
-                    // Derive a user-friendly message from various possible error shapes
-                    let detailMsg = 'Failed to save the Data Set.';
-                    try {
-                        if (error && typeof error === 'object') {
-                            if (error.detail) detailMsg = error.detail;
-                            else if (error.response) {
-                                const parsed = safeParseJson(error.response);
-                                detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
-                            } else {
-                                detailMsg = error.message || JSON.stringify(error);
+                    if (!error.handled) {
+                        let detailMsg = 'Failed to save the Data Set.';
+                        try {
+                            if (error && typeof error === 'object') {
+                                if (error.detail) detailMsg = error.detail;
+                                else if (error.response) {
+                                    const parsed = safeParseJson(error.response);
+                                    detailMsg = parsed && parsed.detail ? parsed.detail : (error.message || JSON.stringify(error));
+                                } else {
+                                    detailMsg = error.message || JSON.stringify(error);
+                                }
+                            } else if (typeof error === 'string') {
+                                detailMsg = error;
                             }
-                        } else if (typeof error === 'string') {
-                            detailMsg = error;
+                        } catch (e) {
+                            detailMsg = 'Failed to save the Data Set.';
                         }
-                    } catch (e) {
-                        detailMsg = 'Failed to save the Data Set.';
+                        showToast(detailMsg, 'error');
                     }
-                    showToast(detailMsg, 'error');
                 } finally {
-                    // 5. ALWAYS re-enable the button and restore its text
                     submitButton.disabled = false;
                     submitButton.textContent = originalButtonText;
                 }

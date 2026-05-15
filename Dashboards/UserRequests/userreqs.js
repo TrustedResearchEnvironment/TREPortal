@@ -4,7 +4,7 @@
 // =================================================================
 const TABLE_CONTAINER_ID = 'requests-table-area';
 const API_REQUEST_ID = 'GetRequests';
-const API_DELETE_REQUEST = 'DeleteRequestID';
+const API_CANCEL_REQUEST = 'CancelRequestID';
 const API_GET_REQUEST_DETAILS = 'GetRequestID';
 const API_GET_DATASET_DETAILS = 'GetDataSetID';
 const API_GET_ASSIST_PROJECTS = 'GetAssistProjectsFilteredByUpn';
@@ -12,6 +12,7 @@ const API_GET_ASSIST_PROJECTS = 'GetAssistProjectsFilteredByUpn';
 // We will store all fetched data here
 let allRequests = []; 
 let currentPage = 1;
+let totalPages = 1; // Add global totalPages variable
 const rowsPerPage = 5; // You can control page size here
 const searchInput = document.getElementById('searchRequests');
 
@@ -38,7 +39,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         // Early exit if the response is null, undefined, etc.
         if (!parsedInitial) {
-            console.log("API returned no data.");
+            // console.log("API returned no data.");
             return [];
         }
 
@@ -48,18 +49,18 @@ async function getFromAPI(API_ID, initialParams) {
         if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
 
             // --- PAGINATED PATH ---
-            console.log("Detected a paginated response.");
+            // console.log("Detected a paginated response.");
 
             allResults = parsedInitial.Results;
             const totalPages = parsedInitial.PageCount;
 
             if (totalPages > 1) {
                 for (let page = 2; page <= totalPages; page++) {
-                    console.log(`Fetching page ${page} of ${totalPages}...`);
+                    // console.log(`Fetching page ${page} of ${totalPages}...`);
 
                     // Construct params for the next page, preserving other initial params
                     const params = { ...initialParams, "page": page };
-                    console.log(params)
+                    // console.log(params)
                     const response = await window.loomeApi.runApiRequest(API_ID, params);
                     const parsed = safeParseJson(response);
 
@@ -72,7 +73,7 @@ async function getFromAPI(API_ID, initialParams) {
 
         } else {
             // --- NON-PAGINATED PATH ---
-            console.log("Detected a non-paginated response.");
+            // console.log("Detected a non-paginated response.");
 
             if (Array.isArray(parsedInitial)) {
                 allResults = parsedInitial;
@@ -81,7 +82,7 @@ async function getFromAPI(API_ID, initialParams) {
             }
         }
 
-        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        // console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
         return allResults;
 
     } catch (error) {
@@ -94,7 +95,7 @@ async function getFromAPI(API_ID, initialParams) {
 function ViewRequest(request) {
     // Get the modal's body element
     const modalBody = document.getElementById('viewRequestModalBody');
-    console.log("IN VIEW REQ")
+    // console.log("IN VIEW REQ")
     // Populate the modal body with the provided HTML content (your markup)
     modalBody.innerHTML = `
         <form>
@@ -291,9 +292,9 @@ function DeleteRequest(request) {
     setTimeout(() => {
         const confirmBtn = document.getElementById('confirmDeleteBtn');
         if (confirmBtn) {
-            console.log('Adding click listener to confirm delete button');
+            // console.log('Adding click listener to confirm delete button');
             confirmBtn.addEventListener('click', () => {
-                console.log('Delete button clicked for request:', request.RequestID);
+                // console.log('Delete button clicked for request:', request.RequestID);
                 // Call the API to delete the request
                 deleteRequestFromAPI(request.RequestID);
             });
@@ -307,28 +308,28 @@ async function deleteRequestFromAPI(requestId) {
     let loadingToast = null;
     
     try {
-        console.log('Starting delete request process for ID:', requestId);
+        // console.log('Starting delete request process for ID:', requestId);
         
         // Show loading state
         loadingToast = showToast('Deleting request...', 'info');
-        console.log('Loading toast shown:', loadingToast);
+        // console.log('Loading toast shown:', loadingToast);
         
-        const response = await window.loomeApi.runApiRequest(API_DELETE_REQUEST, {
+        const response = await window.loomeApi.runApiRequest(API_CANCEL_REQUEST, {
             "id": requestId,
         });
         
         // Log the response to console
-        console.log('Delete request API response:', response);
+        // console.log('Delete request API response:', response);
         
         // Hide the modal
         try {
             const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteRequestModal'));
             if (deleteModal) {
                 deleteModal.hide();
-                console.log('Delete modal hidden');
-            } else {
-                console.log('Delete modal not found or already hidden');
-            }
+                // console.log('Delete modal hidden');
+            } // else {
+                // console.log('Delete modal not found or already hidden');
+            // }
         } catch (modalError) {
             console.error('Error hiding modal:', modalError);
         }
@@ -336,19 +337,19 @@ async function deleteRequestFromAPI(requestId) {
         // Hide loading toast
         if (loadingToast) {
             hideToast(loadingToast);
-            console.log('Loading toast hidden');
+            // console.log('Loading toast hidden');
         }
         
         // Show success message
         const successToast = showToast('Request deleted successfully', 'success');
-        console.log('Success toast shown:', successToast);
+        // console.log('Success toast shown:', successToast);
         
         // Update all chip counts after deletion
-        console.log('Refreshing chip counts');
+        // console.log('Refreshing chip counts');
         await refreshAllChipCounts();
 
         // Refresh the UI
-        console.log('Refreshing UI');
+        // console.log('Refreshing UI');
         setTimeout(() => {
             renderUI();
         }, 100);
@@ -359,12 +360,12 @@ async function deleteRequestFromAPI(requestId) {
         // Hide loading toast
         if (loadingToast) {
             hideToast(loadingToast);
-            console.log('Loading toast hidden after error');
+            // console.log('Loading toast hidden after error');
         }
         
         // Show error message
         const errorToast = showToast('Failed to delete request. Please try again.', 'error');
-        console.log('Error toast shown:', errorToast);
+        // console.log('Error toast shown:', errorToast);
     }
 }
 
@@ -406,17 +407,17 @@ function showToast(message, type = 'info') {
 
 function hideToast(toast) {
     if (toast && toast.parentNode) {
-        console.log('Hiding toast');
+        // console.log('Hiding toast');
         toast.style.opacity = '0';
         setTimeout(() => {
             if (toast && toast.parentNode) {
                 toast.remove();
-                console.log('Toast removed');
+                // console.log('Toast removed');
             }
         }, 300); // Wait for fade out
-    } else {
-        console.log('Toast not found or already removed');
-    }
+    } // else {
+        // console.log('Toast not found or already removed');
+    // }
 }
 
 function createToastContainer() {
@@ -485,7 +486,7 @@ async function getProjectsMapping() {
         // Fetch projects data
         const initialParams = { "page": 1, "page_size": 100, "search": '' };
         const data = await getFromAPI(API_GET_ASSIST_PROJECTS, initialParams);
-        console.log("Projects data fetched:", data);
+        // console.log("Projects data fetched:", data);
         // Create a mapping from project ID to project name
         const mapping = {};
         if (data) {
@@ -496,7 +497,7 @@ async function getProjectsMapping() {
                 };
             });
         }
-        console.log("Projects mapping created:", mapping);
+        // console.log("Projects mapping created:", mapping);
         // Cache the mapping
         projectsCache = mapping;
         return mapping;
@@ -763,7 +764,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
         return;
     }
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    totalPages = Math.ceil(totalItems / itemsPerPage); // Update global totalPages
     container.innerHTML = ''; // Clear old controls
 
     if (totalPages <= 1) {
@@ -827,7 +828,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
 
 function formatDate(inputDate) {
     // Log what the function receives
-    console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
+    // console.log(`formatDate received:`, inputDate, `(type: ${typeof inputDate})`);
 
     if (!inputDate) {
         // This will be triggered if inputDate is null, undefined, or an empty string ""
@@ -861,7 +862,7 @@ function formatDate(inputDate) {
 /**
  * Renders a data table with dynamic headers and actions.
  */
-function renderTable(containerId, data, config, selectedStatus) {
+function renderTable(containerId, data, config, selectedStatus, searchTerm = '') {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     const table = document.createElement('table');
@@ -898,7 +899,10 @@ function renderTable(containerId, data, config, selectedStatus) {
     
     if (data.length === 0) {
         const colSpan = headers.length + 1; // +1 for chevron column
-        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-6 py-4 text-center text-sm text-gray-500">No requests found.</td></tr>`;
+        const message = searchTerm.trim() ? 
+            'No requests found. Please review your search term.' : 
+            'No requests found.';
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="px-6 py-4 text-center text-sm text-gray-500">${message}</td></tr>`;
     } else {
         data.forEach(item => {
             const row = document.createElement('tr');
@@ -944,14 +948,14 @@ function renderTable(containerId, data, config, selectedStatus) {
                     combinedDetailsContainer.innerHTML = '<p class="text-center">Loading details...</p>';
                     
                     try {
-                        console.log(`Fetching details for RequestID: ${item.RequestID}, DataSetID: ${item.DataSetID}`);
+                        // console.log(`Fetching details for RequestID: ${item.RequestID}, DataSetID: ${item.DataSetID}`);
                         
                         // Try fetching request details first
                         let requestDetails;
                         try {
-                            console.log('Fetching request details...');
+                            // console.log('Fetching request details...');
                             requestDetails = await fetchRequestDetails(item.RequestID);
-                            console.log('Request details received:', requestDetails);
+                            // console.log('Request details received:', requestDetails);
                         } catch (requestError) {
                             console.error('Error fetching request details:', requestError);
                             requestDetails = null;
@@ -960,9 +964,9 @@ function renderTable(containerId, data, config, selectedStatus) {
                         // Then try fetching dataset details
                         let datasetDetails;
                         try {
-                            console.log('Fetching dataset details...');
+                            // console.log('Fetching dataset details...');
                             datasetDetails = await fetchDatasetDetails(item.DataSetID);
-                            console.log('Dataset details received:', datasetDetails);
+                            // console.log('Dataset details received:', datasetDetails);
                         } catch (datasetError) {
                             console.error('Error fetching dataset details:', datasetError);
                             datasetDetails = null;
@@ -974,7 +978,7 @@ function renderTable(containerId, data, config, selectedStatus) {
                         }
                         
                         // Display whatever details we have
-                        console.log('Displaying combined details');
+                        // console.log('Displaying combined details');
                         displayCombinedDetails(combinedDetailsContainer, requestDetails, datasetDetails);
                         
                     } catch (error) {
@@ -1100,7 +1104,7 @@ async function getCounts(status) {
         "statusId": parseInt(Object.keys(statusIdToNameMap).find(key => statusIdToNameMap[key] === status))
     }
     
-    console.log(apiParams)
+    // console.log(apiParams)
     const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
     const parsedResponse = safeParseJson(response);
 
@@ -1138,12 +1142,12 @@ async function renderUI() {
         "statusId": parseInt(Object.keys(statusIdToNameMap).find(key => statusIdToNameMap[key] === selectedStatus))
     }
     
-    console.log(apiParams)
+    // console.log(apiParams)
     const response = await window.loomeApi.runApiRequest(API_REQUEST_ID, apiParams);
     const parsedResponse = safeParseJson(response)
     const rawData = parsedResponse.Results;
     const totalItems = parsedResponse.RowCount;
-    console.log(rawData)
+    // console.log(rawData)
 
     // --- 2. PREPARE THE MASTER DATA ARRAY ---
     // Transform the raw data just once into the format our UI needs.
@@ -1151,11 +1155,11 @@ async function renderUI() {
         ...item,
         status: statusIdToNameMap[item.StatusID] || 'Unknown'
     }));
-    console.log(allRequests)
+    // console.log(allRequests)
 
     // --- Render the components ---
     const configForTable = configMap[selectedStatus];
-    renderTable(TABLE_CONTAINER_ID, allRequests, configForTable, selectedStatus);
+    renderTable(TABLE_CONTAINER_ID, allRequests, configForTable, selectedStatus, searchTerm);
     renderPagination('pagination-controls', totalItems, rowsPerPage, currentPage);
 }
 
@@ -1174,13 +1178,18 @@ async function renderMyRequestsPage() {
         const chipsContainer = document.getElementById('status-chips-container');
         for (const chip of chipsContainer.querySelectorAll('.chip')) {
             const status = chip.dataset.status;
-            console.log(status)
+            // console.log(status)
             // Await the asynchronous getCounts function for each chip
             const count = await getCounts(status);
             chip.querySelector('.chip-count').textContent = count;
         }
 
         // --- 4. SETUP EVENT LISTENERS ---
+        // Add refresh button event listener
+        const refreshBtn = document.getElementById('refresh-data-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', refreshPageData);
+        }
         
         // Listener for status chip clicks
         chipsContainer.addEventListener('click', (event) => {
@@ -1216,14 +1225,20 @@ async function renderMyRequestsPage() {
         paginationContainer.addEventListener('keydown', (event) => {
             // Only act if the user pressed Enter and the target is our input
             if (event.key === 'Enter' && event.target.id === 'page-input') {
-                const newPage = parseInt(event.target.value, 10);
-                if (!isNaN(newPage) && newPage > 0) {
+                const inputElement = event.target;
+                const newPage = parseInt(inputElement.value, 10);
+
+                // Validate the input
+                if (newPage >= 1 && newPage <= totalPages) {
                     currentPage = newPage;
                     renderUI();
+                } else {
+                    // If invalid, show a message and reset the input to the current page
+                    showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
+                    inputElement.value = currentPage;
                 }
             }
         });
-
         // --- 5. INITIAL PAGE RENDER ---
         // Programmatically click the first chip to trigger the initial render.
         document.querySelector('.chip[data-status="Pending Approval"]').click();
@@ -1231,6 +1246,34 @@ async function renderMyRequestsPage() {
     } catch (error) {
         console.error("Error setting up the page:", error);
         // ... your error handling ...
+    }
+}
+
+// =================================================================
+//                      REFRESH FUNCTION
+// =================================================================
+
+async function refreshPageData() {
+    let loadingToast = null;
+    
+    try {
+        loadingToast = showToast('Refreshing data...', 'info');
+        await renderUI();
+        await refreshAllChipCounts();
+        
+        if (loadingToast) {
+            hideToast(loadingToast);
+        }
+        
+        showToast('Data refreshed', 'success');
+    } catch (error) {
+        console.error('Error refreshing page data:', error);
+        
+        if (loadingToast) {
+            hideToast(loadingToast);
+        }
+        
+        showToast('Failed to refresh data. Please try again.', 'error');
     }
 }
 

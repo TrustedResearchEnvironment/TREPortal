@@ -802,40 +802,17 @@ video {
     background-color: rgba(255, 255, 255, 0.25);
 }
 
-/* Toast Notifications */
-#toast-container {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    z-index: 9999;
+/* This is the container that will scroll */
+.table-container {
+    max-height: 600px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb; /* Optional: adds a nice border */
+    border-radius: 8px; /* Optional: rounded corners */
 }
 
-.toast {
-    padding: 15px 20px;
-    color: #fff;
-    margin-bottom: 10px;
-    border-radius: 4px;
-    min-width: 250px;
-    max-width: 350px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+ /*Make sure the table fills the container */
+table {
+    width: 100%;
+    border-collapse: collapse; /* Important for clean lines */
 }
 
-.toast-info {
-    background-color: #2196F3;
-}
-
-.toast-success {
-    background-color: #4CAF50;
-}
-
-.toast-warning {
-    background-color: #FF9800;
-}
-
-.toast-error {
-    background-color: #F44336;
-}
-
-.toast-message {
-    word-wrap: break-word;
-}

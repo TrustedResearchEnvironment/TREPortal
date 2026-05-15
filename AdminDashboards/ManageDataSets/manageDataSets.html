@@ -64,7 +64,7 @@
             border: 1px solid #d8dbe0;
             border-radius: 0.35rem;
             box-shadow: 0 6px 15px rgba(15, 23, 42, 0.15);
-             width: 195%;
+            width: 195%;
             box-sizing: border-box;
             display: none;
             z-index: 4000;
@@ -209,16 +209,16 @@
                     </select>
                 </div>
                 
-                <!-- Step 2: Form Details Container -->
-                <div id="dataSetDetailsContainer">
+                <!-- Step 2: Form Details Container  -->
+                <div id="dataSetDetailsContainer"> 
                     <div class="mb-3">
                         <label for="dataSetName" class="form-label">Name</label>
-                        <input type="text" class="form-control" id="dataSetName" required>
+                        <input type="text" class="form-control" id="dataSetName" maxlength="100" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="dataSetDescription" class="form-label">Description</label>
-                        <textarea class="form-control" id="dataSetDescription" rows="2"></textarea>
+                        <textarea class="form-control" id="dataSetDescription" rows="2" maxlength="700"></textarea>
                     </div>
                     <div class="mb-3">
                         <label for="dataSource" class="form-label">Data Source</label>
@@ -229,11 +229,11 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="dataSetOwner" class="form-label">Owner</label>
-                            <input type="email" class="form-control" id="dataSetOwner">
+                            <input type="email" class="form-control" id="dataSetOwner" maxlength="254" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="dataSetApprover" class="form-label">Approver</label>
-                            <input type="email" class="form-control" id="dataSetApprover">
+                            <input type="email" class="form-control" id="dataSetApprover" maxlength="254" required>
                         </div>
                     </div>
                     <div class="form-check mb-3">
@@ -327,6 +327,35 @@
         </div>
 
     </form> <!-- End of the form tag -->
+
+    <!-- Confirm Save Modal (Redact / Deidentify summary) -->
+    <div id="confirm-save-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999;">
+        <!-- Backdrop -->
+        <div id="confirm-save-backdrop" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);"></div>
+        <!-- Dialog -->
+        <div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:1rem;">
+            <div style="position:relative; background:#fff; border-radius:0.75rem; box-shadow:0 20px 60px rgba(0,0,0,0.3); max-width:700px; width:100%; max-height:80vh; display:flex; flex-direction:column;">
+                <!-- Header -->
+                <div style="padding:1.25rem 1.5rem; border-bottom:1px solid #e5e7eb;">
+                    <h2 style="margin:0; font-size:1.125rem; font-weight:600; color:#111827;">Confirm Data Protection Settings</h2>
+                    <p style="margin:0.25rem 0 0; font-size:0.875rem; color:#6b7280;">Please review the columns flagged for Redact or Deidentify before saving.</p>
+                </div>
+                <!-- Body (scrollable) -->
+                <div id="confirm-save-body" style="padding:1rem 1.5rem; overflow-y:auto; flex:1;">
+                    <!-- Populated dynamically by JS -->
+                </div>
+                <!-- Footer -->
+                <div style="padding:1rem 1.5rem; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:0.75rem;">
+                    <button type="button" id="confirm-save-cancel-btn" class="btn btn-outline-secondary btn-sm">
+                        Cancel
+                    </button>
+                    <button type="button" id="confirm-save-ok-btn" class="btn btn-primary btn-sm">
+                        Confirm &amp; Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     
 </div>
 </body>
