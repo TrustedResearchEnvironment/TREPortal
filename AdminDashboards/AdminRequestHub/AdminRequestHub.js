@@ -385,7 +385,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
         <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${item.RequestID}</td>
-            <td class="${tdCls} font-medium">${item.Name || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
             ${extra}
@@ -441,6 +441,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
                     content.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div class="space-y-2">
+                                <p><span class="font-medium text-gray-600">Request Name:</span> <span class="text-gray-500">${reqRes?.Name || item.dataset?.name || 'N/A'}</span></p>
                                 ${dsRes ? `<p><span class="font-medium text-gray-600">Dataset:</span> <span class="text-gray-500">${dsRes.Name || 'N/A'}</span></p>
                                            <p><span class="font-medium text-gray-600">Description:</span> <span class="text-gray-500">${dsRes.Description || 'N/A'}</span></p>` : ''}
                                 <p><span class="font-medium text-gray-600">Target Project:</span> <span class="text-gray-500">${proj.name}</span></p>
@@ -592,7 +593,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
         rows += `
         <tr class="table-hover-row admin-import-row" data-id="${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium">${item.ImportRequestName || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">${item.ImportRequestName || 'N/A'}</td>
             <td class="${tdCls}">${item.CreateUser || item.UserPrincipalName || 'N/A'}</td>
             <td class="${tdCls}">${item.ImportProjectName || item.ProjectName || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
@@ -645,6 +646,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
                     content.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div class="space-y-2">
+                                <p><span class="font-medium text-gray-600">Import Request Name:</span> <span class="text-gray-500">${d?.ImportRequestName || 'N/A'}</span></p>
                                 <p><span class="font-medium text-gray-600">Import Request ID:</span> <span class="text-gray-500">${d?.ImportRequestID || 'N/A'}</span></p>
                                 <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${d?.ProjectName || 'N/A'}</span></p>
                                 ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${d.Purpose}</span></p>` : ''}
@@ -800,7 +802,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
         rows += `
         <tr class="table-hover-row admin-export-row" data-id="${item.ExportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium">${item.ExportRequestName || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${item.ExportRequestName || 'N/A'}</td>
             <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
             <td class="${tdCls}">${item.ExportProjectName || item.ProjectName || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
@@ -853,6 +855,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
                     content.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div class="space-y-2">
+                                <p><span class="font-medium text-gray-600">Export Request Name:</span> <span class="text-gray-500">${d?.ExportRequestName || 'N/A'}</span></p>
                                 <p><span class="font-medium text-gray-600">Export Request ID:</span> <span class="text-gray-500">${d?.ExportRequestID || 'N/A'}</span></p>
                                 <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${d?.ProjectName || 'N/A'}</span></p>
                                 ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${d.Purpose}</span></p>` : ''}
