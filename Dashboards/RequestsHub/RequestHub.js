@@ -464,7 +464,7 @@ function importRenderUI() {
     const container  = document.getElementById('import-table-area');
     const searchTerm = (document.getElementById('import-search')?.value || '').toLowerCase().trim();
     let filtered = importFilterJobs(importCurrentStatus);
-    if (searchTerm) filtered = filtered.filter(j => Object.values(j).some(v => String(v).toLowerCase().includes(searchTerm)));
+    if (searchTerm) filtered = filtered.filter(j => String(j.ImportRequestName || '').toLowerCase().includes(searchTerm));
     const total = filtered.length;
     importTotalPages    = Math.max(1, Math.ceil(total / IMPORT_ROWS_PER_PAGE));
     if (importCurrentPage > importTotalPages) importCurrentPage = importTotalPages;
@@ -598,7 +598,13 @@ function importSetupListeners() {
         importRenderUI();
     });
 
-    document.getElementById('import-search')?.addEventListener('input', () => {
+    const importSearchEl = document.getElementById('import-search');
+    if (importSearchEl) importSearchEl.removeAttribute('minlength');
+    importSearchEl?.addEventListener('input', () => {
+        importCurrentPage = 1;
+        importRenderUI();
+    });
+    importSearchEl?.addEventListener('search', () => {
         importCurrentPage = 1;
         importRenderUI();
     });
@@ -760,7 +766,7 @@ function exportRenderUI() {
     const container  = document.getElementById('export-table-area');
     const searchTerm = (document.getElementById('export-search')?.value || '').toLowerCase().trim();
     let filtered = exportFilterJobs(exportCurrentStatus);
-    if (searchTerm) filtered = filtered.filter(j => Object.values(j).some(v => String(v).toLowerCase().includes(searchTerm)));
+    if (searchTerm) filtered = filtered.filter(j => String(j.ExportRequestName || '').toLowerCase().includes(searchTerm));
     const total = filtered.length;
     exportTotalPages    = Math.max(1, Math.ceil(total / EXPORT_ROWS_PER_PAGE));
     if (exportCurrentPage > exportTotalPages) exportCurrentPage = exportTotalPages;
@@ -894,7 +900,13 @@ function exportSetupListeners() {
         exportRenderUI();
     });
 
-    document.getElementById('export-search')?.addEventListener('input', () => {
+    const exportSearchEl = document.getElementById('export-search');
+    if (exportSearchEl) exportSearchEl.removeAttribute('minlength');
+    exportSearchEl?.addEventListener('input', () => {
+        exportCurrentPage = 1;
+        exportRenderUI();
+    });
+    exportSearchEl?.addEventListener('search', () => {
         exportCurrentPage = 1;
         exportRenderUI();
     });
