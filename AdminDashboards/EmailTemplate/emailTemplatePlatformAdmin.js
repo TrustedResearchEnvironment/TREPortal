@@ -3,6 +3,11 @@ const TABLE_CONTAINER_ID = 'requests-table-area';
 const API_REQUEST_ID = 'GetEmailTemplates';
 const API_UPDATE_EMAIL_TEMPLATE = 'UpdateEmailTemplate';
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t<>/"=&#;%\u2014]/.test(value || '');
+}
+
 // --- STATE MANAGEMENT ---
 // These variables need to be accessible by multiple functions.
 let currentPage = 1;
@@ -461,6 +466,26 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     const updatedType = accordionBody.querySelector('.edit-state-type').value;
                     const updatedSubject= accordionBody.querySelector('.edit-state-subject').value;
                     const updatedTemplateText = accordionBody.querySelector('.edit-state-template').value;
+
+                    // --- 1b. Validate for special characters ---
+                    if (containsInvalidChars(updatedType)) {
+                        showToast('Special characters are not allowed in the Email Template Type.', 'error');
+                        saveBtn.textContent = 'Save Changes';
+                        saveBtn.disabled = false;
+                        return;
+                    }
+                    if (containsInvalidChars(updatedSubject)) {
+                        showToast('Special characters are not allowed in the Email Template Subject.', 'error');
+                        saveBtn.textContent = 'Save Changes';
+                        saveBtn.disabled = false;
+                        return;
+                    }
+                    if (containsInvalidChars(updatedTemplateText)) {
+                        showToast('Special characters are not allowed in the Email Body.', 'error');
+                        saveBtn.textContent = 'Save Changes';
+                        saveBtn.disabled = false;
+                        return;
+                    }
 
 
                     // --- 2. Send Request to the Endpoint using fetch ---
