@@ -1101,6 +1101,15 @@ async function updateMetaDataTable(dataSource, dataSetID) {
     }).join('');
 
     tbody.innerHTML = rowsHtml;
+
+    // Notify user of special characters on blur — does NOT auto-sanitize
+    tbody.querySelectorAll('input.form-control').forEach(input => {
+        input.addEventListener('blur', () => {
+            if (containsInvalidChars(input.value)) {
+                showToast('Special characters are not allowed in metadata fields.', 'error');
+            }
+        });
+    });
 }
 
 // End MetaData Table Rendering Functions
@@ -2866,9 +2875,16 @@ async function renderManageDataSetPage() {
                 // The 'blur' event on the input will fire a 'change' event,
                 // which is handled by the main listener below.
                 input.addEventListener('blur', () => {
-                    // Find the object and update it
                     const newValue = input.value.trim();
                     const field = cell.dataset.field;
+
+                    // Reject special characters
+                    if (containsInvalidChars(newValue)) {
+                        showToast('Special characters are not allowed in this field.', 'error');
+                        cell.innerHTML = originalText;
+                        return;
+                    }
+
                     updateInMemoryData(cell.closest('tr'), field, newValue);
                     // Revert the cell to plain text
                     cell.innerHTML = newValue;
@@ -3097,6 +3113,31 @@ async function renderManageDataSetPage() {
                     if (!isValidEmail(formData.Approvers)) {
                         showToast('Approver email is not in a valid format.', 'error');
                         throw new Error('Validation failed: Approver email format is invalid.');
+                    }
+
+                    // Validate special characters in column fields
+                    const columnFieldLabels = { LogicalColumnName: 'Logical Name', BusinessDescription: 'Business Description', ExampleValue: 'Example Value' };
+                    for (const col of allColumnsData) {
+                        for (const [field, label] of Object.entries(columnFieldLabels)) {
+                            if (containsInvalidChars(col[field])) {
+                                const msg = `Special characters are not allowed in the "${label}" column (found in column "${col.ColumnName || col.FolderName || ''}"${col.FileType ? ' / ' + col.FileType : ''}).`;
+                                showToast(msg, 'error');
+                                const err = new Error(msg); err.handled = true; throw err;
+                            }
+                        }
+                    }
+
+                    // Validate special characters in metadata fields
+                    const metaInputs = document.querySelectorAll('#metaDataTable tbody input.form-control');
+                    for (const input of metaInputs) {
+                        if (containsInvalidChars(input.value)) {
+                            const row = input.closest('tr');
+                            const label = row ? (row.querySelector('td small')?.textContent?.trim() || 'Metadata') : 'Metadata';
+                            const msg = `Special characters are not allowed in the "${label}" metadata field.`;
+                            showToast(msg, 'error');
+                            input.focus();
+                            const err = new Error(msg); err.handled = true; throw err;
+                        }
                     }
 
                     // Validate Data Set Field (Table/Folder selection) for types that require it
