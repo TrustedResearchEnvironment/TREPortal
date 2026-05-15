@@ -31,6 +31,11 @@ const configMap = {
 //                      UTILITY & MODAL FUNCTIONS
 // =================================================================
 
+/** Returns true if the string contains any character outside the allowed whitelist. */
+function containsInvalidChars(value) {
+    return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
+}
+
 async function getFromAPI(API_ID, initialParams) {
     let allResults = [];
 
@@ -303,6 +308,13 @@ function ApproveRequest(request) {
 
     // Enable/disable the confirm button based on input
     if (approveReasonEl) {
+        // Character counter - appears at 80% of limit
+        const approveMaxLength = parseInt(approveReasonEl.getAttribute('maxlength') || '255', 10);
+        const approveThreshold = Math.floor(approveMaxLength * 0.8);
+        const approveCounter = document.createElement('div');
+        approveCounter.style.cssText = 'font-size:0.75rem;text-align:right;margin-top:2px;display:none;';
+        approveReasonEl.insertAdjacentElement('afterend', approveCounter);
+
         approveReasonEl.addEventListener('input', () => {
             const val = (approveReasonEl.value || '').trim();
             if (confirmBtn) confirmBtn.disabled = !val;
@@ -312,6 +324,15 @@ function ApproveRequest(request) {
                 } else {
                     approveReasonValidation.classList.remove('d-none');
                 }
+            }
+            // Update counter
+            const len = approveReasonEl.value.length;
+            if (len >= approveThreshold) {
+                approveCounter.textContent = `${len}/${approveMaxLength}`;
+                approveCounter.style.display = 'block';
+                approveCounter.style.color = len >= approveMaxLength ? '#dc3545' : '#fd7e14';
+            } else {
+                approveCounter.style.display = 'none';
             }
         });
     }
@@ -323,6 +344,11 @@ function ApproveRequest(request) {
             if (!note) {
                 if (approveReasonValidation) approveReasonValidation.classList.remove('d-none');
                 showToast('Please provide an approval note.', 'error');
+                if (approveReasonEl) approveReasonEl.focus();
+                return;
+            }
+            if (containsInvalidChars(note)) {
+                showToast('Special characters are not allowed in the approval note.', 'error');
                 if (approveReasonEl) approveReasonEl.focus();
                 return;
             }
@@ -446,6 +472,13 @@ function RejectRequest(request) {
 
     // Enable/disable the confirm button based on input
     if (reasonEl) {
+        // Character counter - appears at 80% of limit
+        const rejectMaxLength = parseInt(reasonEl.getAttribute('maxlength') || '255', 10);
+        const rejectThreshold = Math.floor(rejectMaxLength * 0.8);
+        const rejectCounter = document.createElement('div');
+        rejectCounter.style.cssText = 'font-size:0.75rem;text-align:right;margin-top:2px;display:none;';
+        reasonEl.insertAdjacentElement('afterend', rejectCounter);
+
         reasonEl.addEventListener('input', () => {
             const val = (reasonEl.value || '').trim();
             if (confirmBtn) confirmBtn.disabled = !val;
@@ -455,6 +488,15 @@ function RejectRequest(request) {
                 } else {
                     reasonValidation.classList.remove('d-none');
                 }
+            }
+            // Update counter
+            const len = reasonEl.value.length;
+            if (len >= rejectThreshold) {
+                rejectCounter.textContent = `${len}/${rejectMaxLength}`;
+                rejectCounter.style.display = 'block';
+                rejectCounter.style.color = len >= rejectMaxLength ? '#dc3545' : '#fd7e14';
+            } else {
+                rejectCounter.style.display = 'none';
             }
         });
     }
@@ -466,6 +508,11 @@ function RejectRequest(request) {
             if (!reason) {
                 if (reasonValidation) reasonValidation.classList.remove('d-none');
                 showToast('Please provide a reason for rejection.', 'error');
+                if (reasonEl) reasonEl.focus();
+                return;
+            }
+            if (containsInvalidChars(reason)) {
+                showToast('Special characters are not allowed in the rejection reason.', 'error');
                 if (reasonEl) reasonEl.focus();
                 return;
             }
