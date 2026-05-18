@@ -273,7 +273,7 @@ function accessRenderTable(container, data, selectedStatus) {
         <tr class="table-hover-row access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${escapeHtml(item.RequestID)}</td>
-            <td class="${tdCls} font-medium">${escapeHtml(item.Name) || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${escapeHtml(item.Name) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
@@ -505,7 +505,7 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         rows += `
         <tr class="table-hover-row import-row" data-id="${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium">${escapeHtml(item.ImportRequestName) || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">${escapeHtml(item.ImportRequestName) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${escapeHtml(item.ImportProjectName || item.ProjectName) || 'N/A'}</td>
             ${extra}
@@ -807,7 +807,7 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
         rows += `
         <tr class="table-hover-row export-row" data-id="${item.ExportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium">${escapeHtml(item.ExportRequestName) || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${escapeHtml(item.ExportRequestName) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${escapeHtml(item.ExportProjectName || item.ProjectName) || 'N/A'}</td>
             ${extra}

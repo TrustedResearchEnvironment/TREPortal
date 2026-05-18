@@ -351,11 +351,11 @@ const renderAccordionDetails = (item) => {
                     <tbody>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.MetaDataID}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-name">${item.Name}</span>
+                            <span class="view-state view-state-name" style="display:block;word-break:break-word;overflow-wrap:break-word;">${item.Name}</span>
                             <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-description">${item.Description || ''}</span>
+                            <span class="view-state view-state-description" style="display:block;word-break:break-word;overflow-wrap:break-word;">${item.Description || ''}</span>
                             <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
@@ -557,7 +557,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
     const headers = tableConfig.headers;
     container.innerHTML = '';
     const table = document.createElement('table');
-    table.className = 'w-full divide-y divide-gray-200';
+    table.className = 'w-full table-fixed divide-y divide-gray-200';
     
     // ... (thead creation is the same) ...
     const thead = document.createElement('thead');
@@ -1080,8 +1080,12 @@ async function renderPlatformAdminMetaDataPage() {
     // (Moved outside the try block so it's accessible to fetchAndRenderPage)
     const tableConfig = {
                 headers: [
-                    { label: "Name", key: "Name", widthClass: "w-4/12" },
-                    { label: "Description", key: "Description", className: "break-words", widthClass: "w-6/12" },
+                    { label: "Name", key: "Name", widthClass: "w-4/12", className: "overflow-hidden",
+                      render: (value) => `<span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(value||'').replace(/"/g,'&quot;')}">${value||''}</span>`
+                    },
+                    { label: "Description", key: "Description", widthClass: "w-6/12", className: "overflow-hidden",
+                      render: (value) => `<span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;word-break:break-word;overflow-wrap:break-word;" title="${(value||'').replace(/"/g,'&quot;')}">${value||''}</span>`
+                    },
                     {
                         label: "Active",
                         key: "IsActive",

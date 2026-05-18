@@ -244,9 +244,9 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
             <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
                 <td>${col.ColumnName || ''}</td>
                 <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
-                <td class="editable-cell" data-field="LogicalColumnName">${col.LogicalColumnName || ''}</td>
-                <td class="editable-cell" data-field="BusinessDescription">${col.BusinessDescription || ''}</td>
-                <td class="editable-cell" data-field="ExampleValue">${col.ExampleValue || ''}</td>
+                <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.LogicalColumnName || '')}">${col.LogicalColumnName || ''}</td>
+                <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.BusinessDescription || '')}">${col.BusinessDescription || ''}</td>
+                <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.ExampleValue || '')}">${col.ExampleValue || ''}</td>
                 <td class="checkbox-cell">
                     <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
                 </td>
@@ -265,9 +265,9 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                 <tr data-id="${row.ColumnName}" data-column-name="${row.ColumnName}">
                     <td>${row.ColumnName || ''}</td>
                     <td>${escapeHtml(getDisplayColumnType(row.ColumnType) || row.ColumnType || '')}</td>
-                    <td class="editable-cell" data-field="LogicalColumnName">${row.LogicalColumnName || ''}</td>
-                    <td class="editable-cell" data-field="BusinessDescription">${row.BusinessDescription || ''}</td>
-                    <td class="editable-cell" data-field="ExampleValue">${row.ExampleValue || ''}</td>
+                    <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.LogicalColumnName || '')}">${row.LogicalColumnName || ''}</td>
+                    <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.BusinessDescription || '')}">${row.BusinessDescription || ''}</td>
+                    <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.ExampleValue || '')}">${row.ExampleValue || ''}</td>
                     <td class="checkbox-cell">
                         <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
                     </td>
@@ -1912,13 +1912,13 @@ function updateTableHeader(dataSourceType) {
         }).join('');
 
         return `
-            <th>
+            <th style="${def.filterType === 'deidentify' ? 'min-width:115px;' : ''}position:relative;overflow:visible;">
                 <details class="header-filter" data-filter="${def.filterType}">
                     <summary>
                         <span>${displayLabel}</span>
                         <span class="header-filter-arrow">▾</span>
                     </summary>
-                    <ul>
+                    <ul style="position:absolute;z-index:1050;background:#fff;min-width:110px;box-shadow:0 4px 12px rgba(0,0,0,.15);border-radius:4px;padding:4px 0;margin:0;list-style:none;">
                         ${optionsHtml}
                     </ul>
                 </details>
@@ -2882,12 +2882,22 @@ async function renderManageDataSetPage() {
                     if (containsInvalidChars(newValue)) {
                         showToast('Special characters are not allowed in this field.', 'error');
                         cell.innerHTML = originalText;
+                        cell.title = originalText;
+                        return;
+                    }
+
+                    // Reject values exceeding 500 characters
+                    if (newValue.length > 500) {
+                        showToast(`"${field === 'LogicalColumnName' ? 'Logical Name' : field === 'BusinessDescription' ? 'Business Description' : 'Example Value'}" exceeds 500 characters. Please shorten it.`, 'error');
+                        cell.innerHTML = originalText;
+                        cell.title = originalText;
                         return;
                     }
 
                     updateInMemoryData(cell.closest('tr'), field, newValue);
                     // Revert the cell to plain text
                     cell.innerHTML = newValue;
+                    cell.title = newValue;
                 });
 
                 input.addEventListener('keydown', (e) => {
@@ -3121,6 +3131,12 @@ async function renderManageDataSetPage() {
                         for (const [field, label] of Object.entries(columnFieldLabels)) {
                             if (containsInvalidChars(col[field])) {
                                 const msg = `Special characters are not allowed in the "${label}" column (found in column "${col.ColumnName || col.FolderName || ''}"${col.FileType ? ' / ' + col.FileType : ''}).`;
+                                showToast(msg, 'error');
+                                const err = new Error(msg); err.handled = true; throw err;
+                            }
+                            if ((col[field] || '').length > 500) {
+                                const rowNum = allColumnsData.indexOf(col) + 1;
+                                const msg = `"${label}" in row ${rowNum} (column "${col.ColumnName || col.FolderName || ''}") exceeds the 500 character limit.`;
                                 showToast(msg, 'error');
                                 const err = new Error(msg); err.handled = true; throw err;
                             }
