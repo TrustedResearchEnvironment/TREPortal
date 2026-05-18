@@ -162,8 +162,8 @@ function getDataSourceFormData(formElement) {
 
     // --- 1. Get values from the STATIC fields ---
     // We use .value for text inputs/textareas and .checked for checkboxes.
-    const name = sanitizeInput(formElement.querySelector('#dataSourceName').value);
-    const description = sanitizeInput(formElement.querySelector('#dataSourceDescription').value);
+    const name = sanitizeInput(formElement.querySelector('#dataSourceName').value.trim());
+    const description = sanitizeInput(formElement.querySelector('#dataSourceDescription').value.trim());
     const isActive = formElement.querySelector('#dataSourceActive').checked ? 1 : 0;
 
     // For the <select>, we get the value of the selected <option>.
@@ -1133,8 +1133,8 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                         showToast('Special characters are not allowed in the Description.', 'error');
                         saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
                     }
-                    const updatedName = sanitizeInput(rawName);
-                    const updatedDescription = sanitizeInput(rawDesc);
+                    const updatedName = sanitizeInput(rawName.trim());
+                    const updatedDescription = sanitizeInput(rawDesc.trim());
                     const updatedIsActive = accordionBody.querySelector('.edit-state-isactive').checked;
 
                     // Gather all dynamic field values into a dictionary

@@ -1554,13 +1554,13 @@ function gatherFormData(allColumnsData) {
     const rawName = document.getElementById('dataSetName').value;
     const rawDescription = document.getElementById('dataSetDescription').value;
     const mainDetails = {
-        Name: sanitizeInput(rawName),
-        _rawName: rawName,
-        Description: sanitizeInput(rawDescription),
-        _rawDescription: rawDescription,
+        Name: sanitizeInput(rawName.trim()),
+        _rawName: rawName.trim(),
+        Description: sanitizeInput(rawDescription.trim()),
+        _rawDescription: rawDescription.trim(),
         DataSourceID: parseInt(document.getElementById('dataSource').value, 10),
-        Owner: document.getElementById('dataSetOwner').value,
-        Approvers: document.getElementById('dataSetApprover').value,
+        Owner: document.getElementById('dataSetOwner').value.trim(),
+        Approvers: document.getElementById('dataSetApprover').value.trim(),
         IsActive: document.getElementById('dataSetActive').checked
     };
 
