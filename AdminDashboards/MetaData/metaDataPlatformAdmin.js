@@ -19,6 +19,19 @@ let dataSourceTypesList = [];
 let dataSourceTypeIdToName = new Map();
 const searchInput = document.getElementById('searchRequests');
 
+/**
+ * Escapes a value for safe insertion into HTML.
+ */
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function showToast(message, type = 'success', duration = 5000) {
     const container = document.getElementById('toast-container') || (function(){
         const c = document.createElement('div');
@@ -320,15 +333,15 @@ const renderAccordionDetails = (item) => {
     const visibleTypes = dataSourceTypesList || []//).filter(t => t.name !== 'Folder');
     const checkboxesHtml = visibleTypes.length > 0
         ? visibleTypes.map((t, index) => {
-            const checkboxId = `meta-${item.MetaDataID}-dataSourceType-checkbox-${index}`;
+            const checkboxId = `meta-${escapeHtml(item.MetaDataID)}-dataSourceType-checkbox-${index}`;
             const checkedAttr = appliedIds.has(String(t.id)) ? 'checked' : '';
             return `
                 <li>
                     <a class="dropdown-item accordion-ds-item" href="#">
                         <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="${t.id}" id="${checkboxId}" ${checkedAttr} disabled onclick="event.stopPropagation()">
+                            <input class="form-check-input" type="checkbox" value="${escapeHtml(t.id)}" id="${checkboxId}" ${checkedAttr} disabled onclick="event.stopPropagation()">
                             <label class="form-check-label" for="${checkboxId}">
-                                ${t.name}
+                                ${escapeHtml(t.name)}
                             </label>
                         </div>
                     </a>
@@ -337,26 +350,26 @@ const renderAccordionDetails = (item) => {
         : '<li class="text-muted small px-2">No types available.</li>';
 
     // Compute initial button text based on appliedIds
-    const initiallySelected = visibleTypes.filter(v => appliedIds.has(String(v.id))).map(v => v.name);
+    const initiallySelected = visibleTypes.filter(v => appliedIds.has(String(v.id))).map(v => escapeHtml(v.name));
     const initialButtonText = initiallySelected.length === 0
         ? 'Select Types'
         : (initiallySelected.length <= 2 ? initiallySelected.join(', ') : `${initiallySelected.length} types selected`);
 
     return `
-    <div class="accordion-body bg-slate-50 p-6" data-id="${item.MetaDataID}">
+    <div class="accordion-body bg-slate-50 p-6" data-id="${escapeHtml(item.MetaDataID)}">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12">
             <!-- LEFT COLUMN: Remains the same -->
             <div>
                  <table class="w-full text-sm">
                     <tbody>
-                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.MetaDataID}</td></tr>
+                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${escapeHtml(item.MetaDataID)}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-name" style="display:block;word-break:break-word;overflow-wrap:break-word;">${item.Name}</span>
-                            <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <span class="view-state view-state-name" style="word-break:break-word;overflow-wrap:break-word;">${escapeHtml(item.Name)}</span>
+                            <input type="text" value="${escapeHtml(item.Name)}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-description" style="display:block;word-break:break-word;overflow-wrap:break-word;">${item.Description || ''}</span>
-                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
+                            <span class="view-state view-state-description" style="word-break:break-word;overflow-wrap:break-word;">${escapeHtml(item.Description || '')}</span>
+                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${escapeHtml(item.Description || '')}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-isactive">${item.IsActive ? 'Yes' : 'No'}</span>
@@ -379,10 +392,10 @@ const renderAccordionDetails = (item) => {
                                 <div class="mb-2">
                                     <label class="form-label small text-gray-600">Apply to Data Source Type/s</label>
                                     <div class="dropdown">
-                                        <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start accordion-dataSourceTypeDropdown" type="button" id="dataSourceTypeDropdown-${item.MetaDataID}" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" disabled>
+                                        <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start accordion-dataSourceTypeDropdown" type="button" id="dataSourceTypeDropdown-${escapeHtml(item.MetaDataID)}" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" disabled>
                                             ${initialButtonText}
                                         </button>
-                                        <ul class="dropdown-menu w-100 accordion-dataSourceTypeMenu" aria-labelledby="dataSourceTypeDropdown-${item.MetaDataID}" data-metaid="${item.MetaDataID}" id="dataSourceTypeMenu-${item.MetaDataID}">
+                                        <ul class="dropdown-menu w-100 accordion-dataSourceTypeMenu" aria-labelledby="dataSourceTypeDropdown-${escapeHtml(item.MetaDataID)}" data-metaid="${escapeHtml(item.MetaDataID)}" id="dataSourceTypeMenu-${escapeHtml(item.MetaDataID)}">
                                             ${checkboxesHtml}
                                         </ul>
                                     </div>
@@ -399,7 +412,7 @@ const renderAccordionDetails = (item) => {
         <!-- Action buttons remain the same -->
         <div class="mt-6 text-right">
             <div class="view-state">
-                <button type="button" class="btn btn-danger me-2 btn-delete" data-metaid="${item.MetaDataID}" title="Delete this Meta Data">Delete</button>
+                <button type="button" class="btn btn-danger me-2 btn-delete" data-metaid="${escapeHtml(item.MetaDataID)}" title="Delete this Meta Data">Delete</button>
                 <button class="btn-edit inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Edit</button>
             </div>
             <div class="edit-state hidden space-x-2">
@@ -852,6 +865,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                     setTimeout(() => {
                         // This code will run AFTER the 3-second delay
+                        searchInput.value = '';
                         fetchAndRenderPage(tableConfig, 1, '');
                     }, 3000);
 
@@ -1092,7 +1106,7 @@ async function renderPlatformAdminMetaDataPage() {
                         render: (value) => value == 1 ? 'Yes' : 'No'
                     },
                     { key: 'Details', label: '', widthClass: 'w-12', 
-                      render: () => `<div class="flex justify-end"><svg class="chevron-icon h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
+                      render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
                     }
                 ]
     };

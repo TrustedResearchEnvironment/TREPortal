@@ -63,6 +63,19 @@ const searchInput = document.getElementById('searchRequests');
 // }
 
 /**
+ * Escapes a value for safe insertion into HTML.
+ */
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
  * Displays a temporary "toast" notification on the screen.
  * @param {string} message - The message to display.
  * @param {string} [type='success'] - The type of toast ('success', 'error', 'info').
@@ -116,22 +129,22 @@ const renderAccordionDetails = (item) => {
 
 
     return `
-    <div class="accordion-body bg-slate-50 p-6" data-id="${item.EmailTemplateID}">
+    <div class="accordion-body bg-slate-50 p-6" data-id="${escapeHtml(item.EmailTemplateID)}">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12">
             <!-- LEFT COLUMN: Remains the same -->
             <div>
                  <table class="w-full text-sm">
                     <tbody>
-                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.EmailTemplateID}</td></tr>
+                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${escapeHtml(item.EmailTemplateID)}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Email Template Type</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-type">${item.EmailTemplateType}</span>
-                            <input type="text" value="${item.EmailTemplateType}" class="edit-state edit-state-type hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <span class="view-state view-state-type">${escapeHtml(item.EmailTemplateType)}</span>
+                            <input type="text" value="${escapeHtml(item.EmailTemplateType)}" class="edit-state edit-state-type hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Email Template Subject</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-subject">${item.EmailTemplateSubject || ''}</span>
-                            <textarea class="edit-state edit-state-subject hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${item.EmailTemplateSubject || ''}</textarea>
+                            <span class="view-state view-state-subject">${escapeHtml(item.EmailTemplateSubject || '')}</span>
+                            <textarea class="edit-state edit-state-subject hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${escapeHtml(item.EmailTemplateSubject || '')}</textarea>
                         </td></tr>
-                        <tr class="border-b"><td class="py-2 font-medium text-gray-500">Date Modified</td><td class="py-2 text-gray-900">${dateModified}</td></tr>
+                        <tr class="border-b"><td class="py-2 font-medium text-gray-500">Date Modified</td><td class="py-2 text-gray-900">${escapeHtml(dateModified)}</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -150,8 +163,8 @@ const renderAccordionDetails = (item) => {
                         <tr>
                             <!-- Row 2: The Input/Display Area -->
                             <td colspan="2" class="pb-2 text-gray-900">
-                                <span class="view-state view-state-template">${item.EmailTemplateText || ''}</span>
-                                <textarea class="edit-state edit-state-template hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${item.EmailTemplateText || ''}</textarea>
+                                <span class="view-state view-state-template">${escapeHtml(item.EmailTemplateText || '')}</span>
+                                <textarea class="edit-state edit-state-template hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3">${escapeHtml(item.EmailTemplateText || '')}</textarea>
                             </td>
                         </tr>
                     </tbody>
@@ -517,6 +530,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                     setTimeout(() => {
                         // This code will run AFTER the 3-second delay
+                        searchInput.value = '';
                         fetchAndRenderPage(tableConfig, 1, '');
                     }, 3000);
 
@@ -530,7 +544,16 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 }
             }
 
-            if (cancelButton) toggleEditState(false);
+            if (cancelButton) {
+                // Reset edit fields back to current saved values before hiding them
+                const typeInput    = parentAccordion.querySelector('.edit-state-type');
+                const subjectInput = parentAccordion.querySelector('.edit-state-subject');
+                const bodyInput    = parentAccordion.querySelector('.edit-state-template');
+                if (typeInput)    typeInput.value    = parentAccordion.querySelector('.view-state-type')?.textContent    || '';
+                if (subjectInput) subjectInput.value = parentAccordion.querySelector('.view-state-subject')?.textContent || '';
+                if (bodyInput)    bodyInput.value    = parentAccordion.querySelector('.view-state-template')?.textContent || '';
+                toggleEditState(false);
+            }
         });
     }
 }
@@ -584,7 +607,7 @@ async function renderPlatformAdminEmailTemplatesPage() {
                     { label: "Body", key: "EmailTemplateText", className: "break-words", widthClass: "w-6/12" },
                     { label: "Modified Date", key: "ModifiedDate", render: (value) => formatDate(value) },
                     { key: 'Details', label: '', widthClass: 'w-12', 
-                      render: () => `<div class="flex justify-end"><svg class="chevron-icon h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
+                      render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
                     }
                 ]
             };

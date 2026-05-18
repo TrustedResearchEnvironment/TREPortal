@@ -859,20 +859,20 @@ const renderAccordionDetails = (item) => {
     // --- END of new logic ---
 
     return `
-    <div class="accordion-body bg-slate-50 p-6" data-id="${item.DataSourceID}">
+    <div class="accordion-body bg-slate-50 p-6" data-id="${escapeHtml(item.DataSourceID)}">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12">
             <!-- LEFT COLUMN: Remains the same -->
             <div>
                  <table class="w-full text-sm">
                     <tbody>
-                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${item.DataSourceID}</td></tr>
+                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">ID</td><td class="py-2 text-gray-900">${escapeHtml(item.DataSourceID)}</td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Name</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-name">${item.Name}</span>
-                            <input type="text" value="${item.Name}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            <span class="view-state view-state-name">${escapeHtml(item.Name)}</span>
+                            <input type="text" value="${escapeHtml(item.Name)}" maxlength="100" class="edit-state edit-state-name hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Description</td><td class="py-2 text-gray-900">
-                            <span class="view-state view-state-description">${item.Description || ''}</span>
-                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${item.Description || ''}</textarea>
+                            <span class="view-state view-state-description">${escapeHtml(item.Description || '')}</span>
+                            <textarea class="edit-state edit-state-description hidden w-full rounded-md border-gray-300 shadow-sm sm:text-sm" rows="3" maxlength="500">${escapeHtml(item.Description || '')}</textarea>
                         </td></tr>
                         <tr class="border-b"><td class="py-2 font-medium text-gray-500">Active</td><td class="py-2 text-gray-900">
                             <span class="view-state view-state-isactive">${item.IsActive ? 'Yes' : 'No'}</span>
@@ -889,9 +889,9 @@ const renderAccordionDetails = (item) => {
             <div>
                 <table class="w-full text-sm mb-4">
                      <tbody>
-                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">Type</td><td class="py-2 text-gray-900">${dataSourceType || 'N/A'}</td></tr>
-                        <tr class="border-b"><td class="py-2 font-medium text-gray-500">Date Modified</td><td class="py-2 text-gray-900">${dateModified}</td></tr>
-                        <tr class="border-b"><td class="py-2 font-medium text-gray-500">Date Refreshed</td><td class="py-2 text-gray-900">${item.displayRefreshedDate}</td></tr>
+                        <tr class="border-b"><td class="py-2 font-medium text-gray-500 w-1/3">Type</td><td class="py-2 text-gray-900">${escapeHtml(dataSourceType || 'N/A')}</td></tr>
+                        <tr class="border-b"><td class="py-2 font-medium text-gray-500">Date Modified</td><td class="py-2 text-gray-900">${escapeHtml(dateModified)}</td></tr>
+                        <tr class="border-b"><td class="py-2 font-medium text-gray-500">Date Refreshed</td><td class="py-2 text-gray-900">${escapeHtml(item.displayRefreshedDate)}</td></tr>
                     </tbody>
                 </table>
                 <h4 class="text-sm font-semibold text-gray-600 mt-6 mb-2">Data Source Fields</h4>
@@ -1203,6 +1203,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                     setTimeout(() => {
                         // This code will run AFTER the 3-second delay
+                        searchInput.value = '';
                         fetchAndRenderPage(tableConfig, 1, '');
                     }, 3000);
 
@@ -1216,7 +1217,16 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 }
             }
 
-            if (cancelButton) toggleEditState(false);
+            if (cancelButton) {
+                // Reset edit fields back to current saved values before hiding them
+                const nameInput = parentAccordion.querySelector('.edit-state-name');
+                const descInput = parentAccordion.querySelector('.edit-state-description');
+                const activeInput = parentAccordion.querySelector('.edit-state-isactive');
+                if (nameInput) nameInput.value = parentAccordion.querySelector('.view-state-name')?.textContent || '';
+                if (descInput) descInput.value = parentAccordion.querySelector('.view-state-description')?.textContent || '';
+                if (activeInput) activeInput.checked = parentAccordion.querySelector('.view-state-isactive')?.textContent?.trim() === 'Yes';
+                toggleEditState(false);
+            }
         });
     }
 }
@@ -1364,7 +1374,7 @@ async function renderPlatformAdminDataSourcePage() {
             },
             {
                 key: 'Details', label: '', widthClass: 'w-12',
-                render: () => `<div class="flex justify-end"><svg class="chevron-icon h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
+                render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
             }
 
 

@@ -2033,6 +2033,7 @@ async function renderManageDataSetPage() {
     const approver = document.getElementById('dataSetApprover');
     const dataSetFieldsTable = document.getElementById('dataSetFieldsTable');
     const submitButton = document.getElementById('submit-button');
+    const cancelEditBtn = document.getElementById('cancel-edit-button');
 
     // Export button logic (now positioned after form elements)
     const exportBtn = document.getElementById('export-ds-cols-btn');
@@ -2494,6 +2495,31 @@ async function renderManageDataSetPage() {
 
     // Delete button handler: call delete API and show API detail on error
     const deleteBtn = document.getElementById('delete-button');
+
+    // Cancel Edit button handler: restore form to last loaded values
+    if (cancelEditBtn) {
+        cancelEditBtn.style.display = 'none';
+        cancelEditBtn.addEventListener('click', async () => {
+            if (!formSnapshot) return;
+            nameInput.value = formSnapshot.name;
+            descriptionInput.value = formSnapshot.description;
+            activeCheckbox.checked = formSnapshot.isActive;
+            owner.value = formSnapshot.owner;
+            approver.value = formSnapshot.approvers;
+            // Reload the columns from the saved state
+            await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
+            // Re-fetch and restore the metadata fields from the API.
+            // Build a minimal data source object from the module-level globals —
+            // allDataSources is not in scope here (it lives inside DOMContentLoaded).
+            const currentDataSetID = selectionDropdown ? selectionDropdown.value : null;
+            if (currentDataSourceID && currentDataSourceTypeID && currentDataSetID && currentDataSetID !== 'new') {
+                const minimalDataSource = { DataSourceID: currentDataSourceID, DataSourceTypeID: currentDataSourceTypeID };
+                await updateMetaDataTable(minimalDataSource, currentDataSetID);
+            }
+            showToast('Changes cancelled. Form restored to saved values.', 'info');
+        });
+    }
+
     if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
             const selectedId = selectionDropdown ? selectionDropdown.value : null;
@@ -2597,6 +2623,26 @@ async function renderManageDataSetPage() {
         // console.log("Form cleared for new data source.");
     }
 
+    // Snapshot of the last loaded dataset for cancel-edit restoration
+    let formSnapshot = null;
+
+    function saveFormSnapshot(dataSet, dataSource) {
+        formSnapshot = {
+            name: dataSet.Name,
+            description: dataSet.Description,
+            dataSourceID: dataSource.DataSourceID,
+            isActive: dataSet.IsActive,
+            owner: dataSet.Owner,
+            approvers: dataSet.Approvers
+        };
+    }
+
+    function updateCancelEditButtonState() {
+        if (!cancelEditBtn) return;
+        const selected = selectionDropdown ? selectionDropdown.value : 'new';
+        cancelEditBtn.style.display = (selected && selected !== 'new') ? '' : 'none';
+    }
+
     /**
      * Fills the form fields with data from a given data source object.
      * @param {object} dataSet The data set object with details.
@@ -2609,7 +2655,7 @@ async function renderManageDataSetPage() {
         activeCheckbox.checked = dataSet.IsActive;
         owner.value = dataSet.Owner;
         approver.value = dataSet.Approvers;
-
+        saveFormSnapshot(dataSet, dataSource);
         // console.log("Form populated with:", dataSet, dataSource);
     }
 
@@ -2695,6 +2741,7 @@ async function renderManageDataSetPage() {
         if (!deleteBtn) return;
         const selected = selectionDropdown ? selectionDropdown.value : 'new';
         deleteBtn.style.display = (selected && selected !== 'new') ? '' : 'none';
+        updateCancelEditButtonState();
     }
 
 
