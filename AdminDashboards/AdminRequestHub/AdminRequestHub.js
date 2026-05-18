@@ -137,6 +137,10 @@ function openActionModal(type, tab, id, name, projectId, createUser) {
         document.getElementById('actionRequestName').textContent = name;
         approveDiv.classList.remove('d-none');
         rejectDiv.classList.add('d-none');
+        document.getElementById('approveMessageError')?.classList.add('d-none');
+        confirmBtn.className = 'btn btn-success';
+        confirmBtn.textContent = 'Approve';
+        confirmBtn.disabled = true;
         if (msgTa) {
             msgTa.value = '';
             msgTa.maxLength = 500;
@@ -158,11 +162,9 @@ function openActionModal(type, tab, id, name, projectId, createUser) {
                 } else {
                     approveCounter.style.display = 'none';
                 }
+                confirmBtn.disabled = msgTa.value.trim().length === 0;
             };
         }
-        document.getElementById('approveMessageError')?.classList.add('d-none');
-        confirmBtn.className = 'btn btn-success';
-        confirmBtn.textContent = 'Approve';
     } else {
         titleEl.textContent = 'Reject Request';
         document.getElementById('actionRequestNameReject').textContent = name;
@@ -179,21 +181,29 @@ function openActionModal(type, tab, id, name, projectId, createUser) {
             }
             rejectCounter.textContent = '';
             rejectCounter.style.display = 'none';
-            reasonTa.oninput = () => {
-                const len = reasonTa.value.length;
-                const threshold = Math.floor(500 * 0.8);
-                if (len >= threshold) {
-                    rejectCounter.textContent = `${len} / 500`;
-                    rejectCounter.style.display = '';
-                    rejectCounter.style.color = '#dc3545';
-                } else {
-                    rejectCounter.style.display = 'none';
-                }
-            };
         }
         if (reasonErr) reasonErr.classList.add('d-none');
         confirmBtn.className = 'btn btn-danger';
         confirmBtn.textContent = 'Reject';
+        confirmBtn.disabled = true;
+        if (reasonTa) {
+            reasonTa.oninput = () => {
+                const len = reasonTa.value.length;
+                const threshold = Math.floor(500 * 0.8);
+                if (len >= threshold) {
+                    let rejectCounter = rejectDiv.querySelector('.char-counter');
+                    if (rejectCounter) {
+                        rejectCounter.textContent = `${len} / 500`;
+                        rejectCounter.style.display = '';
+                        rejectCounter.style.color = '#dc3545';
+                    }
+                } else {
+                    const rejectCounter = rejectDiv.querySelector('.char-counter');
+                    if (rejectCounter) rejectCounter.style.display = 'none';
+                }
+                confirmBtn.disabled = reasonTa.value.trim().length === 0;
+            };
+        }
     }
     modal.show();
 }

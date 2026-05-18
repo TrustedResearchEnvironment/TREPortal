@@ -625,31 +625,34 @@ function importSetupListeners() {
     });
 
     // Import modal wiring
-    const importModal   = document.getElementById('importModal');
-    const importNameEl  = document.getElementById('import-request-name');
-    const importSelEl   = document.getElementById('import-project-select');
-    const importSubmBtn = document.getElementById('import-submit-btn');
+    const importModal = document.getElementById('importModal');
 
     importModal?.addEventListener('show.bs.modal', () => {
+        const importNameEl  = importModal.querySelector('#import-request-name');
+        const importSelEl   = importModal.querySelector('#import-project-select');
+        const importSubmBtn = importModal.querySelector('#import-submit-btn');
         if (!importProjectsFetched) importPopulateProjects();
         if (importNameEl) { importNameEl.value = ''; importNameEl.maxLength = 100; attachCharCounter(importNameEl, 100); }
-        if (importSelEl)   importSelEl.value  = '';
+        if (importSelEl)   importSelEl.value = '';
         if (importSubmBtn) importSubmBtn.disabled = true;
+
+        const checkImportForm = () => {
+            if (importSubmBtn) importSubmBtn.disabled = !(importNameEl?.value.trim() && importSelEl?.value);
+        };
+        if (importNameEl) importNameEl.oninput  = checkImportForm;
+        if (importSelEl)  importSelEl.onchange = checkImportForm;
     });
 
-    const checkImportForm = () => {
-        if (importSubmBtn) importSubmBtn.disabled = !(importNameEl?.value.trim() && importSelEl?.value);
-    };
-    importNameEl?.addEventListener('input',  checkImportForm);
-    importSelEl?.addEventListener('change', checkImportForm);
-
-    importSubmBtn?.addEventListener('click', async () => {
+    importModal?.addEventListener('click', async (e) => {
+        const importSubmBtn = importModal.querySelector('#import-submit-btn');
+        if (!e.target.closest('#import-submit-btn')) return;
+        const importNameEl = importModal.querySelector('#import-request-name');
+        const importSelEl  = importModal.querySelector('#import-project-select');
         const name = sanitizeInput(importNameEl?.value.trim());
-        const opt  = importSelEl?.options[importSelEl.selectedIndex];
+        const opt  = importSelEl?.options[importSelEl?.selectedIndex];
         if (containsInvalidChars(importNameEl?.value || '')) { showToast('Special characters are not allowed in the request name.', 'error'); return; }
         if (!name || !opt?.value) { showToast('Please fill in all fields.', 'error'); return; }
-        importSubmBtn.disabled    = true;
-        importSubmBtn.textContent = 'Submitting…';
+        if (importSubmBtn) { importSubmBtn.disabled = true; importSubmBtn.textContent = 'Submitting…'; }
         const t = showToast('Creating import request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataImportByAssistProjectID', {
@@ -675,8 +678,7 @@ function importSetupListeners() {
             dismissToast(t);
             showToast('Failed to create import request.', 'error');
         } finally {
-            importSubmBtn.disabled    = false;
-            importSubmBtn.textContent = 'Submit Request';
+            if (importSubmBtn) { importSubmBtn.disabled = false; importSubmBtn.textContent = 'Submit Request'; }
         }
     });
 }
@@ -927,31 +929,34 @@ function exportSetupListeners() {
     });
 
     // Export modal wiring
-    const exportModal   = document.getElementById('exportModal');
-    const exportNameEl  = document.getElementById('export-request-name');
-    const exportSelEl   = document.getElementById('export-project-select');
-    const exportSubmBtn = document.getElementById('export-submit-btn');
+    const exportModal = document.getElementById('exportModal');
 
     exportModal?.addEventListener('show.bs.modal', () => {
+        const exportNameEl  = exportModal.querySelector('#export-request-name');
+        const exportSelEl   = exportModal.querySelector('#export-project-select');
+        const exportSubmBtn = exportModal.querySelector('#export-submit-btn');
         if (!exportProjectsFetched) exportPopulateProjects();
         if (exportNameEl) { exportNameEl.value = ''; exportNameEl.maxLength = 100; attachCharCounter(exportNameEl, 100); }
-        if (exportSelEl)   exportSelEl.value  = '';
+        if (exportSelEl)   exportSelEl.value = '';
         if (exportSubmBtn) exportSubmBtn.disabled = true;
+
+        const checkExportForm = () => {
+            if (exportSubmBtn) exportSubmBtn.disabled = !(exportNameEl?.value.trim() && exportSelEl?.value);
+        };
+        if (exportNameEl) exportNameEl.oninput  = checkExportForm;
+        if (exportSelEl)  exportSelEl.onchange = checkExportForm;
     });
 
-    const checkExportForm = () => {
-        if (exportSubmBtn) exportSubmBtn.disabled = !(exportNameEl?.value.trim() && exportSelEl?.value);
-    };
-    exportNameEl?.addEventListener('input',  checkExportForm);
-    exportSelEl?.addEventListener('change', checkExportForm);
-
-    exportSubmBtn?.addEventListener('click', async () => {
+    exportModal?.addEventListener('click', async (e) => {
+        const exportSubmBtn = exportModal.querySelector('#export-submit-btn');
+        if (!e.target.closest('#export-submit-btn')) return;
+        const exportNameEl = exportModal.querySelector('#export-request-name');
+        const exportSelEl  = exportModal.querySelector('#export-project-select');
         const name = sanitizeInput(exportNameEl?.value.trim());
-        const opt  = exportSelEl?.options[exportSelEl.selectedIndex];
+        const opt  = exportSelEl?.options[exportSelEl?.selectedIndex];
         if (containsInvalidChars(exportNameEl?.value || '')) { showToast('Special characters are not allowed in the request name.', 'error'); return; }
         if (!name || !opt?.value) { showToast('Please fill in all fields.', 'error'); return; }
-        exportSubmBtn.disabled    = true;
-        exportSubmBtn.textContent = 'Submitting…';
+        if (exportSubmBtn) { exportSubmBtn.disabled = true; exportSubmBtn.textContent = 'Submitting…'; }
         const t = showToast('Creating export request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataExportByAssistProjectID', {
@@ -977,8 +982,7 @@ function exportSetupListeners() {
             dismissToast(t);
             showToast('Failed to create export request.', 'error');
         } finally {
-            exportSubmBtn.disabled    = false;
-            exportSubmBtn.textContent = 'Submit Request';
+            if (exportSubmBtn) { exportSubmBtn.disabled = false; exportSubmBtn.textContent = 'Submit Request'; }
         }
     });
 }
