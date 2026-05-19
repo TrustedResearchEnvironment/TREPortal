@@ -595,6 +595,17 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
 async function renderPlatformAdminEmailTemplatesPage() {
     
     try {  
@@ -613,10 +624,10 @@ async function renderPlatformAdminEmailTemplatesPage() {
             };
         
         
-        searchInput.addEventListener('input', () => {
+        searchInput.addEventListener('input', debounce(() => {
             // When a new search is performed, always go back to page 1
             fetchAndRenderPage(tableConfig, 1, searchInput.value);
-        });
+        }, 300));
         
         // --- NEW PAGINATION EVENT LISTENER (EVENT DELEGATION) ---
         const paginationContainer = document.getElementById('pagination-controls');

@@ -1121,6 +1121,17 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
 async function getFromAPI(API_ID, initialParams) {
     let allResults = [];
 
@@ -1969,10 +1980,10 @@ function setupColumnNameDropdownHandlers() {
 
     if (searchInput) {
         searchInput.value = columnNameDropdownSearchTerm;
-        searchInput.addEventListener('input', (event) => {
+        searchInput.addEventListener('input', debounce((event) => {
             columnNameDropdownSearchTerm = event.target.value;
             refreshList();
-        });
+        }, 300));
     }
 
     if (selectAllCheckbox) {
@@ -2827,10 +2838,10 @@ async function renderManageDataSetPage() {
 
             const columnsSearchInput = document.getElementById('dataSetColumnsSearch');
             if (columnsSearchInput) {
-                columnsSearchInput.addEventListener('input', () => {
+                columnsSearchInput.addEventListener('input', debounce(() => {
                     columnSearchTerm = (columnsSearchInput.value || '').trim();
                     applyColumnSearchFilter();
-                });
+                }, 300));
             }
             const columnsHeader = document.getElementById('dataSetColsHeader');
             if (columnsHeader) {

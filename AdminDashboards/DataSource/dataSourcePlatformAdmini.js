@@ -1165,12 +1165,8 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                     // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
                     const parsed = safeParseJson(updatedDataSource);
-                    if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
-                        const error = new Error(parsed.detail || parsed.message || 'Server error');
-                        error.detail = parsed.detail;
-                        error.response = updatedDataSource;
-                        throw error;
-                    }
+                    const updateApiErr = extractApiError(parsed);
+                    if (updateApiErr) throw new Error(updateApiErr);
 
                     // --- 3. Handle the Server's Response ---
                     if (!updatedDataSource) {
@@ -1209,7 +1205,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                 } catch (error) {
                     console.error('Failed to save:', error);
-                    showToast(`Error: ${error.message || 'Failed to save data.'}`, 'error');
+                    showToast(error.message || 'Failed to save data.', 'error');
                 } finally {
                     // Reset the button back to its original state
                     saveBtn.textContent = 'Save Changes';
@@ -1294,6 +1290,35 @@ function formatDate(inputDate) {
  */
 function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
+}
+
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
+/**
+ * Extracts a human-readable error message from an API response.
+ * Handles: plain string, { detail: string }, { detail: [{field,message}] },
+ * and top-level [{field,message}] arrays.
+ */
+function extractApiError(parsed) {
+    if (!parsed) return null;
+    if (Array.isArray(parsed)) {
+        return parsed.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (typeof parsed.detail === 'string') return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+        return parsed.detail.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (parsed.status && parsed.status >= 400) return parsed.message || 'Server error';
+    return null;
 }
 
 /**
@@ -1387,9 +1412,9 @@ async function renderPlatformAdminDataSourcePage() {
     const paginationContainer = document.getElementById('pagination-controls');
 
     // The search input now calls fetchAndRenderPage
-    searchInput.addEventListener('input', () => {
+    searchInput.addEventListener('input', debounce(() => {
         fetchAndRenderPage(tableConfig, 1, searchInput.value);
-    });
+    }, 300));
 
     // Your existing click listener for pagination buttons
     paginationContainer.addEventListener('click', (event) => {
@@ -1491,12 +1516,8 @@ async function renderPlatformAdminDataSourcePage() {
 
             // Handle cases where the API returns an error object (e.g. HTTPException) instead of throwing
             const parsed = safeParseJson(response);
-            if (parsed && (parsed.detail || (parsed.status && parsed.status >= 400))) {
-                const error = new Error(parsed.detail || parsed.message || 'Server error');
-                error.detail = parsed.detail;
-                error.response = response;
-                throw error;
-            }
+            const apiErr = extractApiError(parsed);
+            if (apiErr) throw new Error(apiErr);
 
             showToast('Data Source added successfully!\nPlease wait while the data refreshes.', 'success');
 
@@ -1508,7 +1529,7 @@ async function renderPlatformAdminDataSourcePage() {
 
         } catch (error) {
             console.error("API call failed:", error);
-            showToast(`Error: ${error.message || 'Failed to save data.'}`, 'error');
+            showToast(error.message || 'Failed to save data.', 'error');
         } finally {
             saveButton.disabled = false;
             saveButton.innerHTML = 'Save';

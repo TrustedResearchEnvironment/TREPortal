@@ -871,7 +871,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                 } catch (error) {
                     console.error('Failed to save:', error);
-                    showToast(`Error: ${error.message || 'Failed to save data.'}`, 'error');
+                    showToast(error.message || 'Failed to save data.', 'error');
                 } finally {
                     // Reset the button back to its original state
                     saveBtn.textContent = 'Save Changes';
@@ -1079,6 +1079,16 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
 
 async function renderPlatformAdminMetaDataPage() {
 
@@ -1114,10 +1124,10 @@ async function renderPlatformAdminMetaDataPage() {
 
     // --- 2. Set up Event Listeners ---
     // The search input now calls fetchAndRenderPage
-    searchInput.addEventListener('input', () => {
+    searchInput.addEventListener('input', debounce(() => {
         // When a new search is performed, always go back to page 1
         fetchAndRenderPage(tableConfig, 1, searchInput.value);
-    });
+    }, 300));
 
     // The pagination container now calls fetchAndRenderPage
     const paginationContainer = document.getElementById('pagination-controls');
@@ -1223,7 +1233,7 @@ async function renderPlatformAdminMetaDataPage() {
             
         } catch (error) {
             console.error("API call failed:", error);
-            showToast(`Error: ${error.message || 'Failed to save data.'}`, 'error');
+            showToast(error.message || 'Failed to save data.', 'error');
         } finally {
             saveButton.disabled = false;
             saveButton.innerHTML = 'Save';

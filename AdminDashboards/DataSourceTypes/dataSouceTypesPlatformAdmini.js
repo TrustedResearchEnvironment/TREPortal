@@ -547,6 +547,35 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
+/**
+ * Extracts a human-readable error message from an API response.
+ * Handles: plain string, { detail: string }, { detail: [{field,message}] },
+ * and top-level [{field,message}] arrays.
+ */
+function extractApiError(parsed) {
+    if (!parsed) return null;
+    if (Array.isArray(parsed)) {
+        return parsed.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (typeof parsed.detail === 'string') return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+        return parsed.detail.map(e => e.message || e.field || JSON.stringify(e)).join('\n');
+    }
+    if (parsed.status && parsed.status >= 400) return parsed.message || 'Server error';
+    return null;
+}
+
 async function renderPlatformAdminDataSourceTypesPage() {
     
     try {
@@ -578,10 +607,10 @@ async function renderPlatformAdminDataSourceTypesPage() {
         
         
         // --- SEARCH EVENT LISTENER ---
-        searchInput.addEventListener('input', () => {
+        searchInput.addEventListener('input', debounce(() => {
             // When a new search is performed, always go back to page 1
             fetchAndRenderPage(1, searchInput.value);
-        });
+        }, 300));
         
         // --- NEW PAGINATION EVENT LISTENER (EVENT DELEGATION) ---
         const paginationContainer = document.getElementById('pagination-controls');
@@ -661,6 +690,9 @@ async function renderPlatformAdminDataSourceTypesPage() {
                 
                 const response = await window.loomeApi.runApiRequest(API_ADD_METADATA, payload);
                 // console.log("RESPONSE: ", response)
+                const parsed = safeParseJson(response);
+                const apiErr = extractApiError(parsed);
+                if (apiErr) throw new Error(apiErr);
                 
                 showToast('Data Source Type created successfully!');
                 
@@ -672,7 +704,7 @@ async function renderPlatformAdminDataSourceTypesPage() {
                 
             } catch (error) {
                 console.error("API call failed:", error);
-                showToast(`Error: ${error.message || 'Failed to save data.'}`, 'error');
+                showToast(error.message || 'Failed to save data.', 'error');
             } finally {
                 saveButton.disabled = false;
                 saveButton.innerHTML = 'Save';

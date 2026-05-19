@@ -260,6 +260,17 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
 async function getFromAPI(API_ID, initialParams) {
     let allResults = [];
 
@@ -1316,10 +1327,10 @@ async function renderMyRequestsPage() {
         });
 
         // Listener for the search input
-        searchInput.addEventListener('input', () => {
+        searchInput.addEventListener('input', debounce(() => {
             currentPage = 1; // Reset to page 1 when searching
             renderUI(); // Re-render everything
-        });
+        }, 300));
 
         // Listener for pagination buttons
         const paginationContainer = document.getElementById('pagination-controls');
