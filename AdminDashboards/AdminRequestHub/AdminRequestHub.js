@@ -46,6 +46,7 @@ function formatDate(inputDate) {
 function showToast(message, type = 'success', duration = 5000) {
     let container = document.getElementById('toast-container');
     if (!container) { container = document.createElement('div'); container.id = 'toast-container'; document.body.appendChild(container); }
+    container.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
     const bgMap = { success: '#1AABA3', error: '#dc3545', warning: '#fd7e14', info: '#0dcaf0' };
     const toast = document.createElement('div');
     toast.style.cssText = [

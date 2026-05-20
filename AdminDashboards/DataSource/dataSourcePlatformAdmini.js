@@ -31,9 +31,10 @@ let folderConnectionMap = new Map();
  */
 function showToast(message, type = 'success', duration = 3000) {
     const container = document.getElementById('toast-container') || createToastContainer();
+    container.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
-    toast.style.cssText = 'margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
+    toast.style.cssText = 'pointer-events:auto;margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
 
     let bgColor = '#2196F3'; // info default
     if (type === 'success') bgColor = '#1AABA3';
@@ -79,8 +80,22 @@ function createToastContainer() {
     const container = document.createElement('div');
     container.id = 'toast-container';
     container.className = 'toast-top-right';
-    container.style.cssText = 'position: fixed; top: 12px; right: 12px; z-index: 9999;';
-    document.body.appendChild(container);
+    container.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+
+    // The scrollable area in this page is an inner div, not window.
+    // Attach the container to that div so position:fixed inside it tracks correctly,
+    // OR just ensure body is the scroll container by moving overflow to body.
+    // Simplest: move the toast into the scrollable div and use sticky positioning.
+    const scrollPane = document.querySelector('.overflow-y-auto') || document.body;
+    if (scrollPane !== document.body) {
+        // Make the scrollable pane position:relative so we can use sticky inside it
+        scrollPane.style.position = 'relative';
+        container.style.cssText = 'position:sticky;top:12px;float:right;margin-right:12px;z-index:9999;display:flex;flex-direction:column;gap:8px;width:fit-content;pointer-events:none;';
+        // Each toast needs pointer-events re-enabled
+        scrollPane.prepend(container);
+    } else {
+        document.body.appendChild(container);
+    }
     return container;
 }
 

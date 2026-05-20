@@ -62,6 +62,7 @@ const searchInput = document.getElementById('searchExports');
  */
 function showToast(message, type = 'success', duration = 3000) {
     const container = document.getElementById('toast-container') || createToastContainer();
+    container.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
     toast.style.cssText = 'margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
