@@ -821,6 +821,17 @@ function safeParseJson(response) {
 }
 
 /**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
+/**
 * Renders a compact and functional set of pagination controls.
 * Includes First, Previous, Next, Last buttons and a page input field.
 */
@@ -1282,10 +1293,10 @@ async function renderApproversPage() {
         });
 
         // Listener for the search input
-        searchInput.addEventListener('input', () => {
+        searchInput.addEventListener('input', debounce(() => {
             currentPage = 1; // Reset to page 1 when searching
             renderUI(); // Re-render everything
-        });
+        }, 300));
 
         // Listener for pagination buttons
         const paginationContainer = document.getElementById('pagination-controls');

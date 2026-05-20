@@ -513,7 +513,9 @@ async function validateDataSetColumns(parsedCols, metaRow) {
 
                 // For NEW REDCap: call the REDCap sync endpoint to get expected columns
                 // using existing helper; adapt if your endpoint differs.
-                const rc = await syncREDCapDataSetColumns(parseInt(metaRow.DataSourceID, 10));
+                const rcDsId = safeParseId(metaRow.DataSourceID);
+                if (rcDsId === null) throw new Error('Invalid DataSourceID in metadata row.');
+                const rc = await syncREDCapDataSetColumns(rcDsId);
                 // console.log("syncREDCapDataSetColumns returned:", rc);
                 // syncREDCapDataSetColumns may return an object like { status, metadata }
                 // where `metadata` is an array of fields with properties such as
@@ -837,7 +839,8 @@ async function fetchDataSetFieldValue(data_set_id) {
         const tableIdAsString = result.Value; // The value is a string, e.g., "9"
 
         // --- CONVERT TO INTEGER HERE ---
-        const tableId = parseInt(tableIdAsString, 10);
+        const tableId = safeParseId(tableIdAsString);
+        if (tableId === null) throw new Error(`Invalid table reference ID: ${tableIdAsString}`);
 
         const tableInfo = await fetchLoomeDataSourceTablesByTableId(tableId);
         // console.log("Fetched Table Info:", tableId, tableInfo[0]);
@@ -1062,7 +1065,7 @@ async function updateMetaDataTable(dataSource, dataSetID) {
                 const metaDef = allDefsById[mid];
                 // Even if not currently associated or active, show as legacy
                 extraDefs.push({
-                    id: metaDef ? metaDef.MetaDataID : parseInt(mid, 10),
+                    id: metaDef ? metaDef.MetaDataID : (safeParseId(mid) ?? 0),
                     label: `${metaDef ? metaDef.Name : `Meta ${mid}`} (legacy)`,
                     inputId: `meta_${mid}`,
                     type: 'text',
@@ -1130,6 +1133,18 @@ function debounce(fn, wait = 300) {
         clearTimeout(timer);
         timer = setTimeout(() => fn(...args), wait);
     };
+}
+
+/**
+ * Safely parses an ID value, rejecting NaN, floats, negatives, zero,
+ * and values exceeding SQL INT max (2147483647).
+ * @param {any} value
+ * @returns {number|null}
+ */
+function safeParseId(value) {
+    const n = parseInt(value, 10);
+    if (!Number.isInteger(n) || !Number.isFinite(n) || n <= 0 || n > 2147483647) return null;
+    return n;
 }
 
 async function getFromAPI(API_ID, initialParams) {
@@ -1569,7 +1584,7 @@ function gatherFormData(allColumnsData) {
         _rawName: rawName.trim(),
         Description: sanitizeInput(rawDescription.trim()),
         _rawDescription: rawDescription.trim(),
-        DataSourceID: parseInt(document.getElementById('dataSource').value, 10),
+        DataSourceID: safeParseId(document.getElementById('dataSource').value),
         Owner: document.getElementById('dataSetOwner').value.trim(),
         Approvers: document.getElementById('dataSetApprover').value.trim(),
         IsActive: document.getElementById('dataSetActive').checked
@@ -1589,7 +1604,7 @@ function gatherFormData(allColumnsData) {
             const valueInput = row.querySelector('td:last-child input, td:last-child select');
             if (keyInput && valueInput) {
                 metaData.push({
-                    MetaDataID: parseInt(keyInput.value, 10),
+                    MetaDataID: safeParseId(keyInput.value),
                     Value: valueInput.value
                 });
             }
@@ -1698,7 +1713,7 @@ async function createDataSet(data) {
 async function updateDataSet(data_set_id, data) {
     const payload = {
         ...data,
-        id: parseInt(data_set_id, 10),
+        id: safeParseId(data_set_id),
         OptOutMessage: null,
         OptOutList: null,
         OptOutColumn: "-1",
@@ -2337,10 +2352,10 @@ async function renderManageDataSetPage() {
                     // If metadata contains DataSourceTypeID/DataSourceID, set globals so header and behavior match
                     if (Array.isArray(parsedMeta) && parsedMeta.length > 0) {
                         const meta0 = parsedMeta[0];
-                        const dsType = parseInt(meta0.DataSourceTypeID, 10);
-                        const dsId = parseInt(meta0.DataSourceID, 10);
-                        if (!Number.isNaN(dsType)) currentDataSourceTypeID = dsType;
-                        if (!Number.isNaN(dsId)) currentDataSourceID = dsId;
+                        const dsType = safeParseId(meta0.DataSourceTypeID);
+                        const dsId = safeParseId(meta0.DataSourceID);
+                        if (dsType !== null) currentDataSourceTypeID = dsType;
+                        if (dsId !== null) currentDataSourceID = dsId;
                     }
 
                     // Update master state and refresh UI
@@ -2388,8 +2403,8 @@ async function renderManageDataSetPage() {
                             selectionDropdown.value = dsIdFromMeta;
 
                             // 3. Render Field/Meta tables and populate JSON values
-                            const dsIdToUse = (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceID') && metaRow.DataSourceID) ? parseInt(metaRow.DataSourceID, 10) : currentDataSourceID;
-                            const dsTypeToUse = (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceTypeID') && metaRow.DataSourceTypeID) ? parseInt(metaRow.DataSourceTypeID, 10) : currentDataSourceTypeID;
+                            const dsIdToUse = (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceID') && metaRow.DataSourceID) ? (safeParseId(metaRow.DataSourceID) ?? currentDataSourceID) : currentDataSourceID;
+                            const dsTypeToUse = (Object.prototype.hasOwnProperty.call(metaRow, 'DataSourceTypeID') && metaRow.DataSourceTypeID) ? (safeParseId(metaRow.DataSourceTypeID) ?? currentDataSourceTypeID) : currentDataSourceTypeID;
                             const tmpDataSource = { 
                                 DataSourceID: dsIdToUse, 
                                 DataSourceTypeID: dsTypeToUse 
@@ -2574,7 +2589,9 @@ async function renderManageDataSetPage() {
                     return;
                 }
 
-                const params = { id: parseInt(selectedId, 10) };
+                const safeSelectedId = safeParseId(selectedId);
+                if (safeSelectedId === null) { showToast('Invalid dataset ID.', 'error'); return; }
+                const params = { id: safeSelectedId };
                 // Use the low-level runApiRequest so we can inspect error payloads directly
                 // This API call updates the database
                 const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);

@@ -14,6 +14,29 @@ function safeParseJson(response) {
     return response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
+/**
+ * Safely parses an ID value, rejecting NaN, floats, negatives, zero,
+ * and values exceeding SQL INT max (2147483647).
+ * @param {any} value
+ * @returns {number|null}
+ */
+function safeParseId(value) {
+    const n = parseInt(value, 10);
+    if (!Number.isInteger(n) || !Number.isFinite(n) || n <= 0 || n > 2147483647) return null;
+    return n;
+}
+
 function formatDate(inputDate) {
     if (!inputDate) return 'N/A';
     const d = new Date(inputDate);
@@ -242,13 +265,16 @@ function setupActionModalConfirm() {
         }
         modal?.hide();
 
+        const safeId = safeParseId(id);
+        if (safeId === null) { showToast('Invalid request ID.', 'error'); return; }
+
         const t = showToast(`${type === 'approve' ? 'Approving' : 'Rejecting'}…`, 'info');
         try {
             if (tab === 'access') {
                 if (type === 'approve') {
-                    await window.loomeApi.runApiRequest('ApproveRequestID', { id: parseInt(id, 10), Message: msg || '' });
+                    await window.loomeApi.runApiRequest('ApproveRequestID', { id: safeId, Message: msg || '' });
                 } else {
-                    await window.loomeApi.runApiRequest('RejectRequestID', { id: parseInt(id, 10), Message: reason });
+                    await window.loomeApi.runApiRequest('RejectRequestID', { id: safeId, Message: reason });
                 }
                 dismissToast(t);
                 showToast(`Request ${type === 'approve' ? 'approved' : 'rejected'} successfully.`, 'success');
@@ -256,19 +282,19 @@ function setupActionModalConfirm() {
 
             } else if (tab === 'import') {
                 if (type === 'approve') {
-                    await window.loomeApi.runApiRequest('ApproveImportRequest', { id: parseInt(id, 10), Message: msg || '' });
+                    await window.loomeApi.runApiRequest('ApproveImportRequest', { id: safeId, Message: msg || '' });
                     dismissToast(t);
                     showToast('Import request approved. Initiating data transfer…', 'success');
                     await Promise.all([adminImportRenderUI(), adminImportRefreshChipCounts()]);
                     // Kick off the integrate job to transfer data to the target project
                     try {
-                        await window.loomeApi.runApiRequest('ApprovedImportRequestIntegrateJob', { ImportRequestID: parseInt(id, 10) });
+                        await window.loomeApi.runApiRequest('ApprovedImportRequestIntegrateJob', { ImportRequestID: safeId });
                         showToast('Data transfer from Import Project to Target Project has been initiated.', 'info');
                     } catch (integrateErr) {
                         showToast('Request approved but data transfer job failed to start. Please retry manually.', 'error');
                     }
                 } else {
-                    await window.loomeApi.runApiRequest('RejectImportRequest', { id: parseInt(id, 10), Message: reason });
+                    await window.loomeApi.runApiRequest('RejectImportRequest', { id: safeId, Message: reason });
                     dismissToast(t);
                     showToast('Import request rejected successfully.', 'success');
                     await Promise.all([adminImportRenderUI(), adminImportRefreshChipCounts()]);
@@ -276,14 +302,14 @@ function setupActionModalConfirm() {
 
             } else if (tab === 'export') {
                 if (type === 'approve') {
-                    await window.loomeApi.runApiRequest('ApproveExportRequest', { id: parseInt(id, 10), Message: msg || '' });
+                    await window.loomeApi.runApiRequest('ApproveExportRequest', { id: safeId, Message: msg || '' });
                     dismissToast(t);
                     showToast('Export request approved. Adding researcher to Airlock Project…', 'success');
                     await Promise.all([adminExportRenderUI(), adminExportRefreshChipCounts()]);
                     // Kick off the integrate job to add the researcher to the Airlock project
                     try {
                         await window.loomeApi.runApiRequest('ApprovedExportRequestIntegrateJob', {
-                            ExportRequestID: parseInt(id, 10),
+                            ExportRequestID: safeId,
                             ExportProjectID: pendingAction.projectId || '',
                             ResearcherEmail: pendingAction.createUser || ''
                         });
@@ -292,7 +318,7 @@ function setupActionModalConfirm() {
                         showToast('Request approved but Airlock integration job failed to start. Please retry manually.', 'error');
                     }
                 } else {
-                    await window.loomeApi.runApiRequest('RejectExportRequest', { id: parseInt(id, 10), Message: reason });
+                    await window.loomeApi.runApiRequest('RejectExportRequest', { id: safeId, Message: reason });
                     dismissToast(t);
                     showToast('Export request rejected successfully.', 'success');
                     await Promise.all([adminExportRenderUI(), adminExportRefreshChipCounts()]);
@@ -483,9 +509,9 @@ function adminAccessSetupListeners() {
         adminAccessRenderUI();
     });
 
-    document.getElementById('admin-access-search')?.addEventListener('input', () => {
+    document.getElementById('admin-access-search')?.addEventListener('input', debounce(() => {
         adminAccessCurrentPage = 1; adminAccessRenderUI();
-    });
+    }, 300));
 
     document.getElementById('admin-access-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
@@ -692,9 +718,9 @@ function adminImportSetupListeners() {
         adminImportRenderUI();
     });
 
-    document.getElementById('admin-import-search')?.addEventListener('input', () => {
+    document.getElementById('admin-import-search')?.addEventListener('input', debounce(() => {
         adminImportCurrentPage = 1; adminImportRenderUI();
-    });
+    }, 300));
 
     document.getElementById('admin-import-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
@@ -861,7 +887,9 @@ function adminExportRenderTable(container, data, selectedStatus) {
                 loaded = true;
                 const content = detailRow.querySelector('.admin-export-detail-content');
                 try {
-                    const d = safeParseJson(await window.loomeApi.runApiRequest('GetExportRequestByID', { ExportRequestID: parseInt(row.dataset.id, 10) }));
+                    const exportRowId = safeParseId(row.dataset.id);
+                    if (exportRowId === null) throw new Error('Invalid export request ID.');
+                    const d = safeParseJson(await window.loomeApi.runApiRequest('GetExportRequestByID', { ExportRequestID: exportRowId }));
                     content.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div class="space-y-2">
@@ -901,9 +929,9 @@ function adminExportSetupListeners() {
         adminExportRenderUI();
     });
 
-    document.getElementById('admin-export-search')?.addEventListener('input', () => {
+    document.getElementById('admin-export-search')?.addEventListener('input', debounce(() => {
         adminExportCurrentPage = 1; adminExportRenderUI();
-    });
+    }, 300));
 
     document.getElementById('admin-export-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');

@@ -168,7 +168,7 @@ function getDataSourceFormData(formElement) {
 
     // For the <select>, we get the value of the selected <option>.
     // Parse it as an integer to match the type used in comparisons (e.g. === 2)
-    const dataSourceTypeID = parseInt(formElement.querySelector('#dataSourceType').value, 10);
+    const dataSourceTypeID = safeParseId(formElement.querySelector('#dataSourceType').value);
 
     // --- 2. Get values from the DYNAMICALLY generated fields ---
     // Initialize an empty object to hold the key-value pairs.
@@ -265,7 +265,7 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
 
     // --- 5. CREATE the event handler function ---
     const handleTypeChange = async (event) => {
-        const selectedTypeId = parseInt(event.target.value);
+        const selectedTypeId = safeParseId(event.target.value);
         const fieldsContainer = document.querySelector('#dataSourceFieldsContainer');
 
         // Special handling for Database type (ID = 1)
@@ -1051,7 +1051,9 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 }
                 if (!confirm('Are you sure you want to delete this Data Source? This action cannot be undone.')) return;
                 try {
-                    const params = { id: parseInt(dataSourceId, 10) };
+                    const safeDsId = safeParseId(dataSourceId);
+                    if (safeDsId === null) { showToast('Invalid Data Source ID.', 'error'); return; }
+                    const params = { id: safeDsId };
                     const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASOURCE_ID, params);
                     const parsed = safeParseJson(raw);
                     if (parsed && parsed.detail) {
@@ -1301,6 +1303,18 @@ function debounce(fn, wait = 300) {
         clearTimeout(timer);
         timer = setTimeout(() => fn(...args), wait);
     };
+}
+
+/**
+ * Safely parses an ID value, rejecting NaN, floats, negatives, zero,
+ * and values exceeding SQL INT max (2147483647).
+ * @param {any} value
+ * @returns {number|null}
+ */
+function safeParseId(value) {
+    const n = parseInt(value, 10);
+    if (!Number.isInteger(n) || !Number.isFinite(n) || n <= 0 || n > 2147483647) return null;
+    return n;
 }
 
 /**

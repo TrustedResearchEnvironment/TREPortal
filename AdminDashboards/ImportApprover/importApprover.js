@@ -271,6 +271,18 @@ function debounce(fn, wait = 300) {
     };
 }
 
+/**
+ * Safely parses an ID value, rejecting NaN, floats, negatives, zero,
+ * and values exceeding SQL INT max (2147483647).
+ * @param {any} value
+ * @returns {number|null}
+ */
+function safeParseId(value) {
+    const n = parseInt(value, 10);
+    if (!Number.isInteger(n) || !Number.isFinite(n) || n <= 0 || n > 2147483647) return null;
+    return n;
+}
+
 async function getFromAPI(API_ID, initialParams) {
     let allResults = [];
 
@@ -518,7 +530,9 @@ async function approveRequestFromAPI(requestId, reason) {
         loadingToast = showToast('Approving request...', 'info');
         // console.log('Loading toast shown:', loadingToast);
         
-        const params = { "id": parseInt(requestId), "reason": reason };
+        const safeRequestId = safeParseId(requestId);
+        if (safeRequestId === null) throw new Error('Invalid request ID.');
+        const params = { "id": safeRequestId, "reason": reason };
         if (reason !== undefined && reason !== null) params.reason = String(reason);
 
         const response = await window.loomeApi.runApiRequest(API_APPROVE_REQUEST, params);
@@ -664,7 +678,9 @@ async function rejectRequestFromAPI(requestId, reason) {
         // Show loading state
         loadingToast = showToast('Rejecting request...', 'info');
         
-        const params = { "id": parseInt(requestId, 10), "reason": reason };
+        const safeRequestId = safeParseId(requestId);
+        if (safeRequestId === null) throw new Error('Invalid request ID.');
+        const params = { "id": safeRequestId, "reason": reason };
         if (reason !== undefined && reason !== null) params.reason = String(reason);
 
         const response = await window.loomeApi.runApiRequest(API_REJECT_REQUEST, params);

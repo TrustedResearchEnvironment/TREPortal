@@ -120,6 +120,17 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
 function formatDate(inputDate) {
     if (!inputDate) return 'N/A';
     const date = new Date(inputDate);
@@ -882,10 +893,10 @@ function setupEventListeners() {
 
     // Search functionality
     if (searchInput) {
-        searchInput.addEventListener('input', () => {
+        searchInput.addEventListener('input', debounce(() => {
             currentPage = 1; // Reset to first page on search
             renderUI();
-        });
+        }, 300));
     }
 
     // Pagination button clicks

@@ -828,15 +828,18 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     // --- 2. Send Request to the Endpoint using fetch ---
                     // Collect selected types from the accordion dropdown (if any)
                     const selectedTypes = Array.from(accordionBody.querySelectorAll('.accordion-dataSourceTypeMenu input[type="checkbox"]:checked'))
-                        .map(cb => parseInt(cb.value, 10)).filter(v => !Number.isNaN(v));
+                        .map(cb => safeParseId(cb.value)).filter(v => v !== null);
 
                     // Validate required fields before sending
                     if (!updatedName || String(updatedName).trim() === '') {
                         throw new Error('Name is required.');
                     }
 
+                    const safeMetaDataId = safeParseId(metaDataId);
+                    if (safeMetaDataId === null) throw new Error('Invalid record ID.');
+
                     const updateParams = {
-                        "meta_data_id": parseInt(metaDataId, 10),
+                        "meta_data_id": safeMetaDataId,
                         "description":  updatedDescription,
                         "isActive":  updatedIsActive,
                         "name":  updatedName,
@@ -889,7 +892,9 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
                 try {
                     const metaDataID = deleteButton?.dataset?.metaid || accordionBody?.dataset?.id;
-                    const params = { meta_data_id : parseInt(metaDataID, 10) };
+                    const safeDeleteId = safeParseId(metaDataID);
+                    if (safeDeleteId === null) { showToast('Invalid record ID.', 'error'); return; }
+                    const params = { meta_data_id: safeDeleteId };
                     // Use the low-level runApiRequest so we can inspect error payloads directly
                     const raw = await window.loomeApi.runApiRequest(API_CANCEL_METADATA, params);
                     const parsed = safeParseJson(raw);
@@ -1088,6 +1093,18 @@ function debounce(fn, wait = 300) {
         clearTimeout(timer);
         timer = setTimeout(() => fn(...args), wait);
     };
+}
+
+/**
+ * Safely parses an ID value, rejecting NaN, floats, negatives, zero,
+ * and values exceeding SQL INT max (2147483647).
+ * @param {any} value
+ * @returns {number|null}
+ */
+function safeParseId(value) {
+    const n = parseInt(value, 10);
+    if (!Number.isInteger(n) || !Number.isFinite(n) || n <= 0 || n > 2147483647) return null;
+    return n;
 }
 
 async function renderPlatformAdminMetaDataPage() {

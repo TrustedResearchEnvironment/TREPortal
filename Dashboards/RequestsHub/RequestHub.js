@@ -14,6 +14,17 @@ function safeParseJson(response) {
     return response;
 }
 
+/**
+ * Returns a debounced version of fn that delays invocation by `wait` ms.
+ */
+function debounce(fn, wait = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
 function formatDate(inputDate) {
     if (!inputDate) return 'N/A';
     const d = new Date(inputDate);
@@ -358,10 +369,10 @@ function accessSetupListeners() {
         accessRenderUI();
     });
 
-    document.getElementById('access-search')?.addEventListener('input', () => {
+    document.getElementById('access-search')?.addEventListener('input', debounce(() => {
         accessCurrentPage = 1;
         accessRenderUI();
-    });
+    }, 300));
 
     document.getElementById('access-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
@@ -600,14 +611,14 @@ function importSetupListeners() {
 
     const importSearchEl = document.getElementById('import-search');
     if (importSearchEl) importSearchEl.removeAttribute('minlength');
-    importSearchEl?.addEventListener('input', () => {
+    importSearchEl?.addEventListener('input', debounce(() => {
         importCurrentPage = 1;
         importRenderUI();
-    });
-    importSearchEl?.addEventListener('search', () => {
+    }, 300));
+    importSearchEl?.addEventListener('search', debounce(() => {
         importCurrentPage = 1;
         importRenderUI();
-    });
+    }, 300));
 
     document.getElementById('import-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
@@ -904,14 +915,14 @@ function exportSetupListeners() {
 
     const exportSearchEl = document.getElementById('export-search');
     if (exportSearchEl) exportSearchEl.removeAttribute('minlength');
-    exportSearchEl?.addEventListener('input', () => {
+    exportSearchEl?.addEventListener('input', debounce(() => {
         exportCurrentPage = 1;
         exportRenderUI();
-    });
-    exportSearchEl?.addEventListener('search', () => {
+    }, 300));
+    exportSearchEl?.addEventListener('search', debounce(() => {
         exportCurrentPage = 1;
         exportRenderUI();
-    });
+    }, 300));
 
     document.getElementById('export-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
