@@ -12,6 +12,9 @@ let rowsPerPage = 5; // Default, will be updated by API response
 let tableConfig = {}; // Will hold your headers configuration
 const searchInput = document.getElementById('searchRequests');
 
+// Incremented on every new fetchAndRenderPage call; stale responses are ignored.
+let _fetchToken = 0;
+
 /**
  * Strips characters outside the safe whitelist to guard against injection.
  * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
@@ -226,6 +229,15 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
  * @param {string} searchTerm The search term to filter by.
  */
 async function fetchAndRenderPage(page, searchTerm = '') {
+    const token = ++_fetchToken;
+
+    const setPaginationDisabled = (disabled) => {
+        document.querySelectorAll('#pagination-controls button[data-page]').forEach(btn => {
+            btn.disabled = disabled;
+        });
+    };
+    setPaginationDisabled(true);
+
     try {
         // --- 1. Call the API with pagination parameters ---
         // NOTE: Your loomeApi.runApiRequest must support passing parameters.
@@ -239,7 +251,9 @@ async function fetchAndRenderPage(page, searchTerm = '') {
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_DATASRCTYPES_ID, apiParams);
 
-        
+        // A newer request has superseded this one — discard the stale response.
+        if (token !== _fetchToken) return;
+
         const parsedResponse = safeParseJson(response);
         // console.log(parsedResponse)
 
@@ -278,9 +292,12 @@ async function fetchAndRenderPage(page, searchTerm = '') {
         }
 
     } catch (error) {
+        if (token !== _fetchToken) return; // stale error — ignore
         console.error("Failed to fetch or render page:", error);
         const container = document.getElementById(TABLE_CONTAINER_ID);
         container.innerHTML = `<div class="p-4 text-red-600">Error loading data: ${error.message}</div>`;
+    } finally {
+        if (token === _fetchToken) setPaginationDisabled(false);
     }
 }
 

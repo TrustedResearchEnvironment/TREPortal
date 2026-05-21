@@ -173,6 +173,7 @@ let accessCurrentPage   = 1;
 let accessTotalPages    = 1;
 let accessCurrentStatus = 'Pending Approval';
 let accessProjectsCache = null;
+let _accessFetchToken   = 0;
 
 async function accessGetProjectsMapping() {
     if (accessProjectsCache) return accessProjectsCache;
@@ -235,6 +236,8 @@ function accessShowDeleteModal(requestId, requestName) {
 }
 
 async function accessRenderUI() {
+    const token = ++_accessFetchToken;
+    document.querySelectorAll('#access-pagination [data-page]').forEach(b => { b.disabled = true; });
     const container  = document.getElementById('access-table-area');
     const searchTerm = (document.getElementById('access-search')?.value || '').trim();
     container.innerHTML = `<p class="text-center py-4 text-gray-400 text-sm">Loading…</p>`;
@@ -243,6 +246,7 @@ async function accessRenderUI() {
         const statusId = Object.entries(ACCESS_STATUS_MAP).find(([, v]) => v === accessCurrentStatus)?.[0];
         const params   = { page: accessCurrentPage, pageSize: ACCESS_ROWS_PER_PAGE, search: searchTerm, statusId: parseInt(statusId) };
         const res      = await window.loomeApi.runApiRequest('GetRequests', params);
+        if (token !== _accessFetchToken) return;
         const parsed   = safeParseJson(res);
         const data     = (parsed?.Results || []).map(item => ({ ...item, _status: ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
         const total    = parsed?.RowCount || 0;
@@ -250,7 +254,10 @@ async function accessRenderUI() {
         accessRenderTable(container, data, accessCurrentStatus);
         renderPaginationHtml('access-pagination', total, ACCESS_ROWS_PER_PAGE, accessCurrentPage);
     } catch (e) {
+        if (token !== _accessFetchToken) return;
         container.innerHTML = `<p class="text-center py-4 text-red-500 text-sm">Error loading requests: ${e.message}</p>`;
+    } finally {
+        if (token === _accessFetchToken) document.querySelectorAll('#access-pagination [data-page]').forEach(b => { b.disabled = false; });
     }
 }
 

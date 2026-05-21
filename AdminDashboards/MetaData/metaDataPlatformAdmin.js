@@ -19,6 +19,9 @@ let dataSourceTypesList = [];
 let dataSourceTypeIdToName = new Map();
 const searchInput = document.getElementById('searchRequests');
 
+// Incremented on every new fetchAndRenderPage call; stale responses are ignored.
+let _fetchToken = 0;
+
 /**
  * Escapes a value for safe insertion into HTML.
  */
@@ -82,13 +85,13 @@ function AddMetadata(typeNamesList) {
 
     // 1. Generate the HTML for the checkboxes (this part is mostly the same)
     // Accept an array of objects {id, name} or fallback to simple name list
-    const checkboxesHtml = typeNamesList
-        .filter(item => {
-            if (!item) return false;
-            //if (typeof item === 'string') return item !== 'Folder';
-            return item.name || item.Name//) !== 'Folder';
-        })
-        .map((item, index) => {
+    const filteredTypes = typeNamesList.filter(item => {
+        if (!item) return false;
+        return item.name || item.Name;
+    });
+
+    const checkboxesHtml = filteredTypes.length > 0
+        ? filteredTypes.map((item, index) => {
             const id = (item && (item.DataSourceTypeID !== undefined || item.id !== undefined)) ? (item.DataSourceTypeID ?? item.id) : index;
             const name = typeof item === 'string' ? item : (item.Name || item.name || String(item));
             const checkboxId = `dataSourceType-checkbox-${index}`;
@@ -104,7 +107,8 @@ function AddMetadata(typeNamesList) {
                     </a>
                 </li>
             `;
-        }).join('');
+        }).join('')
+        : '<li class="text-muted small px-3 py-2">No data source types available.</li>';
 
     // 2. Populate the modal body with the form structure
     modalBody.innerHTML = `
@@ -127,13 +131,14 @@ function AddMetadata(typeNamesList) {
             <div class="mb-3">
                 <label for="dataSourceTypeDropdown" class="form-label">Apply to Data Source Type/s</label>
                 <div class="dropdown">
-                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="dataSourceTypeDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-                        Select Types
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" id="dataSourceTypeDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" ${filteredTypes.length === 0 ? 'disabled' : ''}>
+                        ${filteredTypes.length === 0 ? 'No types available' : 'Select Types'}
                     </button>
                     <ul class="dropdown-menu w-100" aria-labelledby="dataSourceTypeDropdown" id="dataSourceTypeMenu">
                         ${checkboxesHtml}
                     </ul>
                 </div>
+                ${filteredTypes.length === 0 ? '<div class="form-text text-warning">No data source types are configured. Please add types before creating metadata.</div>' : ''}
             </div>
         </form>
     `;
@@ -145,6 +150,9 @@ function AddMetadata(typeNamesList) {
     const dropdownButton = document.getElementById('dataSourceTypeDropdown');
     const dropdownMenu = document.getElementById('dataSourceTypeMenu');
     const checkboxes = dropdownMenu.querySelectorAll('input[type="checkbox"]');
+
+    // Nothing to wire up if there are no types
+    if (checkboxes.length === 0) return;
     // Build a local id->name map to show names on the button when values are IDs
     const localIdToName = new Map();
     Array.from(checkboxes).forEach(cb => {
@@ -504,6 +512,15 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
  * @param {string} searchTerm The search term to filter by.
  */
 async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
+    const token = ++_fetchToken;
+
+    const setPaginationDisabled = (disabled) => {
+        document.querySelectorAll('#pagination-controls button[data-page]').forEach(btn => {
+            btn.disabled = disabled;
+        });
+    };
+    setPaginationDisabled(true);
+
     try {
         // --- 1. Call the API with pagination parameters ---
         // NOTE: Your loomeApi.runApiRequest must support passing parameters.
@@ -517,7 +534,9 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_GET_ALL_METADATA, apiParams);
 
-        
+        // A newer request has superseded this one — discard the stale response.
+        if (token !== _fetchToken) return;
+
         const parsedResponse = safeParseJson(response);
         // console.log(parsedResponse)
 
@@ -554,9 +573,12 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         }
 
     } catch (error) {
+        if (token !== _fetchToken) return; // stale error — ignore
         console.error("Failed to fetch or render page:", error);
         const container = document.getElementById(TABLE_CONTAINER_ID);
         container.innerHTML = `<div class="p-4 text-red-600">Error loading data: ${error.message}</div>`;
+    } finally {
+        if (token === _fetchToken) setPaginationDisabled(false);
     }
 }
 

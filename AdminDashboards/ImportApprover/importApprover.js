@@ -17,6 +17,9 @@ let totalPages = 1; // Add global totalPages variable
 const rowsPerPage = 5; // You can control page size here
 const searchInput = document.getElementById('searchRequests');
 
+// Incremented on every new renderUI call; stale responses are ignored.
+let _fetchToken = 0;
+
 /**
  * Strips characters outside the safe whitelist to guard against injection.
  * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
@@ -1259,7 +1262,17 @@ async function getCounts(status) {
 async function renderUI() {
     const activeChip = document.querySelector('.chip.active');
     if (!activeChip) return; // Don't render if no chip is active
-    
+
+    const token = ++_fetchToken;
+
+    const setPaginationDisabled = (disabled) => {
+        document.querySelectorAll('#pagination-controls button[data-page]').forEach(btn => {
+            btn.disabled = disabled;
+        });
+    };
+    setPaginationDisabled(true);
+
+    try {
     const selectedStatus = activeChip.dataset.status;
     const searchTerm = searchInput.value.toLowerCase();
 
@@ -1275,6 +1288,10 @@ async function renderUI() {
     
     // console.log(apiParams)
     const response = await window.loomeApi.runApiRequest(GET_ALL_IMPORT_REQUESTS, apiParams);
+
+        // A newer request has superseded this one — discard the stale response.
+        if (token !== _fetchToken) return;
+
     const parsedResponse = safeParseJson(response)
     const rawData = parsedResponse.Results;
     const totalItems = parsedResponse.RowCount;
@@ -1292,6 +1309,12 @@ async function renderUI() {
     const configForTable = configMap[selectedStatus];
     renderTable(TABLE_CONTAINER_ID, allRequests, configForTable, selectedStatus, searchTerm);
     renderPagination('pagination-controls', totalItems, rowsPerPage, currentPage);
+    } catch (error) {
+        if (token !== _fetchToken) return;
+        console.error('Failed to render UI:', error);
+    } finally {
+        if (token === _fetchToken) setPaginationDisabled(false);
+    }
 }
 
 // =================================================================

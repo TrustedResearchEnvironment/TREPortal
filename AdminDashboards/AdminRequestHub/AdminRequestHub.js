@@ -345,6 +345,7 @@ let adminAccessCurrentPage   = 1;
 let adminAccessTotalPages    = 1;
 let adminAccessCurrentStatus = 'Pending Approval';
 let adminAccessProjectsCache = null;
+let _adminAccessFetchToken   = 0;
 
 async function adminAccessGetProjectsMapping() {
     if (adminAccessProjectsCache) return adminAccessProjectsCache;
@@ -379,6 +380,8 @@ async function adminAccessRefreshChipCounts() {
 }
 
 async function adminAccessRenderUI() {
+    const token = ++_adminAccessFetchToken;
+    document.querySelectorAll('#admin-access-pagination [data-page]').forEach(b => { b.disabled = true; });
     const container  = document.getElementById('admin-access-table-area');
     const searchTerm = (document.getElementById('admin-access-search')?.value || '').trim();
     container.innerHTML = `<p class="text-center py-4 text-gray-400 text-sm">Loading…</p>`;
@@ -386,6 +389,7 @@ async function adminAccessRenderUI() {
         const statusId = Object.entries(ADMIN_ACCESS_STATUS_MAP).find(([, v]) => v === adminAccessCurrentStatus)?.[0];
         const params   = { page: adminAccessCurrentPage, pageSize: ADMIN_ACCESS_ROWS_PER_PAGE, search: searchTerm, statusId: parseInt(statusId) };
         const res      = await window.loomeApi.runApiRequest('GetAllRequests', params);
+        if (token !== _adminAccessFetchToken) return;
         const parsed   = safeParseJson(res);
         const data     = (parsed?.Results || []).map(item => ({ ...item, _status: ADMIN_ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
         const total    = parsed?.RowCount || 0;
@@ -393,7 +397,10 @@ async function adminAccessRenderUI() {
         adminAccessRenderTable(container, data, adminAccessCurrentStatus);
         renderPaginationHtml('admin-access-pagination', total, ADMIN_ACCESS_ROWS_PER_PAGE, adminAccessCurrentPage);
     } catch (e) {
+        if (token !== _adminAccessFetchToken) return;
         container.innerHTML = `<p class="text-center py-4 text-red-500 text-sm">Error loading requests: ${e.message}</p>`;
+    } finally {
+        if (token === _adminAccessFetchToken) document.querySelectorAll('#admin-access-pagination [data-page]').forEach(b => { b.disabled = false; });
     }
 }
 
@@ -541,6 +548,7 @@ const ADMIN_IMPORT_ROWS_PER_PAGE = 5;
 let adminImportCurrentPage   = 1;
 let adminImportTotalPages    = 1;
 let adminImportCurrentStatus = 'Awaiting Submission';
+let _adminImportFetchToken   = 0;
 
 async function adminImportGetCount(status) {
     try {
@@ -567,6 +575,8 @@ async function adminImportRefreshChipCounts() {
 }
 
 async function adminImportRenderUI() {
+    const token = ++_adminImportFetchToken;
+    document.querySelectorAll('#admin-import-pagination [data-page]').forEach(b => { b.disabled = true; });
     const container  = document.getElementById('admin-import-table-area');
     const searchTerm = (document.getElementById('admin-import-search')?.value || '').trim();
     container.innerHTML = `<p class="text-center py-4 text-gray-400 text-sm">Loading…</p>`;
@@ -577,6 +587,7 @@ async function adminImportRenderUI() {
                 window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: 0 }),
                 window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: -1 })
             ]);
+            if (token !== _adminImportFetchToken) return;
             const p0 = safeParseJson(r0) || {};
             const pW = safeParseJson(rW) || {};
             const combined = [...(p0.Results || []), ...(pW.Results || [])].map(item => ({
@@ -592,6 +603,7 @@ async function adminImportRenderUI() {
             const statusId = ADMIN_IMPORT_STATUS_ID_MAP[adminImportCurrentStatus];
             const params   = { page: adminImportCurrentPage, pageSize: ADMIN_IMPORT_ROWS_PER_PAGE, search: searchTerm, statusId };
             const res      = await window.loomeApi.runApiRequest('GetAllImportRequests', params);
+            if (token !== _adminImportFetchToken) return;
             const parsed   = safeParseJson(res);
             const data     = (parsed?.Results || []).map(item => ({
                 ...item, _status: ADMIN_IMPORT_STATUS_MAP[item.StatusID] ?? ADMIN_IMPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
@@ -602,7 +614,10 @@ async function adminImportRenderUI() {
             renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
         }
     } catch (e) {
+        if (token !== _adminImportFetchToken) return;
         container.innerHTML = `<p class="text-center py-4 text-red-500 text-sm">Error loading import requests: ${e.message}</p>`;
+    } finally {
+        if (token === _adminImportFetchToken) document.querySelectorAll('#admin-import-pagination [data-page]').forEach(b => { b.disabled = false; });
     }
 }
 
@@ -750,6 +765,7 @@ const ADMIN_EXPORT_ROWS_PER_PAGE = 5;
 let adminExportCurrentPage   = 1;
 let adminExportTotalPages    = 1;
 let adminExportCurrentStatus = 'Awaiting Submission';
+let _adminExportFetchToken   = 0;
 
 async function adminExportGetCount(status) {
     try {
@@ -776,6 +792,8 @@ async function adminExportRefreshChipCounts() {
 }
 
 async function adminExportRenderUI() {
+    const token = ++_adminExportFetchToken;
+    document.querySelectorAll('#admin-export-pagination [data-page]').forEach(b => { b.disabled = true; });
     const container  = document.getElementById('admin-export-table-area');
     const searchTerm = (document.getElementById('admin-export-search')?.value || '').trim();
     container.innerHTML = `<p class="text-center py-4 text-gray-400 text-sm">Loading…</p>`;
@@ -786,6 +804,7 @@ async function adminExportRenderUI() {
                 window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: 0 }),
                 window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: -1 })
             ]);
+            if (token !== _adminExportFetchToken) return;
             const p0 = safeParseJson(r0) || {};
             const pW = safeParseJson(rW) || {};
             const combined = [...(p0.Results || []), ...(pW.Results || [])].map(item => ({
@@ -801,6 +820,7 @@ async function adminExportRenderUI() {
             const statusId = ADMIN_EXPORT_STATUS_ID_MAP[adminExportCurrentStatus];
             const params   = { page: adminExportCurrentPage, pageSize: ADMIN_EXPORT_ROWS_PER_PAGE, search: searchTerm, statusId };
             const res      = await window.loomeApi.runApiRequest('GetAllExportRequests', params);
+            if (token !== _adminExportFetchToken) return;
             const parsed   = safeParseJson(res);
             const data     = (parsed?.Results || []).map(item => ({
                 ...item, _status: ADMIN_EXPORT_STATUS_MAP[item.StatusID] ?? ADMIN_EXPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
@@ -811,7 +831,10 @@ async function adminExportRenderUI() {
             renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
         }
     } catch (e) {
+        if (token !== _adminExportFetchToken) return;
         container.innerHTML = `<p class="text-center py-4 text-red-500 text-sm">Error loading export requests: ${e.message}</p>`;
+    } finally {
+        if (token === _adminExportFetchToken) document.querySelectorAll('#admin-export-pagination [data-page]').forEach(b => { b.disabled = false; });
     }
 }
 

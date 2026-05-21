@@ -23,6 +23,9 @@ let dataSourceTypeMap = new Map();
 let dbConnectionMap = new Map();
 let folderConnectionMap = new Map();
 
+// Incremented on every new fetchAndRenderPage call; stale responses are ignored.
+let _fetchToken = 0;
+
 /**
  * Displays a temporary "toast" notification on the screen.
  * @param {string} message - The message to display.
@@ -739,6 +742,18 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
  * @param {string} searchTerm The search term to filter by.
  */
 async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
+    // Claim this request's token. Any response whose token no longer matches
+    // the current value is stale and will be discarded.
+    const token = ++_fetchToken;
+
+    // Disable pagination buttons for the duration of the request.
+    const setPaginationDisabled = (disabled) => {
+        document.querySelectorAll('#pagination-controls button[data-page]').forEach(btn => {
+            btn.disabled = disabled;
+        });
+    };
+    setPaginationDisabled(true);
+
     try {
         // --- 1. Call the API with pagination parameters ---
         // NOTE: Your loomeApi.runApiRequest must support passing parameters.
@@ -753,6 +768,8 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         // You might need to pass params differently, e.g., runApiRequest(10, apiParams)
         const response = await window.loomeApi.runApiRequest(API_DATASOURCE_ID, apiParams);
 
+        // A newer request has superseded this one — discard the stale response.
+        if (token !== _fetchToken) return;
 
         const parsedResponse = safeParseJson(response);
         // console.log(parsedResponse)
@@ -797,9 +814,13 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         }
 
     } catch (error) {
+        if (token !== _fetchToken) return; // stale error — ignore
         console.error("Failed to fetch or render page:", error);
         const container = document.getElementById(TABLE_CONTAINER_ID);
         container.innerHTML = `<div class="p-4 text-red-600">Error loading data: ${error.message}</div>`;
+    } finally {
+        // Only re-enable buttons if this is still the latest request.
+        if (token === _fetchToken) setPaginationDisabled(false);
     }
 }
 
@@ -983,7 +1004,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             if (isAccordion) {
                 triggerRow.className = 'accordion-trigger hover:bg-gray-50 cursor-pointer';
                 // Use a more robust unique ID
-                const accordionId = `accordion-content-${item.DataSourceId || index}`;
+                const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 triggerRow.dataset.target = `#${accordionId}`;
             }
 
@@ -1016,7 +1037,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
             if (isAccordion) {
                 const contentRow = document.createElement('tr');
-                const accordionId = `accordion-content-${item.DataSourceId || index}`;
+                const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 contentRow.id = accordionId;
                 contentRow.className = 'accordion-content hidden';
 
