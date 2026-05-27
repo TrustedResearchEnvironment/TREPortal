@@ -116,7 +116,7 @@ function AddMetadata(typeNamesList) {
             <!-- Name, Description, Active fields... -->
             <div class="mb-3">
                 <label for="metaDataName" class="form-label">Name</label>
-                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control" maxlength="100" required>
+                <input id="metaDataName" placeholder="Name for this Meta Data" class="form-control" maxlength="100" required aria-required="true">
             </div>
             <div class="mb-3">
                 <label for="metaDataDescription" class="form-label">Description</label>
@@ -627,9 +627,13 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             const triggerRow = document.createElement('tr');
             if (isAccordion) {
                 triggerRow.className = 'accordion-trigger hover:bg-gray-50 cursor-pointer';
+                triggerRow.setAttribute('role', 'button');
+                triggerRow.setAttribute('tabindex', '0');
+                triggerRow.setAttribute('aria-expanded', 'false');
                 // Use a more robust unique ID
                 const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 triggerRow.dataset.target = `#${accordionId}`;
+                triggerRow.setAttribute('aria-controls', accordionId);
             }
             
             // ... (main row creation is the same) ...
@@ -664,6 +668,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 contentRow.id = accordionId;
                 contentRow.className = 'accordion-content hidden';
+                contentRow.setAttribute('aria-hidden', 'true');
                 
                 const contentCell = document.createElement('td');
                 contentCell.colSpan = headers.length;
@@ -680,6 +685,16 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
     // --- SIMPLIFIED Event Listener ---
     if (config.renderAccordionContent) {
+        tbody.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                const trigger = event.target.closest('.accordion-trigger');
+                if (trigger) {
+                    event.preventDefault();
+                    trigger.click();
+                }
+            }
+        });
+
         tbody.addEventListener('click', async (event) => {
             const trigger = event.target.closest('.accordion-trigger');
             const accordionBody = event.target.closest('.accordion-body');
@@ -691,7 +706,10 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const contentRow = document.querySelector(targetId);
                 if (contentRow) {
                     contentRow.classList.toggle('hidden');
+                    const isOpen = !contentRow.classList.contains('hidden');
                     trigger.classList.toggle('expanded');
+                    trigger.setAttribute('aria-expanded', String(isOpen));
+                    contentRow.setAttribute('aria-hidden', String(!isOpen));
                     const chevron = trigger.querySelector('.chevron-icon');
                     if (chevron) chevron.classList.toggle('rotate-180');
                 }
@@ -820,28 +838,28 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const saveBtn = saveButton;
                 const accordionBody = saveBtn.closest('.accordion-body');
                 const metaDataId = accordionBody.dataset.id; // Using .dataset.id
-             
-                // Show a "saving..." state for better UX
-                saveBtn.textContent = 'Saving...';
-                saveBtn.disabled = true;
 
                 try {
-                    // --- 1. Gather Data from the Form ---
+                    // --- 1. Gather Data from the Form --- (validate BEFORE disabling)
                     // Use document.querySelector to find elements within the accordionBody
                     const rawName = accordionBody.querySelector('.edit-state-name').value;
                     const rawDesc = accordionBody.querySelector('.edit-state-description').value;
                     if (containsInvalidChars(rawName)) {
                         showToast('Special characters are not allowed in the Name.', 'error');
-                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                        return;
                     }
                     if (!rawName.trim()) {
                         showToast('Name is required.', 'error');
-                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                        return;
                     }
                     if (containsInvalidChars(rawDesc)) {
                         showToast('Special characters are not allowed in the Description.', 'error');
-                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                        return;
                     }
+
+                    // Validation passed — now disable the button
+                    saveBtn.textContent = 'Saving...';
+                    saveBtn.disabled = true;
                     const updatedName = sanitizeInput(sanitizeStringForJson(rawName));
                     const updatedDescription = sanitizeInput(sanitizeStringForJson(rawDesc));
                     const updatedIsActive = !!accordionBody.querySelector('.edit-state-isactive').checked ? 1 : 0;
@@ -1155,7 +1173,7 @@ async function renderPlatformAdminMetaDataPage() {
                         render: (value) => value == 1 ? 'Yes' : 'No'
                     },
                     { key: 'Details', label: '', widthClass: 'w-12', 
-                      render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
+                      render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" aria-hidden="true" focusable="false" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
                     }
                 ]
     };

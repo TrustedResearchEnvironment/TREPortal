@@ -32,19 +32,22 @@
             <ul class="nav nav-tabs border-0" id="adminTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="admin-access-tab" data-bs-toggle="tab"
-                            data-bs-target="#admin-access-pane" type="button" role="tab">
+                            data-bs-target="#admin-access-pane" type="button" role="tab"
+                            aria-controls="admin-access-pane" aria-selected="true">
                         Data Access
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="admin-import-tab" data-bs-toggle="tab"
-                            data-bs-target="#admin-import-pane" type="button" role="tab">
+                            data-bs-target="#admin-import-pane" type="button" role="tab"
+                            aria-controls="admin-import-pane" aria-selected="false">
                         Data Import
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="admin-export-tab" data-bs-toggle="tab"
-                            data-bs-target="#admin-export-pane" type="button" role="tab">
+                            data-bs-target="#admin-export-pane" type="button" role="tab"
+                            aria-controls="admin-export-pane" aria-selected="false">
                         Data Export
                     </button>
                 </li>
@@ -57,7 +60,7 @@
                 <!-- ════════════════════════════════════════
                      ACCESS TAB (Admin)
                 ════════════════════════════════════════ -->
-                <div class="tab-pane fade show active" id="admin-access-pane" role="tabpanel">
+                <div class="tab-pane fade show active" id="admin-access-pane" role="tabpanel" aria-labelledby="admin-access-tab">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                         <div id="admin-access-chips" class="d-flex flex-wrap gap-2">
                             <button class="req-chip active" data-status="Pending Approval">Pending Approval <span class="chip-count"></span></button>
@@ -65,7 +68,7 @@
                             <button class="req-chip" data-status="Rejected">Rejected <span class="chip-count"></span></button>
                             <button class="req-chip" data-status="Finalised">Finalised <span class="chip-count"></span></button>
                         </div>
-                        <input id="admin-access-search" type="text" class="form-control form-control-sm" style="max-width:240px" placeholder="Search requests…">
+                        <input id="admin-access-search" type="text" aria-label="Search access requests" class="form-control form-control-sm" style="max-width:240px" placeholder="Search requests…">
                     </div>
                     <div id="admin-access-table-area" class="mb-3"></div>
                     <div id="admin-access-pagination" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
@@ -74,7 +77,7 @@
                 <!-- ════════════════════════════════════════
                      IMPORT TAB (Admin)
                 ════════════════════════════════════════ -->
-                <div class="tab-pane fade" id="admin-import-pane" role="tabpanel">
+                <div class="tab-pane fade" id="admin-import-pane" role="tabpanel" aria-labelledby="admin-import-tab">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                         <div id="admin-import-chips" class="d-flex flex-wrap gap-2">
                             <button class="req-chip active" data-status="Awaiting Submission">Awaiting Submission <span class="chip-count"></span></button>
@@ -83,7 +86,7 @@
                             <button class="req-chip" data-status="Rejected">Rejected <span class="chip-count"></span></button>
                             <button class="req-chip" data-status="Finalised">Finalised <span class="chip-count"></span></button>
                         </div>
-                        <input id="admin-import-search" type="text" class="form-control form-control-sm" style="max-width:240px" placeholder="Search imports…">
+                        <input id="admin-import-search" type="text" aria-label="Search import requests" class="form-control form-control-sm" style="max-width:240px" placeholder="Search imports…">
                     </div>
                     <div id="admin-import-table-area" class="mb-3"></div>
                     <div id="admin-import-pagination" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
@@ -92,7 +95,7 @@
                 <!-- ════════════════════════════════════════
                      EXPORT TAB (Admin)
                 ════════════════════════════════════════ -->
-                <div class="tab-pane fade" id="admin-export-pane" role="tabpanel">
+                <div class="tab-pane fade" id="admin-export-pane" role="tabpanel" aria-labelledby="admin-export-tab">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                         <div id="admin-export-chips" class="d-flex flex-wrap gap-2">
                             <button class="req-chip active" data-status="Awaiting Submission">Awaiting Submission <span class="chip-count"></span></button>
@@ -101,7 +104,7 @@
                             <button class="req-chip" data-status="Rejected">Rejected <span class="chip-count"></span></button>
                             <button class="req-chip" data-status="Finalised">Finalised <span class="chip-count"></span></button>
                         </div>
-                        <input id="admin-export-search" type="text" class="form-control form-control-sm" style="max-width:240px" placeholder="Search exports…">
+                        <input id="admin-export-search" type="text" aria-label="Search export requests" class="form-control form-control-sm" style="max-width:240px" placeholder="Search exports…">
                     </div>
                     <div id="admin-export-table-area" class="mb-3"></div>
                     <div id="admin-export-pagination" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
@@ -129,7 +132,7 @@
                     <p class="mb-2 small text-muted">You are approving:</p>
                     <p id="actionRequestName" class="fw-semibold mb-3"></p>
                     <label for="approvalMessage" class="form-label fw-medium">Message <span class="text-danger">*</span></label>
-                    <textarea id="approvalMessage" class="form-control" rows="3" placeholder="Enter an approval message…"></textarea>
+                    <textarea id="approvalMessage" class="form-control" rows="3" aria-required="true" placeholder="Enter an approval message…"></textarea>
                     <div id="approveMessageError" class="text-danger small mt-1 d-none">An approval message is required.</div>
                 </div>
                 <!-- Reject view -->
@@ -137,7 +140,7 @@
                     <p class="mb-2 small text-muted">You are rejecting:</p>
                     <p id="actionRequestNameReject" class="fw-semibold mb-3"></p>
                     <label for="rejectionReason" class="form-label fw-medium">Reason <span class="text-danger">*</span></label>
-                    <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter the reason for rejection…"></textarea>
+                    <textarea id="rejectionReason" class="form-control" rows="3" aria-required="true" placeholder="Enter the reason for rejection…"></textarea></textarea>
                     <div id="rejectReasonError" class="text-danger small mt-1 d-none">A rejection reason is required.</div>
                 </div>
             </div>

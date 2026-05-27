@@ -37,6 +37,9 @@ function showToast(message, type = 'success', duration = 3000) {
     container.style.cssText = 'position:fixed;top:12px;right:12px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
     const toast = document.createElement('div');
     toast.className = `toast-item toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+    toast.setAttribute('aria-atomic', 'true');
     toast.style.cssText = 'pointer-events:auto;margin-bottom:10px;padding:12px 16px;border-radius:6px;color:#fff;display:flex;align-items:center;min-width:250px;max-width:360px;opacity:0;transition:opacity .25s ease,transform .25s ease;';
 
     let bgColor = '#2196F3'; // info default
@@ -54,6 +57,7 @@ function showToast(message, type = 'success', duration = 3000) {
     if (type === 'error') {
         const closeBtn = document.createElement('button');
         closeBtn.innerHTML = '&times;';
+        closeBtn.setAttribute('aria-label', 'Dismiss notification');
         closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;margin-left:12px;cursor:pointer;';
         closeBtn.onclick = () => {
             if (toast.parentNode) toast.remove();
@@ -240,7 +244,7 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
                 <form id="addDataSourceForm">
                   <div class="mb-3">
                     <label for="dataSourceName" class="form-label">Name</label>
-                    <input type="text" class="form-control" id="dataSourceName" placeholder="Name for this Data Source" maxlength="100" required>
+                    <input type="text" class="form-control" id="dataSourceName" placeholder="Name for this Data Source" maxlength="100" required aria-required="true">
                   </div>
                   
                   <div class="mb-3">
@@ -250,7 +254,7 @@ function AddDataSource(typeNamesList, allFields, allTypesArray) {
 
                   <div class="mb-3">
                       <label for="dataSourceType" class="form-label">Data Source Type</label>
-                      <select class="form-select" id="dataSourceType" required>
+                      <select class="form-select" id="dataSourceType" required aria-required="true">
                           <option value="" selected disabled>Select a Type...</option>
                           ${optionsHtml}
                       </select>
@@ -1003,9 +1007,13 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             const triggerRow = document.createElement('tr');
             if (isAccordion) {
                 triggerRow.className = 'accordion-trigger hover:bg-gray-50 cursor-pointer';
+                triggerRow.setAttribute('role', 'button');
+                triggerRow.setAttribute('tabindex', '0');
+                triggerRow.setAttribute('aria-expanded', 'false');
                 // Use a more robust unique ID
                 const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 triggerRow.dataset.target = `#${accordionId}`;
+                triggerRow.setAttribute('aria-controls', accordionId);
             }
 
             // ... (main row creation is the same) ...
@@ -1040,6 +1048,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 contentRow.id = accordionId;
                 contentRow.className = 'accordion-content hidden';
+                contentRow.setAttribute('aria-hidden', 'true');
 
                 const contentCell = document.createElement('td');
                 contentCell.colSpan = headers.length;
@@ -1056,6 +1065,16 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
     // --- SIMPLIFIED Event Listener ---
     if (config.renderAccordionContent) {
+        tbody.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                const trigger = event.target.closest('.accordion-trigger');
+                if (trigger) {
+                    event.preventDefault();
+                    trigger.click();
+                }
+            }
+        });
+
         tbody.addEventListener('click', async (event) => {
             const trigger = event.target.closest('.accordion-trigger');
             const accordionBody = event.target.closest('.accordion-body');
@@ -1067,7 +1086,10 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const contentRow = document.querySelector(targetId);
                 if (contentRow) {
                     contentRow.classList.toggle('hidden');
+                    const isOpen = !contentRow.classList.contains('hidden');
                     trigger.classList.toggle('expanded');
+                    trigger.setAttribute('aria-expanded', String(isOpen));
+                    contentRow.setAttribute('aria-hidden', String(!isOpen));
                     const chevron = trigger.querySelector('.chevron-icon');
                     if (chevron) chevron.classList.toggle('rotate-180');
                 }
@@ -1150,27 +1172,27 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const accordionBody = saveBtn.closest('.accordion-body');
                 const dataSourceId = accordionBody.dataset.id; // Using .dataset.id
 
-                // Show a "saving..." state for better UX
-                saveBtn.textContent = 'Saving...';
-                saveBtn.disabled = true;
-
                 try {
 
-                    // --- 1. Gather Data from the Form ---
+                    // --- 1. Gather Data from the Form --- (validate BEFORE disabling)
                     const rawName = accordionBody.querySelector('.edit-state-name').value;
                     const rawDesc = accordionBody.querySelector('.edit-state-description').value;
                     if (containsInvalidChars(rawName)) {
                         showToast('Special characters are not allowed in the Name.', 'error');
-                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                        return;
                     }
                     if (!rawName.trim()) {
                         showToast('Name is required.', 'error');
-                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                        return;
                     }
                     if (containsInvalidChars(rawDesc)) {
                         showToast('Special characters are not allowed in the Description.', 'error');
-                        saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; return;
+                        return;
                     }
+
+                    // Validation passed — now disable the button
+                    saveBtn.textContent = 'Saving...';
+                    saveBtn.disabled = true;
                     const updatedName = sanitizeInput(rawName.trim());
                     const updatedDescription = sanitizeInput(rawDesc.trim());
                     const updatedIsActive = accordionBody.querySelector('.edit-state-isactive').checked;
@@ -1393,6 +1415,12 @@ function attachCharCounter(inputEl, max) {
     inputEl.dataset.charCounterAttached = 'true';
     const counter = document.createElement('span');
     counter.style.cssText = 'font-size:0.75rem;float:right;display:none;margin-top:2px;';
+    // Give the counter a stable id so the input can reference it via aria-describedby
+    const counterId = `char-counter-${inputEl.id || Math.random().toString(36).slice(2)}`;
+    counter.id = counterId;
+    counter.setAttribute('aria-live', 'polite');
+    inputEl.setAttribute('aria-describedby',
+        [inputEl.getAttribute('aria-describedby'), counterId].filter(Boolean).join(' '));
     inputEl.insertAdjacentElement('afterend', counter);
     const threshold = Math.floor(max * 0.8);
     const update = () => {
@@ -1449,7 +1477,7 @@ async function renderPlatformAdminDataSourcePage() {
             },
             {
                 key: 'Details', label: '', widthClass: 'w-12',
-                render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
+                render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" aria-hidden="true" focusable="false" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
             }
 
 

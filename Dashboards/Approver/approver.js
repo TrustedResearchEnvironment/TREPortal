@@ -986,6 +986,10 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
         data.forEach(item => {
             const row = document.createElement('tr');
             row.classList.add('cursor-pointer', 'hover:bg-gray-50'); // Add visual indication this row is clickable
+            row.setAttribute('role', 'button');
+            row.setAttribute('tabindex', '0');
+            row.setAttribute('aria-expanded', 'false');
+            row.setAttribute('aria-controls', `approver-detail-${item.RequestID}`);
             const tdClasses = 'px-6 py-4 whitespace-nowrap text-sm text-gray-800';
             
             let statusSpecificCols = '';
@@ -998,7 +1002,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             
             row.innerHTML = `
                 <td class="${tdClasses} text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 chevron-icon transition-transform inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 chevron-icon transition-transform inline-block" aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </td>
@@ -1012,6 +1016,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             // Create accordion row
             const accordionRow = document.createElement('tr');
             accordionRow.classList.add('hidden', 'accordion-row');
+            accordionRow.id = `approver-detail-${item.RequestID}`;
+            accordionRow.setAttribute('aria-hidden', 'true');
             if (selectedStatus === 'Pending Approval') {
             accordionRow.innerHTML = `
                 <td colspan="${headers.length + 1}" class="p-0"> <!-- +1 for chevron column -->
@@ -1056,11 +1062,18 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     </td>
                 `;
             }            
+            // Add keyboard support for accordion row
+            row.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+            });
             // Add click event to toggle accordion
             row.addEventListener('click', async () => {
                 // console.log('Row clicked:', item.RequestID);
                 // Toggle the accordion visibility
                 accordionRow.classList.toggle('hidden');
+                const isOpen = !accordionRow.classList.contains('hidden');
+                row.setAttribute('aria-expanded', String(isOpen));
+                accordionRow.setAttribute('aria-hidden', String(!isOpen));
                 
                 // Toggle chevron rotation
                 const chevron = row.querySelector('.chevron-icon');

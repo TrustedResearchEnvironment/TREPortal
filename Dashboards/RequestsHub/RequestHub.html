@@ -31,19 +31,22 @@
             <ul class="nav nav-tabs border-0" id="requestTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="access-tab" data-bs-toggle="tab"
-                            data-bs-target="#access-pane" type="button" role="tab">
+                            data-bs-target="#access-pane" type="button" role="tab"
+                            aria-controls="access-pane" aria-selected="true">
                         Data Access
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="import-tab" data-bs-toggle="tab"
-                            data-bs-target="#import-pane" type="button" role="tab">
+                            data-bs-target="#import-pane" type="button" role="tab"
+                            aria-controls="import-pane" aria-selected="false">
                         Data Import
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="export-tab" data-bs-toggle="tab"
-                            data-bs-target="#export-pane" type="button" role="tab">
+                            data-bs-target="#export-pane" type="button" role="tab"
+                            aria-controls="export-pane" aria-selected="false">
                         Data Export
                     </button>
                 </li>
@@ -56,7 +59,7 @@
                 <!-- ════════════════════════════════════════
                      ACCESS TAB
                 ════════════════════════════════════════ -->
-                <div class="tab-pane fade show active" id="access-pane" role="tabpanel">
+                <div class="tab-pane fade show active" id="access-pane" role="tabpanel" aria-labelledby="access-tab">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                         <div id="access-chips" class="d-flex flex-wrap gap-2">
                             <button class="req-chip active" data-status="Pending Approval">Pending Approval <span class="chip-count"></span></button>
@@ -64,7 +67,7 @@
                             <button class="req-chip" data-status="Rejected">Rejected <span class="chip-count"></span></button>
                             <button class="req-chip" data-status="Finalised">Finalised <span class="chip-count"></span></button>
                         </div>
-                        <input id="access-search" type="text" class="form-control form-control-sm" style="max-width:240px" placeholder="Search requests…">
+                        <input id="access-search" type="text" aria-label="Search access requests" class="form-control form-control-sm" style="max-width:240px" placeholder="Search requests…">
                     </div>
                     <div id="access-table-area" class="mb-3"></div>
                     <div id="access-pagination" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
@@ -73,7 +76,7 @@
                 <!-- ════════════════════════════════════════
                      IMPORT TAB
                 ════════════════════════════════════════ -->
-                <div class="tab-pane fade" id="import-pane" role="tabpanel">
+                <div class="tab-pane fade" id="import-pane" role="tabpanel" aria-labelledby="import-tab">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                         <div id="import-chips" class="d-flex flex-wrap gap-2">
                             <button class="req-chip active" data-status="Awaiting Submission">Awaiting Submission <span class="chip-count"></span></button>
@@ -83,7 +86,7 @@
                             <button class="req-chip" data-status="Finalised">Finalised <span class="chip-count"></span></button>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
-                            <input id="import-search" type="text" class="form-control form-control-sm" style="max-width:220px" placeholder="Search imports…">
+                            <input id="import-search" type="text" aria-label="Search import requests" class="form-control form-control-sm" style="max-width:220px" placeholder="Search imports…">
                             <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#importModal">
                                 + New Import Request
                             </button>
@@ -96,7 +99,7 @@
                 <!-- ════════════════════════════════════════
                      EXPORT TAB
                 ════════════════════════════════════════ -->
-                <div class="tab-pane fade" id="export-pane" role="tabpanel">
+                <div class="tab-pane fade" id="export-pane" role="tabpanel" aria-labelledby="export-tab">
                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                         <div id="export-chips" class="d-flex flex-wrap gap-2">
                             <button class="req-chip active" data-status="Awaiting Submission">Awaiting Submission <span class="chip-count"></span></button>
@@ -106,7 +109,7 @@
                             <button class="req-chip" data-status="Finalised">Finalised <span class="chip-count"></span></button>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
-                            <input id="export-search" type="text" class="form-control form-control-sm" style="max-width:220px" placeholder="Search exports…">
+                            <input id="export-search" type="text" aria-label="Search export requests" class="form-control form-control-sm" style="max-width:220px" placeholder="Search exports…">
                             <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#exportModal">
                                 + New Export Request
                             </button>
@@ -149,7 +152,7 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label for="import-request-name" class="form-label fw-medium">Import Request Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="import-request-name" placeholder="Enter a name for this request">
+                    <input type="text" class="form-control" id="import-request-name" aria-required="true" placeholder="Enter a name for this request">
                 </div>
                 <div class="mb-1">
                     <label for="import-project-select" class="form-label fw-medium">Source Assist Project <span class="text-danger">*</span></label>
@@ -179,7 +182,7 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label for="export-request-name" class="form-label fw-medium">Export Request Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="export-request-name" placeholder="Enter a name for this request">
+                    <input type="text" class="form-control" id="export-request-name" aria-required="true" placeholder="Enter a name for this request">
                 </div>
                 <div class="mb-1">
                     <label for="export-project-select" class="form-label fw-medium">Source Assist Project <span class="text-danger">*</span></label>

@@ -105,7 +105,7 @@ function renderPaginationHtml(containerId, totalItems, rowsPerPage, currentPage)
         <button class="${btnCls}" data-page="${totalPages}" ${disabled(currentPage === totalPages)}>Last</button>`;
 }
 
-const SVG_CHEVRON = `<svg class="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+const SVG_CHEVRON = `<svg class="chevron-icon" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>`;
 const SVG_TRASH = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="margin-right:4px;flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>`;
 
@@ -289,14 +289,14 @@ function accessRenderTable(container, data, selectedStatus) {
             : '';
 
         rows += `
-        <tr class="table-hover-row access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}">
+        <tr class="table-hover-row access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${escapeHtml(item.RequestID)}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${escapeHtml(item.Name) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
-        <tr class="access-detail-row hidden">
+        <tr class="access-detail-row hidden" id="access-detail-${item.RequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
                     <div class="d-flex justify-content-end mb-2">${deleteBtn}</div>
@@ -319,10 +319,15 @@ function accessRenderTable(container, data, selectedStatus) {
         const detailRow = row.nextElementSibling;
         const chevron   = row.querySelector('.chevron-icon');
         let loaded      = false;
+        row.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+        });
         row.addEventListener('click', async (e) => {
             if (e.target.closest('.access-delete-btn')) return;
             const isOpen = !detailRow.classList.contains('hidden');
             detailRow.classList.toggle('hidden', isOpen);
+            row.setAttribute('aria-expanded', String(!isOpen));
+            detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
             if (!isOpen && !loaded) {
                 loaded = true;
@@ -522,14 +527,14 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm import-submit-btn ms-2" data-id="${item.ImportRequestID}">Submit</button>` : '';
 
         rows += `
-        <tr class="table-hover-row import-row" data-id="${item.ImportRequestID}">
+        <tr class="table-hover-row import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="import-detail-${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">${escapeHtml(item.ImportRequestName) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${escapeHtml(item.ImportProjectName || item.ProjectName) || 'N/A'}</td>
             ${extra}
         </tr>
-        <tr class="import-detail-row hidden">
+        <tr class="import-detail-row hidden" id="import-detail-${item.ImportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
                     <div class="d-flex justify-content-end mb-2">${deleteBtn}${submitBtn}</div>
@@ -551,10 +556,15 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         const detailRow = row.nextElementSibling;
         const chevron   = row.querySelector('.chevron-icon');
         let loaded      = false;
+        row.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+        });
         row.addEventListener('click', async (e) => {
             if (e.target.closest('.import-delete-btn') || e.target.closest('.import-submit-btn')) return;
             const isOpen = !detailRow.classList.contains('hidden');
             detailRow.classList.toggle('hidden', isOpen);
+            row.setAttribute('aria-expanded', String(!isOpen));
+            detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
             if (!isOpen && !loaded) {
                 loaded = true;
@@ -826,14 +836,14 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
         const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm export-submit-btn ms-2" data-id="${item.ExportRequestID}">Submit</button>` : '';
 
         rows += `
-        <tr class="table-hover-row export-row" data-id="${item.ExportRequestID}">
+        <tr class="table-hover-row export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="export-detail-${item.ExportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${escapeHtml(item.ExportRequestName) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${escapeHtml(item.ExportProjectName || item.ProjectName) || 'N/A'}</td>
             ${extra}
         </tr>
-        <tr class="export-detail-row hidden">
+        <tr class="export-detail-row hidden" id="export-detail-${item.ExportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
                     <div class="d-flex justify-content-end mb-2">${deleteBtn}${submitBtn}</div>
@@ -855,10 +865,15 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
         const detailRow = row.nextElementSibling;
         const chevron   = row.querySelector('.chevron-icon');
         let loaded      = false;
+        row.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+        });
         row.addEventListener('click', async (e) => {
             if (e.target.closest('.export-delete-btn') || e.target.closest('.export-submit-btn')) return;
             const isOpen = !detailRow.classList.contains('hidden');
             detailRow.classList.toggle('hidden', isOpen);
+            row.setAttribute('aria-expanded', String(!isOpen));
+            detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
             if (!isOpen && !loaded) {
                 loaded = true;

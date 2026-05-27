@@ -373,9 +373,13 @@ function renderTable(containerId, tableConfig, data, config = {}) {
             const triggerRow = document.createElement('tr');
             if (isAccordion) {
                 triggerRow.className = 'accordion-trigger hover:bg-gray-50 cursor-pointer';
+                triggerRow.setAttribute('role', 'button');
+                triggerRow.setAttribute('tabindex', '0');
+                triggerRow.setAttribute('aria-expanded', 'false');
                 // Use a more robust unique ID
                 const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 triggerRow.dataset.target = `#${accordionId}`;
+                triggerRow.setAttribute('aria-controls', accordionId);
             }
             
             // ... (main row creation is the same) ...
@@ -410,6 +414,7 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const accordionId = `accordion-content-${item.DataSourceID || index}`;
                 contentRow.id = accordionId;
                 contentRow.className = 'accordion-content hidden';
+                contentRow.setAttribute('aria-hidden', 'true');
                 
                 const contentCell = document.createElement('td');
                 contentCell.colSpan = headers.length;
@@ -426,6 +431,16 @@ function renderTable(containerId, tableConfig, data, config = {}) {
 
     // --- SIMPLIFIED Event Listener ---
     if (config.renderAccordionContent) {
+        tbody.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                const trigger = event.target.closest('.accordion-trigger');
+                if (trigger) {
+                    event.preventDefault();
+                    trigger.click();
+                }
+            }
+        });
+
         tbody.addEventListener('click', async (event) => {
             const trigger = event.target.closest('.accordion-trigger');
             const accordionBody = event.target.closest('.accordion-body');
@@ -437,7 +452,10 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                 const contentRow = document.querySelector(targetId);
                 if (contentRow) {
                     contentRow.classList.toggle('hidden');
+                    const isOpen = !contentRow.classList.contains('hidden');
                     trigger.classList.toggle('expanded');
+                    trigger.setAttribute('aria-expanded', String(isOpen));
+                    contentRow.setAttribute('aria-hidden', String(!isOpen));
                     const chevron = trigger.querySelector('.chevron-icon');
                     if (chevron) chevron.classList.toggle('rotate-180');
                 }
@@ -618,7 +636,7 @@ async function renderPlatformAdminEmailTemplatesPage() {
                     { label: "Body", key: "EmailTemplateText", className: "break-words", widthClass: "w-6/12" },
                     { label: "Modified Date", key: "ModifiedDate", render: (value) => formatDate(value) },
                     { key: 'Details', label: '', widthClass: 'w-12', 
-                      render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
+                      render: () => `<div style="display:flex;justify-content:flex-end;"><svg class="chevron-icon h-5 w-5 text-gray-500" aria-hidden="true" focusable="false" style="width:20px;height:20px;flex-shrink:0;color:#6b7280;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></div>`
                     }
                 ]
             };

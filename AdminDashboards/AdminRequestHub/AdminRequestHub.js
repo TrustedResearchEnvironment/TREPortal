@@ -108,7 +108,7 @@ function renderPaginationHtml(containerId, totalItems, rowsPerPage, currentPage)
         <button class="${btnCls}" data-page="${totalPages}" ${d(currentPage === totalPages)}>Last</button>`;
 }
 
-const SVG_CHEVRON = `<svg class="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+const SVG_CHEVRON = `<svg class="chevron-icon" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>`;
 
 const SVG_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="margin-right:3px;vertical-align:middle">
@@ -426,7 +426,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
         }
 
         rows += `
-        <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}">
+        <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${item.RequestID}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
@@ -434,7 +434,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
             <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
             ${extra}
         </tr>
-        <tr class="admin-access-detail-row hidden">
+        <tr class="admin-access-detail-row hidden" id="admin-access-detail-${item.RequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
                     <div class="bg-white rounded shadow-sm position-relative">
@@ -463,10 +463,15 @@ function adminAccessRenderTable(container, data, selectedStatus) {
         const detailRow = row.nextElementSibling;
         const chevron   = row.querySelector('.chevron-icon');
         let loaded      = false;
+        row.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+        });
         row.addEventListener('click', async (e) => {
             if (e.target.closest('.admin-reject-btn')) return;
             const isOpen = !detailRow.classList.contains('hidden');
             detailRow.classList.toggle('hidden', isOpen);
+            row.setAttribute('aria-expanded', String(!isOpen));
+            detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
             if (!isOpen && !loaded) {
                 loaded = true;
@@ -643,7 +648,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
         }
 
         rows += `
-        <tr class="table-hover-row admin-import-row" data-id="${item.ImportRequestID}">
+        <tr class="table-hover-row admin-import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-import-detail-${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">${item.ImportRequestName || 'N/A'}</td>
             <td class="${tdCls}">${item.CreateUser || item.UserPrincipalName || 'N/A'}</td>
@@ -651,7 +656,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
-        <tr class="admin-import-detail-row hidden">
+        <tr class="admin-import-detail-row hidden" id="admin-import-detail-${item.ImportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
                     <div class="bg-white rounded shadow-sm position-relative">
@@ -685,10 +690,15 @@ function adminImportRenderTable(container, data, selectedStatus) {
         const detailRow = row.nextElementSibling;
         const chevron   = row.querySelector('.chevron-icon');
         let loaded      = false;
+        row.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+        });
         row.addEventListener('click', async (e) => {
             if (e.target.closest('.admin-import-approve-btn') || e.target.closest('.admin-import-reject-btn') || e.target.closest('.btn-group')) return;
             const isOpen = !detailRow.classList.contains('hidden');
             detailRow.classList.toggle('hidden', isOpen);
+            row.setAttribute('aria-expanded', String(!isOpen));
+            detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
             if (!isOpen && !loaded) {
                 loaded = true;
@@ -860,7 +870,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
         }
 
         rows += `
-        <tr class="table-hover-row admin-export-row" data-id="${item.ExportRequestID}">
+        <tr class="table-hover-row admin-export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-export-detail-${item.ExportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${item.ExportRequestName || 'N/A'}</td>
             <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
@@ -868,7 +878,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
-        <tr class="admin-export-detail-row hidden">
+        <tr class="admin-export-detail-row hidden" id="admin-export-detail-${item.ExportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
                     <div class="bg-white rounded shadow-sm position-relative">
@@ -902,10 +912,15 @@ function adminExportRenderTable(container, data, selectedStatus) {
         const detailRow = row.nextElementSibling;
         const chevron   = row.querySelector('.chevron-icon');
         let loaded      = false;
+        row.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
+        });
         row.addEventListener('click', async (e) => {
             if (e.target.closest('.admin-export-approve-btn') || e.target.closest('.admin-export-reject-btn') || e.target.closest('.btn-group')) return;
             const isOpen = !detailRow.classList.contains('hidden');
             detailRow.classList.toggle('hidden', isOpen);
+            row.setAttribute('aria-expanded', String(!isOpen));
+            detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
             if (!isOpen && !loaded) {
                 loaded = true;

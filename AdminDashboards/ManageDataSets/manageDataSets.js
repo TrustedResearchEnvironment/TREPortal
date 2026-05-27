@@ -468,6 +468,8 @@ function showColumnsLoader(message = 'Loading columns...') {
         }
         loader.classList.remove('d-none');
     }
+    const table = document.getElementById('dataSetColsTable');
+    if (table) table.setAttribute('aria-busy', 'true');
 }
 
 function hideColumnsLoader() {
@@ -475,6 +477,8 @@ function hideColumnsLoader() {
     if (loader) {
         loader.classList.add('d-none');
     }
+    const table = document.getElementById('dataSetColsTable');
+    if (table) table.setAttribute('aria-busy', 'false');
 }
 
 function normalizeBooleanFlag(value) {
@@ -1894,18 +1898,19 @@ function updateTableHeader(dataSourceType) {
         if (def.sortKey === 'column-name') {
             const arrow = columnNameSortDirection === 'desc' ? '▲' : '▼';
             const ariaLabel = columnNameSortDirection === 'desc' ? 'Sort ascending' : 'Sort descending';
+            const ariaSortValue = columnNameSortDirection === 'asc' ? 'ascending' : 'descending';
             const listHtml = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
             return `
-                <th>
+                <th aria-sort="${ariaSortValue}">
                     <details class="header-filter column-name-filter" data-filter="column-name">
-                        <summary>
+                        <summary aria-label="Column Name, sorted ${ariaSortValue}. Click to filter.">
                             <span>${def.label}</span>
-                            <span class="header-filter-arrow">▾</span>
+                            <span class="header-filter-arrow" aria-hidden="true">▾</span>
                         </summary>
                         <div class="column-name-dropdown">
                             <div class="column-name-sort-row">
-                                <button type="button" data-action="sort-asc" title="Sort A-Z">A-Z</button>
-                                <button type="button" data-action="sort-desc" title="Sort Z-A">Z-A</button>
+                                <button type="button" data-action="sort-asc" title="Sort A-Z" aria-label="Sort column name A to Z">A-Z</button>
+                                <button type="button" data-action="sort-desc" title="Sort Z-A" aria-label="Sort column name Z to A">Z-A</button>
                                 <span style="flex:1"></span>
                                 
                             </div>
@@ -3059,9 +3064,22 @@ async function renderManageDataSetPage() {
 
             // Stash for the pending save so the confirm button can execute it
             let pendingSave = null;
+            let _confirmModalTrigger = null; // element to restore focus to on close
 
-            function showConfirmModal() { confirmModal.style.display = ''; }
-            function hideConfirmModal() { confirmModal.style.display = 'none'; }
+            function showConfirmModal() {
+                _confirmModalTrigger = document.activeElement;
+                confirmModal.style.display = '';
+                confirmModal.setAttribute('aria-hidden', 'false');
+                // Move focus into the dialog so screen readers announce it
+                const dialog = confirmModal.querySelector('[role="dialog"]');
+                if (dialog) dialog.focus();
+            }
+            function hideConfirmModal() {
+                confirmModal.style.display = 'none';
+                confirmModal.setAttribute('aria-hidden', 'true');
+                // Restore focus to the element that opened the modal
+                if (_confirmModalTrigger) { _confirmModalTrigger.focus(); _confirmModalTrigger = null; }
+            }
 
             function buildConfirmModalBody(columns) {
                 const included = columns.filter(c => !c.Redact);
@@ -3151,13 +3169,10 @@ async function renderManageDataSetPage() {
                 // 1. Prevent the browser from reloading the page
                 event.preventDefault();
 
-                // 2. Provide immediate user feedback and prevent double-clicks
                 const originalButtonText = submitButton.textContent;
-                submitButton.disabled = true;
-                submitButton.textContent = 'Saving...';
 
                 try {
-                    // 3. Gather all data from the form into a structured object
+                    // 2. Gather all data from the form into a structured object
                     const formData = gatherFormData(allColumnsData);
                     // console.log("Form Data to Submit:", formData);
                     
@@ -3244,6 +3259,10 @@ async function renderManageDataSetPage() {
 
                     // --- Show confirmation modal before saving ---
                     confirmBody.innerHTML = buildConfirmModalBody(allColumnsData);
+
+                    // Validation passed — disable the button now while the modal is open
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Saving...';
 
                     // Stash the actual save as a function the Confirm button will call
                     pendingSave = async () => {
