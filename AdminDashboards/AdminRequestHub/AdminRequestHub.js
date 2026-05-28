@@ -283,7 +283,7 @@ function setupActionModalConfirm() {
 
             } else if (tab === 'import') {
                 if (type === 'approve') {
-                    await window.loomeApi.runApiRequest('ApproveImportRequest', { id: safeId, Message: msg || '' });
+                    await window.loomeApi.runApiRequest('ApproveImportRequest', { id: safeId, reason: msg || '' });
                     dismissToast(t);
                     showToast('Import request approved. Initiating data transfer…', 'success');
                     await Promise.all([adminImportRenderUI(), adminImportRefreshChipCounts()]);
@@ -295,7 +295,7 @@ function setupActionModalConfirm() {
                         showToast('Request approved but data transfer job failed to start. Please retry manually.', 'error');
                     }
                 } else {
-                    await window.loomeApi.runApiRequest('RejectImportRequest', { id: safeId, Message: reason });
+                    await window.loomeApi.runApiRequest('RejectImportRequest', { id: safeId, reason: reason });
                     dismissToast(t);
                     showToast('Import request rejected successfully.', 'success');
                     await Promise.all([adminImportRenderUI(), adminImportRefreshChipCounts()]);
@@ -303,7 +303,7 @@ function setupActionModalConfirm() {
 
             } else if (tab === 'export') {
                 if (type === 'approve') {
-                    await window.loomeApi.runApiRequest('ApproveExportRequest', { id: safeId, Message: msg || '' });
+                    await window.loomeApi.runApiRequest('ApproveExportRequest', { id: safeId, reason: msg || '' });
                     dismissToast(t);
                     showToast('Export request approved. Adding researcher to Airlock Project…', 'success');
                     await Promise.all([adminExportRenderUI(), adminExportRefreshChipCounts()]);
@@ -319,7 +319,7 @@ function setupActionModalConfirm() {
                         showToast('Request approved but Airlock integration job failed to start. Please retry manually.', 'error');
                     }
                 } else {
-                    await window.loomeApi.runApiRequest('RejectExportRequest', { id: safeId, Message: reason });
+                    await window.loomeApi.runApiRequest('RejectExportRequest', { id: safeId, reason: reason });
                     dismissToast(t);
                     showToast('Export request rejected successfully.', 'success');
                     await Promise.all([adminExportRenderUI(), adminExportRefreshChipCounts()]);
