@@ -209,10 +209,12 @@ function renderTable(containerId, data) {
     
     data.forEach(item => {
         const row = document.createElement('tr');
+        // If item.lastExecution.Status returns "Success", show "Data Manager Notified" instead to be more user-friendly
+        const statusText = item.lastExecution.status === "Success" ? "Data Manager Notified" : item.lastExecution.status ?? 'In progress';
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.jobName || 'N/A'}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatDate(item.dateCreated)}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${item.lastExecution.status ?? 'In progress'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${statusText}</td>
         `;
         tbody.appendChild(row);
     });
