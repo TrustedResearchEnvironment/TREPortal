@@ -18,6 +18,7 @@ const API_GET_REDCAP_DATA = 'SyncREDCapData';
 const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
 const API_GET_METADATA = 'GetMetadata';
 const API_VERIFY_UPLOAD_SHEET = 'VerifyUploadedSheet';
+const API_GET_REQUESTS_BY_DATASET_ID = 'GetRequestByDataSetID';
 
 const API_GET_PORTAL_TOKEN = 'Portal - GetToken';
 const API_GET_ASSET_BY_NAME = 'Portal - GetAssetByName';
@@ -591,7 +592,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     const normalize = arr => Array.from(new Set((arr || []).map(s => String(s || '').trim().toLowerCase())));
     const actualNorm = normalize(actual);
     const expectedNorm = normalize(expected);
-    // console.log('Normalized Actual Columns:', actualNorm);
+    // console.log('Normalized Actual Columns:', actualNorm);w
     // console.log('Normalized Expected Columns:', expectedNorm);
 
     const missing = expectedNorm.filter(x => !actualNorm.includes(x));
@@ -1896,7 +1897,7 @@ function updateTableHeader(dataSourceType) {
 
     const buildHeaderCell = (def) => {
         if (def.sortKey === 'column-name') {
-            const arrow = columnNameSortDirection === 'desc' ? '▲' : '▼';
+            const arrow = columnNameSortDirection === 'desc' ? '\u25B2' : '\u25BC';// '▲' : '▼';
             const ariaLabel = columnNameSortDirection === 'desc' ? 'Sort ascending' : 'Sort descending';
             const ariaSortValue = columnNameSortDirection === 'asc' ? 'ascending' : 'descending';
             const listHtml = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
@@ -2569,6 +2570,11 @@ async function renderManageDataSetPage() {
                 Deleting…`;
 
             try {
+                // Before Cancelling a DataSet (Catalogue Asset or from the Database) there are guards that must be passed
+                // 1. Check if there is a matching asset in the Portal Catalogue and delete it if it exists. 
+                //      This ensures we don't leave orphaned assets that point to deleted datasets, which would cause confusion and clutter in the catalogue.
+                // 2. Check if there are any existing requests for the DataSet and prevent deletion if so, 
+                //      since that would orphan requests and cause errors for users who have requested access to this data.
 
                 // These API calls update the Portal Catalogue list
                 const datasetName = nameInput.value.trim();
@@ -2582,10 +2588,11 @@ async function renderManageDataSetPage() {
                     }
                 );
                 const asset = returnedAssets?.items?.[0];
+
+                // Check if the asset exists in the catalogue before attempting to delete it
+                let inCatalogue = false;
                 if (asset && asset.id) {
-                    const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
-                        assetId: asset.id, token: token.access_token 
-                    });
+                    inCatalogue = true;
                     // console.log('Deleted catalogue asset:', deletedDataSet);
                 } else {
                     showToast(`No matching catalogue asset found for "${datasetName}" (${dataSourceTypeLabel}). Database was not modified.`, 'error');
@@ -2594,22 +2601,45 @@ async function renderManageDataSetPage() {
                     return;
                 }
 
-                const safeSelectedId = safeParseId(selectedId);
-                if (safeSelectedId === null) { showToast('Invalid dataset ID.', 'error'); return; }
-                const params = { id: safeSelectedId };
-                // Use the low-level runApiRequest so we can inspect error payloads directly
-                // This API call updates the database
-                const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);
-                const parsed = safeParseJson(raw);
+                // Check if the asset has existing requests
+                let hasExistingRequests = await window.loomeApi.runApiRequest(API_GET_REQUESTS_BY_DATASET_ID, { data_set_id: selectedId });
 
-                // If the API responded with a detail message, treat it as an error
-                if (parsed && parsed.detail) {
-                    showToast(parsed.detail, 'error');
+                // If there are no requests, set hasExistingRequests to false
+                if (hasExistingRequests) {
+                    showToast(`Cannot delete Data Set "${datasetName}" because there are existing requests associated with it. Please resolve or remove those requests before attempting deletion.`, 'error');
                     deleteBtn.disabled = false;
                     deleteBtn.innerHTML = originalHtml;
                     return;
                 }
 
+                // Proceed with cancellation of both Catalogue Asset and Database entry 
+                // if it has a catalogue entry and no existing requests
+                if (inCatalogue && !hasExistingRequests) {
+                    // Proceed with cancellation of both Catalogue Asset and Database entry
+                    // if it has a catalogue entry and no existing requests
+                    
+                    // Cancel from Database Entry
+                    const safeSelectedId = safeParseId(selectedId);
+                    if (safeSelectedId === null) { showToast('Invalid dataset ID.', 'error'); return; }
+                    const params = { id: safeSelectedId };
+                    // Use the low-level runApiRequest so we can inspect error payloads directly
+                    // This API call updates the database
+                    const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);
+                    const parsed = safeParseJson(raw);
+
+                    // If the API responded with a detail message, treat it as an error
+                    if (parsed && parsed.detail) {
+                        showToast(parsed.detail, 'error');
+                        deleteBtn.disabled = false;
+                        deleteBtn.innerHTML = originalHtml;
+                        return;
+                    }
+
+                    // Remove from Catalogue Asset List
+                    const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
+                        assetId: asset.id, token: token.access_token 
+                    });
+                }
 
                 // Some APIs may return a truthy success value or empty array; consider that success
                 showToast('Data Set deleted successfully.', 'success');
