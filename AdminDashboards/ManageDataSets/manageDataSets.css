@@ -78,3 +78,50 @@
   /* This is crucial: it allows the user to click "through" the arrow to the select box */
   pointer-events: none;
 }
+
+/* Keeps structural grid stable */
+td.editable-cell {
+    width: 150px;
+    max-width: 150px;
+    padding: 8px;
+    vertical-align: top;
+    box-sizing: border-box;
+}
+
+/* Controls the 2-line maximum constraint with intact linebreaks */
+.cell-text-wrap {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;   /* Strict 2 lines max limit */
+    -webkit-box-orient: vertical;
+    overflow: hidden;        /* Hides line 3 and beyond */
+    text-overflow: ellipsis; 
+    white-space: pre-wrap;   /* Crucial: preserves line breaks for view mode */
+    word-break: break-word; 
+    line-height: 1.4;
+}
+
+/* Floating editor wrapper */
+.floating-downward-editor {
+    position: absolute;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    background: #ffffff;
+    border: 2px solid #0056b3;
+    border-radius: 4px;
+    z-index: 99999;
+    box-sizing: border-box;
+    display: flex;
+}
+
+/* The actual auto-expanding field */
+.floating-downward-editor textarea {
+    width: 100%;
+    padding: 8px;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    box-sizing: border-box;
+    overflow-y: hidden;
+}

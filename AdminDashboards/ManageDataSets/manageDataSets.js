@@ -179,15 +179,24 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
     });
 
     let rowsHtml = '';
+
     if (dataSetTypeId == 1) { // Database type
 
         rowsHtml = data.map((col, index) => `
             <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
                 <td>${col.ColumnName || ''}</td>
                 <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
-                <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.LogicalColumnName || '')}">${col.LogicalColumnName || ''}</td>
-                <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.BusinessDescription || '')}">${col.BusinessDescription || ''}</td>
-                <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.ExampleValue || '')}">${col.ExampleValue || ''}</td>
+                <td class="editable-cell" data-field="LogicalColumnName" data-raw-value="${col.LogicalColumnName || ''}" title="${escapeHtml(col.LogicalColumnName || '')}">
+                    <div class="cell-text-wrap">${col.LogicalColumnName || ''}</div>
+                </td>
+                <td class="editable-cell" data-field="BusinessDescription" data-raw-value="${col.BusinessDescription || ''}" title="${escapeHtml(col.BusinessDescription || '')}">
+                    <div class="cell-text-wrap">${col.BusinessDescription || ''}</div>
+                </td>
+                <td class="editable-cell" data-field="ExampleValue" data-raw-value="${col.ExampleValue || ''}" title="${escapeHtml(col.ExampleValue || '')}">
+                    <div class="cell-text-wrap">${col.ExampleValue || ''}</div>
+                </td>
+
+
                 <td class="checkbox-cell">
                     <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
                 </td>
@@ -3062,6 +3071,73 @@ async function renderManageDataSetPage() {
             // You could display an error message to the user here.
         }
     });
+    
+    document.getElementById('dataSetColsBody').addEventListener('click', function(e) {
+        const cell = e.target.closest('.editable-cell');
+        if (!cell) return;
+        if (document.querySelector('.floating-downward-editor')) return;
+
+        // FIX: Fallback to the inner text if data-raw-value hasn't been set yet
+        const originalText = cell.getAttribute('data-raw-value') !== null 
+            ? cell.getAttribute('data-raw-value') 
+            : cell.innerText.trim();
+        
+        const rect = cell.getBoundingClientRect();
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+
+        const editorContainer = document.createElement('div');
+        editorContainer.className = 'floating-downward-editor';
+        editorContainer.style.top = `${rect.top + scrollTop}px`;
+        editorContainer.style.left = `${rect.left + scrollLeft}px`;
+        editorContainer.style.width = `${rect.width}px`;
+
+        editorContainer.innerHTML = `<textarea rows="1"></textarea>`;
+        const textarea = editorContainer.querySelector('textarea');
+        textarea.value = originalText; // Safely populates the text container
+
+        document.body.appendChild(editorContainer);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        const autoGrow = () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = `${textarea.scrollHeight}px`;
+        };
+        textarea.addEventListener('input', autoGrow);
+        autoGrow();
+
+        const closeAndSave = () => {
+            const newValue = textarea.value.trim();
+            
+            // Save raw text value securely to the attribute for future edits
+            cell.setAttribute('data-raw-value', newValue);
+            
+            // Update the visible layout
+            cell.innerHTML = `<div class="cell-text-wrap"></div>`;
+            cell.querySelector('.cell-text-wrap').textContent = newValue;
+            cell.setAttribute('title', newValue);
+            
+            editorContainer.remove();
+        };
+
+        textarea.addEventListener('blur', closeAndSave);
+        
+        textarea.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                textarea.blur();
+            }
+            if (event.key === 'Escape') {
+                textarea.value = originalText;
+                textarea.blur();
+            }
+        });
+    });
+
+
+
+
 
 }
 
