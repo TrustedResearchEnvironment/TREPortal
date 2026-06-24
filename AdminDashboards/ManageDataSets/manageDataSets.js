@@ -185,9 +185,9 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
             <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
                 <td>${col.ColumnName || ''}</td>
                 <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
-                <td class="editable-cell" data-field="LogicalColumnName">${col.LogicalColumnName || ''}</td>
-                <td class="editable-cell" data-field="BusinessDescription">${col.BusinessDescription || ''}</td>
-                <td class="editable-cell" data-field="ExampleValue">${col.ExampleValue || ''}</td>
+                <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.LogicalColumnName || '')}">${col.LogicalColumnName || ''}</td>
+                <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.BusinessDescription || '')}">${col.BusinessDescription || ''}</td>
+                <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.ExampleValue || '')}">${col.ExampleValue || ''}</td>
                 <td class="checkbox-cell">
                     <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
                 </td>
