@@ -123,5 +123,9 @@ td.editable-cell {
     font-size: 14px;
     line-height: 1.4;
     box-sizing: border-box;
-    overflow-y: hidden;
+
+    
+    /* Capping height at roughly 7 rows of text + padding */
+    max-height: 160px; 
+    overflow-y: hidden; /* Handled dynamically by JS */
 }

@@ -3102,7 +3102,19 @@ async function renderManageDataSetPage() {
 
         const autoGrow = () => {
             textarea.style.height = 'auto';
-            textarea.style.height = `${textarea.scrollHeight}px`;
+            
+            // Capture computed maximum height configured in the CSS styles block
+            const maxHeight = parseInt(window.getComputedStyle(textarea).maxHeight);
+
+            if (textarea.scrollHeight > maxHeight) {
+                // If text content climbs past max threshold, lock height and reveal scrollbar
+                textarea.style.height = maxHeight + 'px';
+                textarea.style.overflowY = 'auto'; 
+            } else {
+                // Otherwise scale naturally and hide scrollbars to look crisp
+                textarea.style.height = textarea.scrollHeight + 'px';
+                textarea.style.overflowY = 'hidden';
+            }
         };
         textarea.addEventListener('input', autoGrow);
         autoGrow();
