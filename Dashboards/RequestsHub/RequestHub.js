@@ -333,16 +333,43 @@ function accessRenderTable(container, data, selectedStatus) {
                 loaded = true;
                 const content = detailRow.querySelector('.access-detail-content');
                 try {
-                    const [reqRes, projectsMap] = await Promise.all([
+                    const promises = [
                         window.loomeApi.runApiRequest('GetRequestID', { RequestID: row.dataset.id }).then(safeParseJson),
                         accessGetProjectsMapping()
-                    ]);
+                    ];
+                    if (selectedStatus === 'Finalised') {
+                        promises.push(window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: row.dataset.id }).then(safeParseJson));
+                    }
+
+                    const [reqRes, projectsMap, ingestionLogs] = await Promise.all(promises);
+                    const log = (Array.isArray(ingestionLogs) && ingestionLogs.length > 0) ? ingestionLogs[0] : null;
+
+                    if (log) {
+                        const nameCell = row.querySelector('.font-medium');
+                        if (nameCell) nameCell.style.color = '#dc3545';
+                    }
+
                     const dsRes = row.dataset.datasetId
                         ? safeParseJson(await window.loomeApi.runApiRequest('GetDataSetID', { DataSetID: row.dataset.datasetId }))
                         : null;
                     const proj = reqRes?.ProjectID
                         ? (projectsMap[reqRes.ProjectID] || projectsMap[String(reqRes.ProjectID)] || { name: 'Unknown Project' })
                         : { name: 'N/A' };
+                    
+                    let ingestionHtml = '';
+                    if (log && log.ErrorDescription) {
+                        ingestionHtml = `
+                            <div class="mt-3 px-3 py-2 bg-red-50 border-l-4 border-red-500 rounded text-sm">
+                                <div class="flex items-center gap-2 text-red-700 font-medium">
+                                    <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.163c.75 1.334-.213 2.98-1.743 2.98H3.72c-1.53 0-2.492-1.646-1.743-2.98L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>Ingestion Error — contact a data administrator</span>
+                                </div>
+                                <code class="block mt-2 bg-white/60 border border-red-200 rounded px-2 py-1 text-xs text-red-800 overflow-auto" style="max-height:100px; white-space:pre-wrap;">${escapeHtml(log.ErrorDescription)}</code>
+                            </div>`;
+                    }
+
                     content.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div class="space-y-2">
@@ -356,7 +383,8 @@ function accessRenderTable(container, data, selectedStatus) {
                                 ${reqRes?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(reqRes.RejectionMessage)}</span></p>` : ''}
                                 ${reqRes?.FinalisedBy      ? `<p><span class="font-medium text-gray-600">Finalised By:</span> <span class="text-gray-500">${escapeHtml(reqRes.FinalisedBy)}</span></p>` : ''}
                             </div>
-                        </div>`;
+                        </div>
+                        ${ingestionHtml}`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });
