@@ -172,31 +172,90 @@ td.editable-cell {
     line-height: 1.4;
 }
 
-/* Floating editor wrapper */
+/* Base container styling */
+.workspace-wrapper {
+    position: relative;
+    background: transparent;
+}
+
+/* Modern Button Layout Context */
+.modern-fullscreen-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    background-color: #ffffff;
+    color: #1f2937;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    margin-bottom: 12px;
+}
+.modern-fullscreen-btn svg { width: 18px; height: 18px; }
+.modern-fullscreen-btn:hover { background-color: #f9fafb; color: #2563eb; }
+
+/* --- ACTIVE FULLSCREEN LAYOUT STATE WRAPPER --- */
+.table-fullscreen-active {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: #ffffff !important;
+    z-index: 999999 !important; /* Layers directly below editing box */
+    padding: 80px 40px 40px 40px; 
+    box-sizing: border-box;
+    overflow-y: auto; /* Adds structural window scrollbar if rows grow long */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Force table layout to remain robust and fill screen scale space */
+.table-fullscreen-active table {
+    width: 100% !important;
+    margin-bottom: 20px;
+}
+
+/* Pin button to top right when parent is maximized */
+.table-fullscreen-active .modern-fullscreen-btn {
+    position: fixed;
+    top: 20px;
+    right: 40px;
+    z-index: 1000000; /* Stays accessible at the top layer node */
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+}
+.table-fullscreen-active .modern-fullscreen-btn:hover {
+    color: #dc2626;
+}
+
+/* Modern Pagination layout container placement rules */
+.table-pagination-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 0;
+}
+
+/* Textarea popout keeps the highest absolute layer layout priority */
 .floating-downward-editor {
     position: absolute;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     background: #ffffff;
     border: 2px solid #0056b3;
     border-radius: 4px;
-    z-index: 99999;
+    z-index: 2000000; /* 💎 Crucial: Higher than fullscreen parent workspace */
     box-sizing: border-box;
     display: flex;
 }
-
-/* The actual auto-expanding field */
 .floating-downward-editor textarea {
-    width: 100%;
-    padding: 8px;
-    border: none;
-    outline: none;
-    resize: none;
-    font-family: inherit;
-    font-size: 14px;
-    line-height: 1.4;
-    box-sizing: border-box;
+    width: 100%; padding: 8px; border: none; outline: none; resize: none;
+    font-family: inherit; font-size: 14px; line-height: 1.4; box-sizing: border-box;
+}
 
-    /* Capping height at roughly 7 rows of text + padding */
-    max-height: 160px; 
-    overflow-y: hidden; /* Handled dynamically by JS */
+.cell-text-wrap {
+    pointer-events: none;
 }

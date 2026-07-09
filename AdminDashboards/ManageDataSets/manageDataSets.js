@@ -3464,6 +3464,36 @@ async function renderManageDataSetPage() {
         });
     });
 
+    const toggleBtn = document.getElementById('toggleFullscreenBtn');
+    // Target the shared parent wrapper container instead of just the table
+    const workspaceWrapper = document.getElementById('tableWorkspaceWrapper');
+
+    const expandIcon = toggleBtn.querySelector('.icon-expand');
+    const collapseIcon = toggleBtn.querySelector('.icon-collapse');
+
+    function toggleTableFullscreen() {
+        // Toggles class on parent container so both table and pagination expand together
+        const isFullscreen = workspaceWrapper.classList.toggle('table-fullscreen-active');
+        
+        if (isFullscreen) {
+            expandIcon.style.display = 'none';
+            collapseIcon.style.display = 'block';
+        } else {
+            expandIcon.style.display = 'block';
+            collapseIcon.style.display = 'none';
+        }
+    }
+
+    toggleBtn.addEventListener('click', toggleTableFullscreen);
+
+    window.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' || event.key === 'Esc') {
+            if (workspaceWrapper.classList.contains('table-fullscreen-active')) {
+                toggleTableFullscreen();
+            }
+        }
+    });
+
 }
 
 renderManageDataSetPage();
