@@ -248,8 +248,23 @@ async function accessRenderUI() {
         const res      = await window.loomeApi.runApiRequest('GetRequests', params);
         if (token !== _accessFetchToken) return;
         const parsed   = safeParseJson(res);
-        const data     = (parsed?.Results || []).map(item => ({ ...item, _status: ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
+        let data       = (parsed?.Results || []).map(item => ({ ...item, _status: ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
         const total    = parsed?.RowCount || 0;
+
+        if (accessCurrentStatus === 'Finalised') {
+            const logsPromises = data.map(item =>
+                window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID })
+                    .then(safeParseJson)
+                    .catch(() => null)
+            );
+            const logsResults = await Promise.all(logsPromises);
+            data = data.map((item, idx) => {
+                const logs = logsResults[idx];
+                const hasError = Array.isArray(logs) && logs.length > 0 && !!logs[0].ErrorDescription;
+                return { ...item, IngestionError: hasError, _log: (Array.isArray(logs) && logs.length > 0) ? logs[0] : null };
+            });
+        }
+
         accessTotalPages = Math.max(1, Math.ceil(total / ACCESS_ROWS_PER_PAGE));
         accessRenderTable(container, data, accessCurrentStatus);
         renderPaginationHtml('access-pagination', total, ACCESS_ROWS_PER_PAGE, accessCurrentPage);
@@ -266,6 +281,7 @@ function accessRenderTable(container, data, selectedStatus) {
         container.innerHTML = buildEmptyState('No requests found for this status.');
         return;
     }
+
     const tdCls = 'px-6 py-4 text-sm text-gray-700';
     const headers = ['', 'Request ID', 'Request Name', 'Requested On'];
     if (selectedStatus === 'Pending Approval') headers.push('Approvers');
@@ -284,6 +300,9 @@ function accessRenderTable(container, data, selectedStatus) {
             case 'Rejected':         extra = `<td class="${tdCls}">${escapeHtml(item.RejectedBy) || 'N/A'}</td><td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
             case 'Finalised':        extra = `<td class="${tdCls}">${escapeHtml(item.CurrentlyApproved) || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
+
+        const nameStyle = (selectedStatus === 'Finalised' && item.IngestionError) ? 'style="color:#dc3545"' : '';
+
         const deleteBtn = selectedStatus === 'Pending Approval'
             ? `<button class="btn btn-danger btn-sm access-delete-btn" style="display:inline-flex;align-items:center;white-space:nowrap" data-id="${item.RequestID}" data-name="${escapeHtml(item.Name || '')}">${SVG_TRASH}Cancel &amp; Delete</button>`
             : '';
@@ -292,7 +311,7 @@ function accessRenderTable(container, data, selectedStatus) {
         <tr class="table-hover-row access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${escapeHtml(item.RequestID)}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${escapeHtml(item.Name) || 'N/A'}</td>
+            <td class="${tdCls} font-medium" ${nameStyle} style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${escapeHtml(item.Name) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
@@ -333,20 +352,20 @@ function accessRenderTable(container, data, selectedStatus) {
                 loaded = true;
                 const content = detailRow.querySelector('.access-detail-content');
                 try {
+                    const rowData = data.find(d => String(d.RequestID) === String(row.dataset.id));
                     const promises = [
                         window.loomeApi.runApiRequest('GetRequestID', { RequestID: row.dataset.id }).then(safeParseJson),
                         accessGetProjectsMapping()
                     ];
-                    if (selectedStatus === 'Finalised') {
-                        promises.push(window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: row.dataset.id }).then(safeParseJson));
-                    }
+                    
+                    // Reuse the log if we already fetched it during RenderUI
+                    const [reqRes, projectsMap] = await Promise.all(promises);
+                    let log = rowData?._log;
 
-                    const [reqRes, projectsMap, ingestionLogs] = await Promise.all(promises);
-                    const log = (Array.isArray(ingestionLogs) && ingestionLogs.length > 0) ? ingestionLogs[0] : null;
-
-                    if (log) {
-                        const nameCell = row.querySelector('.font-medium');
-                        if (nameCell) nameCell.style.color = '#dc3545';
+                    // Fallback
+                    if (selectedStatus === 'Finalised' && !log) {
+                        const logs = safeParseJson(await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: row.dataset.id }));
+                        log = (Array.isArray(logs) && logs.length > 0) ? logs[0] : null;
                     }
 
                     const dsRes = row.dataset.datasetId

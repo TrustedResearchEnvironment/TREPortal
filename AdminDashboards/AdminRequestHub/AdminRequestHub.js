@@ -14,6 +14,16 @@ function safeParseJson(response) {
     return response;
 }
 
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 /**
  * Returns a debounced version of fn that delays invocation by `wait` ms.
  */
@@ -391,13 +401,28 @@ async function adminAccessRenderUI() {
         const res      = await window.loomeApi.runApiRequest('GetAllRequests', params);
         if (token !== _adminAccessFetchToken) return;
         const parsed   = safeParseJson(res);
-        const data     = (parsed?.Results || []).map(item => ({ ...item, _status: ADMIN_ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
+        let data       = (parsed?.Results || []).map(item => ({ ...item, _status: ADMIN_ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
         const total    = parsed?.RowCount || 0;
+
+        if (adminAccessCurrentStatus === 'Finalised') {
+            const logsPromises = data.map(item =>
+                window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID })
+                    .then(safeParseJson)
+                    .catch(() => null)
+            );
+            const logsResults = await Promise.all(logsPromises);
+            data = data.map((item, idx) => {
+                const logs = logsResults[idx];
+                const hasError = Array.isArray(logs) && logs.length > 0 && !!logs[0].ErrorDescription;
+                return { ...item, IngestionError: hasError, _log: (Array.isArray(logs) && logs.length > 0) ? logs[0] : null };
+            });
+        }
+
         adminAccessTotalPages = Math.max(1, Math.ceil(total / ADMIN_ACCESS_ROWS_PER_PAGE));
         adminAccessRenderTable(container, data, adminAccessCurrentStatus);
         renderPaginationHtml('admin-access-pagination', total, ADMIN_ACCESS_ROWS_PER_PAGE, adminAccessCurrentPage);
     } catch (e) {
-        if (token !== _adminAccessFetchToken) return;
+        if (token !== _fetchToken) return;
         container.innerHTML = `<p class="text-center py-4 text-red-500 text-sm">Error loading requests: ${e.message}</p>`;
     } finally {
         if (token === _adminAccessFetchToken) document.querySelectorAll('#admin-access-pagination [data-page]').forEach(b => { b.disabled = false; });
@@ -425,11 +450,13 @@ function adminAccessRenderTable(container, data, selectedStatus) {
             case 'Finalised':  extra = `<td class="${tdCls}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
 
+        const nameStyle = (selectedStatus === 'Finalised' && item.IngestionError) ? 'style="color:#dc3545"' : '';
+
         rows += `
-        <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
+        <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" data-name="${(item.Name || '').replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${item.RequestID}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
+            <td class="${tdCls} font-medium" ${nameStyle} style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
             ${extra}
@@ -477,20 +504,47 @@ function adminAccessRenderTable(container, data, selectedStatus) {
                 loaded = true;
                 const content = detailRow.querySelector('.admin-access-detail-content');
                 try {
-                    const [reqRes, projectsMap] = await Promise.all([
+                    const rowData = data.find(d => String(d.RequestID) === String(row.dataset.id));
+                    const promises = [
                         window.loomeApi.runApiRequest('GetRequestID', { RequestID: row.dataset.id }).then(safeParseJson),
                         adminAccessGetProjectsMapping()
-                    ]);
+                    ];
+
+                    // Reuse the log if we already fetched it during RenderUI
+                    const [reqRes, projectsMap] = await Promise.all(promises);
+                    let log = rowData?._log;
+
+                    // Fallback in case RenderUI didn't fetch it (e.g. status change or race)
+                    if (selectedStatus === 'Finalised' && !log) {
+                        const logs = safeParseJson(await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: row.dataset.id }));
+                        log = (Array.isArray(logs) && logs.length > 0) ? logs[0] : null;
+                    }
+
                     const dsRes = row.dataset.datasetId
                         ? safeParseJson(await window.loomeApi.runApiRequest('GetDataSetID', { DataSetID: row.dataset.datasetId }))
                         : null;
                     const proj = reqRes?.ProjectID
                         ? (projectsMap[reqRes.ProjectID] || projectsMap[String(reqRes.ProjectID)] || { name: 'Unknown Project' })
                         : { name: 'N/A' };
+
+                    let ingestionHtml = '';
+                    if (log && log.ErrorDescription) {
+                        ingestionHtml = `
+                            <div class="mt-3 px-3 py-2 bg-red-50 border-l-4 border-red-500 rounded text-sm">
+                                <div class="flex items-center gap-2 text-red-700 font-medium">
+                                    <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.163c.75 1.334-.213 2.98-1.743 2.98H3.72c-1.53 0-2.492-1.646-1.743-2.98L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>Ingestion Error — contact a data administrator</span>
+                                </div>
+                                <code class="block mt-2 bg-white/60 border border-red-200 rounded px-2 py-1 text-xs text-red-800 overflow-auto" style="max-height:100px; white-space:pre-wrap;">${escapeHtml(log.ErrorDescription)}</code>
+                            </div>`;
+                    }
+
                     content.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Request Name:</span> <span class="text-gray-500">${reqRes?.Name || item.dataset?.name || 'N/A'}</span></p>
+                                <p><span class="font-medium text-gray-600">Request Name:</span> <span class="text-gray-500">${reqRes?.Name || row.dataset.name || 'N/A'}</span></p>
                                 ${dsRes ? `<p><span class="font-medium text-gray-600">Dataset:</span> <span class="text-gray-500">${dsRes.Name || 'N/A'}</span></p>
                                            <p><span class="font-medium text-gray-600">Description:</span> <span class="text-gray-500">${dsRes.Description || 'N/A'}</span></p>` : ''}
                                 <p><span class="font-medium text-gray-600">Target Project:</span> <span class="text-gray-500">${proj.name}</span></p>
@@ -499,8 +553,10 @@ function adminAccessRenderTable(container, data, selectedStatus) {
                             <div class="space-y-2">
                                 ${reqRes?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${reqRes.ApprovalMessage}</span></p>` : ''}
                                 ${reqRes?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${reqRes.RejectionMessage}</span></p>` : ''}
+                                ${reqRes?.FinalisedBy      ? `<p><span class="font-medium text-gray-600">Finalised By:</span> <span class="text-gray-500">${reqRes.FinalisedBy}</span></p>` : ''}
                             </div>
-                        </div>`;
+                        </div>
+                        ${ingestionHtml}`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });
