@@ -8,7 +8,6 @@ const API_REJECT_REQUEST = 'RejectRequestID';
 const API_GET_REQUEST_DETAILS = 'GetRequestID';
 const API_GET_DATASET_DETAILS = 'GetDataSetID';
 const API_GET_ALL_ASSIST_PROJECTS = 'GetAllAssistProjects';
-const 
 
 // We will store all fetched data here
 let allRequests = []; 
@@ -1076,22 +1075,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                             throw new Error('Failed to fetch both request and dataset details');
                         }
 
-                        // Fetch Ingestion Logs if status is Finalised
-                        let log = null;
-                        if (selectedStatus === 'Finalised') {
-                            try {
-                                const logs = safeParseJson(await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID }));
-                                log = (Array.isArray(logs) && logs.length > 0) ? logs[0] : null;
-
-                                // Apply visual indicator to the table row if error exists
-                                if (log && (log.ErrorDescription || log.IngestionError)) {
-                                    const nameCell = row.querySelector('td:nth-child(3)');
-                                    if (nameCell) nameCell.style.color = '#dc3545';
-                                }
-                            } catch (e) {
-                                console.error('Error fetching ingestion logs:', e);
-                            }
-                        }
+                        // Use pre-fetched ingestion log
+                        const log = item.ingestionLog || null;
                         
                         // Display whatever details we have
                         console.log('Displaying combined details');
@@ -1209,10 +1194,27 @@ async function renderUI() {
 
 
     // --- 2. PREPARE THE MASTER DATA ARRAY ---
-    // Transform the raw data just once into the format our UI needs.
-    allRequests = rawData.map(item => ({
-        ...item,
-        status: statusIdToNameMap[item.StatusID] || 'Unknown'
+    // Transform the raw data and enrichment (e.g. Ingestion Logs)
+    allRequests = await Promise.all(rawData.map(async item => {
+        let ingestionLog = null;
+        if (selectedStatus === 'Finalised') {
+            try {
+                const ingestionResponse = await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { 
+                    "request_id": item.RequestID 
+                });
+                const logs = safeParseJson(ingestionResponse);
+                ingestionLog = (Array.isArray(logs) && logs.length > 0) ? logs[0] : (logs || null);
+            } catch (e) {
+                console.error(`Error fetching ingestion log for RequestID ${item.RequestID}:`, e);
+            }
+        }
+        
+        return {
+            ...item,
+            status: statusIdToNameMap[item.StatusID] || 'Unknown',
+            ingestionLog: ingestionLog,
+            IngestionError: ingestionLog ? (ingestionLog.ErrorDescription || ingestionLog.IngestionError) : null
+        };
     }));
     console.log(allRequests)
 
