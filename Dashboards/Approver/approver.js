@@ -8,6 +8,7 @@ const API_REJECT_REQUEST = 'RejectRequestID';
 const API_GET_REQUEST_DETAILS = 'GetRequestID';
 const API_GET_DATASET_DETAILS = 'GetDataSetID';
 const API_GET_ALL_ASSIST_PROJECTS = 'GetAllAssistProjects';
+const 
 
 // We will store all fetched data here
 let allRequests = []; 
@@ -678,8 +679,9 @@ async function getProjectsMapping() {
  * @param {HTMLElement} container - The container element
  * @param {object} requestDetails - The request details
  * @param {object} datasetDetails - The dataset details
+ * @param {object} [ingestionLog] - Optional ingestion log details
  */
-async function displayCombinedDetails(container, requestDetails, datasetDetails) {
+async function displayCombinedDetails(container, requestDetails, datasetDetails, ingestionLog) {
     // Check if we have valid details
     if ((!requestDetails || Object.keys(requestDetails).length === 0) && 
         (!datasetDetails || Object.keys(datasetDetails).length === 0)) {
@@ -696,6 +698,22 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
         const projectInfo = requestDetails && requestDetails.ProjectID ? 
             (projectsMapping[requestDetails.ProjectID] || { name: 'Unknown Project', description: '' }) : 
             { name: 'Unknown Project', description: '' };
+
+        // Handle Ingestion Error UI
+        let ingestionHtml = '';
+        if (ingestionLog && (ingestionLog.ErrorDescription || ingestionLog.IngestionError)) {
+            const errorDesc = ingestionLog.ErrorDescription || ingestionLog.IngestionError || 'Unknown error occurred during ingestion.';
+            ingestionHtml = `
+                <div class="mt-4 px-3 py-2 bg-red-50 border-l-4 border-red-500 rounded text-sm">
+                    <div class="flex items-center gap-2 text-red-700 font-medium">
+                        <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.163c.75 1.334-.213 2.98-1.743 2.98H3.72c-1.53 0-2.492-1.646-1.743-2.98L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Ingestion Error — contact a data administrator</span>
+                    </div>
+                    <code class="block mt-2 bg-white/60 border border-red-200 rounded px-2 py-1 text-xs text-red-800 overflow-auto" style="max-height:100px; white-space:pre-wrap;">${escapeHtml(errorDesc)}</code>
+                </div>`;
+        }
         
         // Start building HTML
         let html = `
@@ -746,6 +764,7 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
                     </div>
                 </div>
             </div>
+            ${ingestionHtml}
         `;
         
         // Update the container
@@ -771,6 +790,19 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
  */
 function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
+}
+
+/**
+ * Escapes HTML characters to prevent XSS.
+ */
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 /**
@@ -925,6 +957,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             const row = document.createElement('tr');
             row.classList.add('cursor-pointer', 'hover:bg-gray-50'); // Add visual indication this row is clickable
             const tdClasses = 'px-6 py-4 whitespace-nowrap text-sm text-gray-800';
+            const nameStyle = (selectedStatus === 'Finalised' && item.IngestionError) ? 'style="color:#dc3545"' : '';
             
             let statusSpecificCols = '';
             switch (item.status) {
@@ -941,7 +974,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     </svg>
                 </td>
                 <td class="${tdClasses}">${item.RequestID}</td>
-                <td class="${tdClasses}">${item.Name}</td>
+                <td class="${tdClasses}" ${nameStyle}>${item.Name}</td>
                 <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
                 <td class="${tdClasses}">${item.CreateUser}</td>
                 ${statusSpecificCols}
@@ -1042,10 +1075,27 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                         if (!requestDetails && !datasetDetails) {
                             throw new Error('Failed to fetch both request and dataset details');
                         }
+
+                        // Fetch Ingestion Logs if status is Finalised
+                        let log = null;
+                        if (selectedStatus === 'Finalised') {
+                            try {
+                                const logs = safeParseJson(await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID }));
+                                log = (Array.isArray(logs) && logs.length > 0) ? logs[0] : null;
+
+                                // Apply visual indicator to the table row if error exists
+                                if (log && (log.ErrorDescription || log.IngestionError)) {
+                                    const nameCell = row.querySelector('td:nth-child(3)');
+                                    if (nameCell) nameCell.style.color = '#dc3545';
+                                }
+                            } catch (e) {
+                                console.error('Error fetching ingestion logs:', e);
+                            }
+                        }
                         
                         // Display whatever details we have
                         console.log('Displaying combined details');
-                        displayCombinedDetails(combinedDetailsContainer, requestDetails, datasetDetails);
+                        displayCombinedDetails(combinedDetailsContainer, requestDetails, datasetDetails, log);
                         
                     } catch (error) {
                         console.error("Error loading details:", error);
