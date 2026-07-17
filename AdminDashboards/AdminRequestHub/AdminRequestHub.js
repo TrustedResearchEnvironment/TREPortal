@@ -432,7 +432,7 @@ async function adminAccessRenderUI() {
 function adminAccessRenderTable(container, data, selectedStatus) {
     if (!data.length) { container.innerHTML = buildEmptyState('No requests found for this status.'); return; }
     const tdCls = 'px-6 py-4 text-sm text-gray-700';
-    const headers = ['', 'Request ID', 'Request Name', 'Requested On', 'Requested By'];
+    const headers = ['', 'Request Name', 'Requested On', 'Requested By'];
     if (selectedStatus === 'Pending Approval') headers.push('Approvers');
     else if (selectedStatus === 'Approved')    { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
@@ -455,10 +455,9 @@ function adminAccessRenderTable(container, data, selectedStatus) {
         rows += `
         <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" data-name="${(item.Name || '').replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls}">${item.RequestID}</td>
-            <td class="${tdCls} font-medium" ${nameStyle} style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
-            <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
-            <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
+            <td class="${tdCls} font-medium" ${nameStyle} style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${formatDate(item.CreateDate)}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.CreateUser || 'N/A'}</td>
             ${extra}
         </tr>
         <tr class="admin-access-detail-row hidden" id="admin-access-detail-${item.RequestID}" aria-hidden="true">
@@ -481,10 +480,12 @@ function adminAccessRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+        <div class="overflow-x-auto border rounded shadow-sm">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>${thead}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+            </table>
+        </div>`;
 
     container.querySelectorAll('.admin-access-row').forEach(row => {
         const detailRow = row.nextElementSibling;
@@ -706,9 +707,9 @@ function adminImportRenderTable(container, data, selectedStatus) {
         rows += `
         <tr class="table-hover-row admin-import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-import-detail-${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">${item.ImportRequestName || 'N/A'}</td>
-            <td class="${tdCls}">${item.CreateUser || item.UserPrincipalName || 'N/A'}</td>
-            <td class="${tdCls}">${item.ImportProjectName || item.ProjectName || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="width:25%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.ImportRequestName)}">${item.ImportRequestName || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.CreateUser || item.UserPrincipalName)}">${item.CreateUser || item.UserPrincipalName || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.ImportProjectName || item.ProjectName)}">${item.ImportProjectName || item.ProjectName || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
@@ -737,10 +738,16 @@ function adminImportRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+    <div class="overflow-x-auto border rounded shadow-sm">
+        <table class="w-full divide-y divide-gray-200" style="table-layout: fixed; min-width: 800px;">
+            <thead class="bg-gray-50">
+                <tr>${thead}</tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                ${rows}
+            </tbody>
+        </table>
+    </div>`;
 
     container.querySelectorAll('.admin-import-row').forEach(row => {
         const detailRow = row.nextElementSibling;
@@ -928,9 +935,9 @@ function adminExportRenderTable(container, data, selectedStatus) {
         rows += `
         <tr class="table-hover-row admin-export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-export-detail-${item.ExportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${item.ExportRequestName || 'N/A'}</td>
-            <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
-            <td class="${tdCls}">${item.ExportProjectName || item.ProjectName || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${item.ExportRequestName || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.CreateUser || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.ExportProjectName || item.ProjectName || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
@@ -959,10 +966,12 @@ function adminExportRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+        <div class="overflow-x-auto border rounded shadow-sm">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>${thead}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+            </table>
+        </div>`;
 
     container.querySelectorAll('.admin-export-row').forEach(row => {
         const detailRow = row.nextElementSibling;
