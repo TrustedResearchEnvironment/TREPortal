@@ -571,8 +571,8 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         const canDelete = item._status === 'Awaiting Submission' || item._status === 'Failed' || item._status === 'Working';
         const canSubmit = item._status === 'Awaiting Submission';
         const deleteBtn = canDelete ? `<button class="btn btn-danger btn-sm import-delete-btn" style="display:inline-flex;align-items:center;white-space:nowrap" data-id="${item.ImportRequestID}">${SVG_TRASH}Cancel &amp; Delete</button>` : '';
-        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm import-submit-btn ms-2" data-id="${item.ImportRequestID}">Submit</button>` : '';
-
+        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm import-submit-btn ms-2" data-id="${item.ImportRequestID}" data-import-project-id="${item.ImportProjectID || 0}">Submit</button>` : '';
+W
         rows += `
         <tr class="table-hover-row import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="import-detail-${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
@@ -643,13 +643,21 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         btn.addEventListener('click', e => { e.stopPropagation(); importDeleteJob(btn.dataset.id); });
     });
 
+    // Dashboards/RequestsHub/RequestHub.js L649
     container.querySelectorAll('.import-submit-btn').forEach(btn => {
         btn.addEventListener('click', async e => {
             e.stopPropagation();
             if (!confirm('Submit this import request for approval?')) return;
             const t = showToast('Submitting…', 'info');
             try {
-                const res    = await window.loomeApi.runApiRequest('UpdateDataImportRequestStatus', { ImportRequestID: parseInt(btn.dataset.id, 10), statusID: 1 });
+                // Updated to use btn.dataset.importProjectId
+                const res = await window.loomeApi.runApiRequest('SubmitImportRequestForApproval', { 
+                    ImportRequestID: parseInt(btn.dataset.id, 10), 
+                    statusID: 1, 
+                    ImportProjectID: parseInt(btn.dataset.importProjectId, 10),
+                    LoomeAssistTenantsID: btn.dataset.loomeAssistTenantsId || 0,
+                    LoomeAssistName: btn.dataset.loomeAssistName || ''
+                });
                 const parsed = safeParseJson(res);
                 dismissToast(t);
                 if (parsed?.StatusID === 1 || parsed?.success) {
