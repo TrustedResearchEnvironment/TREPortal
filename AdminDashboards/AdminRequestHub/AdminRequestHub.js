@@ -345,6 +345,100 @@ function setupActionModalConfirm() {
 }
 
 // =================================================================
+// TUTORIAL SYSTEM
+// =================================================================
+
+const TUTORIAL_DATA = {
+    'admin-access-tab': {
+        title: 'Admin: Data Access Guide',
+        steps: [
+            { content: 'Welcome to the Admin Request Hub! As an administrator, you can view all access, import, and export requests. Expand any row to see full details.' },
+            { content: 'You cannot approve requests but you may reject them, and you are also required to provide a reason.' },
+            { content: 'Once you Reject a request, the user will be notified with your reason.' },
+            { content: 'Remember to check the "Finalised" tab to see completed requests and any associated logs for auditing purposes.' }
+        ]
+    },
+    'admin-import-tab': {
+        title: 'Admin: Data Import Guide',
+        steps: [
+            { content: 'Review data import requests to ensure only authorized data enters the secure environment.' },
+            { content: 'Approving an import request will automatically trigger the data transfer job to the user\'s designated project.' },
+            { content: 'If the transfer fails, you can track information in the "Finalised" or "Failed" logs (where available).' }
+        ]
+    },
+    'admin-export-tab': {
+        title: 'Admin: Data Export Guide',
+        steps: [
+            { content: 'Admin Review. Once a user submits an export request, a secure "Airlock" project is automatically created. You will find an "Export sum-..." resource within that project containing the user\'s data.' },
+            { content: 'Data Inspection. To review the files, click the Down Arrow on the Export resource in the Airlock project and select "Go to URL" to download and inspect the zipped data.' },
+            { content: 'Finalizing. If the data is compliant and you approve the request, a background job will automatically add the user to the Airlock project to finalize the transfer.' }
+        ]
+    }
+};
+
+let currTutorialStep = 0;
+let currTutorialSet = null;
+
+function renderTutorialStep() {
+    const data = TUTORIAL_DATA[currTutorialSet];
+    if (!data) return;
+
+    const step = data.steps[currTutorialStep];
+    const isLast = currTutorialStep === data.steps.length - 1;
+
+    document.getElementById('tutorialModalTitle').textContent = data.title;
+    document.getElementById('tutorial-content').textContent = step.content;
+    document.getElementById('tutorial-progress').textContent = `Step ${currTutorialStep + 1} of ${data.steps.length}`;
+
+    const backBtn = document.getElementById('tutorial-back');
+    const nextBtn = document.getElementById('tutorial-next');
+
+    // Hide back button on first step
+    backBtn.style.visibility = currTutorialStep === 0 ? 'hidden' : 'visible';
+    
+    // Change "Next" to "Finish" on last step
+    nextBtn.textContent = isLast ? 'Finish' : 'Next';
+}
+
+function setupTutorialListeners() {
+    document.getElementById('tutorial-btn')?.addEventListener('click', () => {
+        const activeTabEl = document.querySelector('#adminTabs .nav-link.active');
+        const activeTabId = activeTabEl?.id;
+
+        if (!activeTabId || !TUTORIAL_DATA[activeTabId]) {
+            showToast('Tutorial not available for this tab.', 'info');
+            return;
+        }
+
+        currTutorialSet = activeTabId;
+        currTutorialStep = 0;
+        renderTutorialStep();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal'));
+        modal.show();
+    });
+
+    document.getElementById('tutorial-next')?.addEventListener('click', () => {
+        const data = TUTORIAL_DATA[currTutorialSet];
+        if (!data) return;
+
+        if (currTutorialStep < data.steps.length - 1) {
+            currTutorialStep++;
+            renderTutorialStep();
+        } else {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal')).hide();
+        }
+    });
+
+    document.getElementById('tutorial-back')?.addEventListener('click', () => {
+        if (currTutorialStep > 0) {
+            currTutorialStep--;
+            renderTutorialStep();
+        }
+    });
+}
+
+// =================================================================
 // ACCESS TAB (Admin)  — server-side pagination via GetAllRequests
 // =================================================================
 
@@ -1062,6 +1156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     adminImportSetupListeners();
     adminExportSetupListeners();
     setupActionModalConfirm();
+    setupTutorialListeners();
 
     // Refresh button
     document.getElementById('refresh-btn')?.addEventListener('click', async () => {

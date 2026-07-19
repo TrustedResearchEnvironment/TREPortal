@@ -1245,6 +1245,78 @@ async function getCounts(status) {
     return parsedResponse.RowCount;
 }
 
+// =================================================================
+// TUTORIAL SYSTEM
+// =================================================================
+
+const TUTORIAL_DATA = {
+    'approver-guide': {
+        title: 'Approver Guide',
+        steps: [
+            { content: 'Welcome to the Approver Dashboard! As an approver, you review and manage user requests for datasets.' },
+            { content: 'Use the status filters (like "Pending Approval") to identify requests that require your immediate action.' },
+            { content: 'Expand any row to see full details. Use the "Approve" or "Reject" buttons to process a request.' },
+            { content: 'When approving or rejecting, you must provide a message that will be shared with the requesting user.' },
+            { content: 'After approval, the system will automatically handle data access provisioning. Once you approve or reject a request, the user will be notified with your reason.' },
+            { content: 'Remember to check the "Finalised" tab to see completed requests and any associated logs for auditing purposes.' }
+        ]
+    }
+};
+
+let currTutorialStep = 0;
+let currTutorialSet = null;
+
+function renderTutorialStep() {
+    const data = TUTORIAL_DATA[currTutorialSet];
+    if (!data) return;
+
+    const step = data.steps[currTutorialStep];
+    const isLast = currTutorialStep === data.steps.length - 1;
+
+    document.getElementById('tutorialModalTitle').textContent = data.title;
+    document.getElementById('tutorial-content').textContent = step.content;
+    document.getElementById('tutorial-progress').textContent = `Step ${currTutorialStep + 1} of ${data.steps.length}`;
+
+    const backBtn = document.getElementById('tutorial-back');
+    const nextBtn = document.getElementById('tutorial-next');
+
+    // Hide back button on first step
+    backBtn.style.visibility = currTutorialStep === 0 ? 'hidden' : 'visible';
+    
+    // Change "Next" to "Finish" on last step
+    nextBtn.textContent = isLast ? 'Finish' : 'Next';
+}
+
+function setupTutorialListeners() {
+    document.getElementById('tutorial-btn')?.addEventListener('click', () => {
+        currTutorialSet = 'approver-guide';
+        currTutorialStep = 0;
+        renderTutorialStep();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal'));
+        modal.show();
+    });
+
+    document.getElementById('tutorial-next')?.addEventListener('click', () => {
+        const data = TUTORIAL_DATA[currTutorialSet];
+        if (!data) return;
+
+        if (currTutorialStep < data.steps.length - 1) {
+            currTutorialStep++;
+            renderTutorialStep();
+        } else {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal')).hide();
+        }
+    });
+
+    document.getElementById('tutorial-back')?.addEventListener('click', () => {
+        if (currTutorialStep > 0) {
+            currTutorialStep--;
+            renderTutorialStep();
+        }
+    });
+}
+
 /**
  * Main function to orchestrate all rendering based on the current state.
  * It filters, paginates, and renders the table and controls.
@@ -1362,6 +1434,7 @@ async function refreshPageData() {
  */
 async function renderApproversPage() {
     try {
+        setupTutorialListeners();
 
         // --- 3. UPDATE ALL CHIP COUNTS ONCE ---
         // This is the logic you wanted. It calculates counts from the unfiltered master array.

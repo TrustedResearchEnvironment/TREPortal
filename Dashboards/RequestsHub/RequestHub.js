@@ -1077,6 +1077,104 @@ function exportSetupListeners() {
 }
 
 // =================================================================
+// TUTORIAL SYSTEM
+// =================================================================
+
+const TUTORIAL_DATA = {
+    'access-tab': {
+        title: 'Data Access Guide',
+        steps: [
+            { content: 'Welcome to the Data Access tab! Here you can view and manage all your requests for workspace datasets.' },
+            { content: 'Use the status chips (Pending Approval, Approved, etc.) to filter your view and check the progress of your requests.' },
+            { content: 'Click on any row to expand details, where you can see the dataset description and your original request purpose.' },
+            { content: 'If a request is still Pending Approval, you can use the "Cancel & Delete" button to remove it.' }
+        ]
+    },
+    'import-tab': {
+        title: 'Data Import Guide',
+        steps: [
+            { content: 'The Data Import tab allows you to bring external data into your secure environment from Assist projects.' },
+            { content: 'Prepare your Data. Organize your data into a zip file named "importdata.zip".' },
+            { content: 'Click "+ New Import Request" to start. You will need to provide a descriptive name and select a source project.' },
+            { content: 'Once submitted, an automated job to create an Import Project and its resources will run.' },
+            { content: 'Once created, your request will appear in "Awaiting Submission". You must go to the Import Project, click the button that will give you the command to copy your importdata.zip file into the storage account.' },
+            { content: 'After copying the file, return to the Data Import tab and click "Submit" on your request to start the formal approval process.' }
+        ]
+    },
+    'export-tab': {
+        title: 'Data Export Guide',
+        steps: [
+            { content: 'Prepare Data. Browse to your summary repository (starts with "sum-"). Move your export files into a folder named "summarydata" and compress it into a .zip file.' },
+            { content: 'Submit. Select the Assist Project and click "Submit Request". This triggers an automated job to create a secure "Airlock" project for administrative review.' },
+            { content: 'Approval. The Data Manager will review your data via the Airlock link. Once approved, you will be automatically added to the Airlock project to finalize the export.' }
+        ]
+    }
+};
+
+let currTutorialStep = 0;
+let currTutorialSet = null;
+
+function renderTutorialStep() {
+    const data = TUTORIAL_DATA[currTutorialSet];
+    if (!data) return;
+
+    const step = data.steps[currTutorialStep];
+    const isLast = currTutorialStep === data.steps.length - 1;
+
+    document.getElementById('tutorialModalTitle').textContent = data.title;
+    document.getElementById('tutorial-content').textContent = step.content;
+    document.getElementById('tutorial-progress').textContent = `Step ${currTutorialStep + 1} of ${data.steps.length}`;
+
+    const backBtn = document.getElementById('tutorial-back');
+    const nextBtn = document.getElementById('tutorial-next');
+
+    // Hide back button on first step
+    backBtn.style.visibility = currTutorialStep === 0 ? 'hidden' : 'visible';
+    
+    // Change "Next" to "Finish" on last step
+    nextBtn.textContent = isLast ? 'Finish' : 'Next';
+}
+
+function setupTutorialListeners() {
+    document.getElementById('tutorial-btn')?.addEventListener('click', () => {
+        // Find which tab is currently active
+        const activeTabEl = document.querySelector('#requestTabs .nav-link.active');
+        const activeTabId = activeTabEl?.id;
+
+        if (!activeTabId || !TUTORIAL_DATA[activeTabId]) {
+            showToast('Tutorial not available for this tab.', 'info');
+            return;
+        }
+
+        currTutorialSet = activeTabId;
+        currTutorialStep = 0;
+        renderTutorialStep();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal'));
+        modal.show();
+    });
+
+    document.getElementById('tutorial-next')?.addEventListener('click', () => {
+        const data = TUTORIAL_DATA[currTutorialSet];
+        if (!data) return;
+
+        if (currTutorialStep < data.steps.length - 1) {
+            currTutorialStep++;
+            renderTutorialStep();
+        } else {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal')).hide();
+        }
+    });
+
+    document.getElementById('tutorial-back')?.addEventListener('click', () => {
+        if (currTutorialStep > 0) {
+            currTutorialStep--;
+            renderTutorialStep();
+        }
+    });
+}
+
+// =================================================================
 // INITIALIZATION
 // =================================================================
 
@@ -1084,6 +1182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     accessSetupListeners();
     importSetupListeners();
     exportSetupListeners();
+    setupTutorialListeners();
 
     if (sessionStorage.getItem('showRequestPendingHint')) {
         sessionStorage.removeItem('showRequestPendingHint');
