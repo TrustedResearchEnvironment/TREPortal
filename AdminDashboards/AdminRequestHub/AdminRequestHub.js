@@ -347,31 +347,30 @@ function setupActionModalConfirm() {
 // =================================================================
 // TUTORIAL SYSTEM
 // =================================================================
-
 const TUTORIAL_DATA = {
     'admin-access-tab': {
         title: 'Admin: Data Access Guide',
         steps: [
             { content: 'Welcome to the Admin Request Hub! As an administrator, you can view all access, import, and export requests. Expand any row to see full details.' },
-            { content: 'You cannot approve requests but you may reject them, and you are also required to provide a reason.' },
-            { content: 'Once you Reject a request, the user will be notified with your reason.' },
-            { content: 'Remember to check the "Finalised" tab to see completed requests and any associated logs for auditing purposes.' }
+            { content: 'You cannot approve access requests, but you can reject them. A reason is required whenever you reject a request.' },
+            { content: 'When you reject a request, the user is automatically notified with your reason.' },
+            { content: 'Check the "Finalised" tab for completed requests and their associated logs, useful for auditing purposes.' }
         ]
     },
     'admin-import-tab': {
         title: 'Admin: Data Import Guide',
         steps: [
             { content: 'Review data import requests to ensure only authorized data enters the secure environment.' },
-            { content: 'Approving an import request will automatically trigger the data transfer job to the user\'s designated project.' },
-            { content: 'If the transfer fails, you can track information in the "Finalised" or "Failed" logs (where available).' }
+            { content: 'Approving an import request automatically triggers the data transfer job to the user\'s designated project.' },
+            { content: 'If a transfer fails, check the "Finalised" or "Failed" logs for details (where available).' }
         ]
     },
     'admin-export-tab': {
         title: 'Admin: Data Export Guide',
         steps: [
-            { content: 'Admin Review. Once a user submits an export request, a secure "Airlock" project is automatically created. You will find an "Export sum-..." resource within that project containing the user\'s data.' },
-            { content: 'Data Inspection. To review the files, click the Down Arrow on the Export resource in the Airlock project and select "Go to URL" to download and inspect the zipped data.' },
-            { content: 'Finalizing. If the data is compliant and you approve the request, a background job will automatically add the user to the Airlock project to finalize the transfer.' }
+            { content: 'Once a user submits an export request, a secure "Airlock" project is automatically created, containing an "Export sum-..." resource with the user\'s data.' },
+            { content: 'To inspect the files, click the down arrow on the Export resource in the Airlock project and select "Go to URL" to download and review the zipped data.' },
+            { content: 'If the data is compliant and you approve the request, a background job automatically adds the user to the Airlock project to finalize the transfer.' }
         ]
     }
 };
