@@ -486,11 +486,27 @@ async function importFetchAllJobs() {
     try {
         const r1   = await window.loomeApi.runApiRequest('GetDataImportFromDBbyUpn', { page: 1, pageSize: 1, search: '' });
         const d1   = safeParseJson(r1);
+        
+        // Handle cases where API returns an array directly
+        if (Array.isArray(d1)) {
+            importAllJobs = d1.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+            return;
+        }
+
         const total = d1?.RowCount || 0;
-        if (!total) { importAllJobs = []; return; }
+        if (!total) {
+            // Check if results are present even if RowCount is missing
+            if (d1?.Results && Array.isArray(d1.Results)) {
+                importAllJobs = d1.Results.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+                return;
+            }
+            importAllJobs = []; 
+            return; 
+        }
+
         const r2   = await window.loomeApi.runApiRequest('GetDataImportFromDBbyUpn', { page: 1, pageSize: total, search: '' });
         const d2   = safeParseJson(r2);
-        importAllJobs = (d2?.Results || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+        importAllJobs = (d2?.Results || d2 || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
     } catch (e) { importAllJobs = []; }
 }
 
@@ -572,7 +588,7 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         const canSubmit = item._status === 'Awaiting Submission';
         const deleteBtn = canDelete ? `<button class="btn btn-danger btn-sm import-delete-btn" style="display:inline-flex;align-items:center;white-space:nowrap" data-id="${item.ImportRequestID}">${SVG_TRASH}Cancel &amp; Delete</button>` : '';
         const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm import-submit-btn ms-2" data-id="${item.ImportRequestID}" data-import-project-id="${item.ImportProjectID || 0}">Submit</button>` : '';
-W
+
         rows += `
         <tr class="table-hover-row import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="import-detail-${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
@@ -803,11 +819,27 @@ async function exportFetchAllJobs() {
     try {
         const r1    = await window.loomeApi.runApiRequest('GetDataExportFromDBbyUpn', { page: 1, pageSize: 1, search: '' });
         const d1    = safeParseJson(r1);
+
+        // Handle cases where API returns an array directly
+        if (Array.isArray(d1)) {
+            exportAllJobs = d1.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+            return;
+        }
+
         const total = d1?.RowCount || 0;
-        if (!total) { exportAllJobs = []; return; }
+        if (!total) {
+            // Check if results are present even if RowCount is missing
+            if (d1?.Results && Array.isArray(d1.Results)) {
+                exportAllJobs = d1.Results.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+                return;
+            }
+            exportAllJobs = []; 
+            return; 
+        }
+
         const r2 = await window.loomeApi.runApiRequest('GetDataExportFromDBbyUpn', { page: 1, pageSize: total, search: '' });
         const d2 = safeParseJson(r2);
-        exportAllJobs = (d2?.Results || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+        exportAllJobs = (d2?.Results || d2 || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
     } catch (e) { exportAllJobs = []; }
 }
 
@@ -1084,29 +1116,29 @@ const TUTORIAL_DATA = {
     'access-tab': {
         title: 'Data Access Guide',
         steps: [
-            { content: 'Welcome to the Data Access tab! Here you can view and manage all your requests for workspace datasets.' },
-            { content: 'Use the status chips (Pending Approval, Approved, etc.) to filter your view and check the progress of your requests.' },
-            { content: 'Click on any row to expand details, where you can see the dataset description and your original request purpose.' },
-            { content: 'If a request is still Pending Approval, you can use the "Cancel & Delete" button to remove it.' }
+            { content: 'Welcome to the Data Access tab! Here you can view and manage your requests for workspace datasets.' },
+            { content: 'Use the status chips (Pending Approval, Approved, etc.) to filter requests and track their progress.' },
+            { content: 'Click any row to expand its details, including the dataset description and your original request purpose.' },
+            { content: 'While a request is still Pending Approval, you can use "Cancel & Delete" to withdraw it.' }
         ]
     },
     'import-tab': {
         title: 'Data Import Guide',
         steps: [
-            { content: 'The Data Import tab allows you to bring external data into your secure environment from Assist projects.' },
-            { content: 'Prepare your Data. Organize your data into a zip file named "importdata.zip".' },
-            { content: 'Click "+ New Import Request" to start. You will need to provide a descriptive name and select a source project.' },
-            { content: 'Once submitted, an automated job to create an Import Project and its resources will run.' },
-            { content: 'Once created, your request will appear in "Awaiting Submission". You must go to the Import Project, click the button that will give you the command to copy your importdata.zip file into the storage account.' },
+            { content: 'The Data Import tab lets you bring external data into your secure environment from Assist projects.' },
+            { content: 'Prepare your data by organizing it into a zip file named "importdata.zip".' },
+            { content: 'Click "+ New Import Request" to begin. You\'ll need to provide a descriptive name and select a source project.' },
+            { content: 'After submitting, an automated job creates an Import Project and its resources.' },
+            { content: 'Once created, your request appears under "Awaiting Submission". Open the Import Project and use the provided command to copy your importdata.zip file into the storage account.' },
             { content: 'After copying the file, return to the Data Import tab and click "Submit" on your request to start the formal approval process.' }
         ]
     },
     'export-tab': {
         title: 'Data Export Guide',
         steps: [
-            { content: 'Prepare Data. Browse to your summary repository (starts with "sum-"). Move your export files into a folder named "summarydata" and compress it into a .zip file.' },
-            { content: 'Submit. Select the Assist Project and click "Submit Request". This triggers an automated job to create a secure "Airlock" project for administrative review.' },
-            { content: 'Approval. The Data Manager will review your data via the Airlock link. Once approved, you will be automatically added to the Airlock project to finalize the export.' }
+            { content: 'Prepare your data by browsing to your summary repository (starts with "sum-"). Move your export files into a folder named "summarydata" and compress it into a .zip file.' },
+            { content: 'Select the Assist Project and click "Submit Request". This triggers an automated job to create a secure "Airlock" project for administrative review.' },
+            { content: 'A Data Manager will review your data via the Airlock link. Once approved, you\'ll be automatically added to the Airlock project to finalize the export.' }
         ]
     }
 };
