@@ -1130,7 +1130,8 @@ const TUTORIAL_DATA = {
             { content: 'Click "+ New Import Request" to begin. You\'ll need to provide a descriptive name and select a source project.' },
             { content: 'After submitting, an automated job creates an Import Project and its resources.' },
             { content: 'Once created, your request appears under "Awaiting Submission". Open the Import Project and use the provided command to copy your importdata.zip file into the storage account.' },
-            { content: 'After copying the file, return to the Data Import tab and click "Submit" on your request to start the formal approval process.' }
+            { content: 'After copying the file, return to the Data Import tab and click "Submit" on your request to start the formal approval process.' },
+            { content: 'You can also use "Cancel & Delete" to withdraw your request while it is still "Awaiting Submission".' }
         ]
     },
     'export-tab': {
