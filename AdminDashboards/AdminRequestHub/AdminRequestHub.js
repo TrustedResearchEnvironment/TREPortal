@@ -95,6 +95,7 @@ function getStatusBadgeHtml(status) {
         'failed':           'bg-red-100 text-red-800',
         'working':          'bg-purple-100 text-purple-800',
         'awaiting submission': 'bg-yellow-100 text-yellow-800',
+        'superseded':          'bg-gray-200 text-gray-800',
     };
     const cls = map[(status || '').toLowerCase()] || 'bg-gray-100 text-gray-800';
     return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${status || 'Unknown'}</span>`;
@@ -362,7 +363,8 @@ const TUTORIAL_DATA = {
         steps: [
             { content: 'Review data import requests to ensure only authorized data enters the secure environment.' },
             { content: 'Approving an import request automatically triggers the data transfer job to the user\'s designated project.' },
-            { content: 'If a transfer fails, check the "Finalised" or "Failed" logs for details (where available).' }
+            { content: 'If a transfer fails, check the "Finalised" or "Failed" logs for details (where available).' },
+            { content: 'A researcher can only have one import request in progress at a time per project. If they submit another request while one is pending, the earlier request will be superseded and not processed.' }
         ]
     },
     'admin-export-tab': {
@@ -370,7 +372,8 @@ const TUTORIAL_DATA = {
         steps: [
             { content: 'Once a user submits an export request, a secure "Airlock" project is automatically created, containing an "Export sum-..." resource with the user\'s data.' },
             { content: 'To inspect the files, click the down arrow on the Export resource in the Airlock project and select "Go to URL" to download and review the zipped data.' },
-            { content: 'If the data is compliant and you approve the request, a background job automatically adds the user to the Airlock project to finalize the transfer.' }
+            { content: 'If the data is compliant and you approve the request, a background job automatically adds the user to the Airlock project to finalize the transfer.' },
+            { content: 'A researcher can only have one export request in progress at a time per project. If they submit another request while one is pending, the earlier request will be superseded and not processed.' }
         ]
     }
 };
@@ -696,8 +699,8 @@ function adminAccessSetupListeners() {
 // IMPORT TAB (Admin)  — server-side pagination via GetAllImportRequests
 // =================================================================
 
-const ADMIN_IMPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
-const ADMIN_IMPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2 };
+const ADMIN_IMPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
+const ADMIN_IMPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2, 'Superseded': -3, 'Cancelled': 5 };
 const ADMIN_IMPORT_ROWS_PER_PAGE = 5;
 
 let adminImportCurrentPage   = 1;
@@ -713,6 +716,13 @@ async function adminImportGetCount(status) {
                 window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 1, search: '', statusId: -1 })
             ]);
             return (safeParseJson(r0)?.RowCount || 0) + (safeParseJson(rW)?.RowCount || 0);
+        }
+        if (status === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 1, search: '', statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 1, search: '', statusId: -3 })
+            ]);
+            return (safeParseJson(r3)?.RowCount || 0) + (safeParseJson(r_3)?.RowCount || 0);
         }
         const statusId = ADMIN_IMPORT_STATUS_ID_MAP[status];
         if (statusId === undefined) return 0;
@@ -754,6 +764,23 @@ async function adminImportRenderUI() {
             const start = (adminImportCurrentPage - 1) * ADMIN_IMPORT_ROWS_PER_PAGE;
             adminImportRenderTable(container, combined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
             renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
+        } else if (adminImportCurrentStatus === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: -3 })
+            ]);
+            if (token !== _adminImportFetchToken) return;
+            const p3 = safeParseJson(r3) || {};
+            const p_3 = safeParseJson(r_3) || {};
+            const combined = [...(p3.Results || []), ...(p_3.Results || [])].map(item => ({
+                ...item, _status: ADMIN_IMPORT_STATUS_MAP[item.StatusID] ?? ADMIN_IMPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
+            }));
+            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const total = (p3.RowCount || 0) + (p_3.RowCount || 0);
+            adminImportTotalPages = Math.max(1, Math.ceil(total / ADMIN_IMPORT_ROWS_PER_PAGE));
+            const start = (adminImportCurrentPage - 1) * ADMIN_IMPORT_ROWS_PER_PAGE;
+            adminImportRenderTable(container, combined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
+            renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
         } else {
             const statusId = ADMIN_IMPORT_STATUS_ID_MAP[adminImportCurrentStatus];
             const params   = { page: adminImportCurrentPage, pageSize: ADMIN_IMPORT_ROWS_PER_PAGE, search: searchTerm, statusId };
@@ -782,7 +809,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
     const headers = ['', 'Import Request Name', 'Requested By', 'Project Name', 'Requested On'];
     if (selectedStatus === 'Approved')    { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
-    else if (selectedStatus === 'Finalised')   { headers.push('Finalised On'); }
+    else if (selectedStatus === 'Finalised')   { headers.push('Status'); headers.push('Finalised On'); }
     else if (selectedStatus === 'Awaiting Submission') headers.push('Status');
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
@@ -793,7 +820,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
         switch (selectedStatus) {
             case 'Approved':            extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':            extra = `<td class="${tdCls}">${item.RejectedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised':           extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised':           extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
         }
 
@@ -924,8 +951,8 @@ function adminImportSetupListeners() {
 // EXPORT TAB (Admin)  — server-side pagination via GetAllExportRequests
 // =================================================================
 
-const ADMIN_EXPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
-const ADMIN_EXPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2 };
+const ADMIN_EXPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
+const ADMIN_EXPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2, 'Superseded': -3, 'Cancelled': 5 };
 const ADMIN_EXPORT_ROWS_PER_PAGE = 5;
 
 let adminExportCurrentPage   = 1;
@@ -941,6 +968,13 @@ async function adminExportGetCount(status) {
                 window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 1, search: '', statusId: -1 })
             ]);
             return (safeParseJson(r0)?.RowCount || 0) + (safeParseJson(rW)?.RowCount || 0);
+        }
+        if (status === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 1, search: '', statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 1, search: '', statusId: -3 })
+            ]);
+            return (safeParseJson(r3)?.RowCount || 0) + (safeParseJson(r_3)?.RowCount || 0);
         }
         const statusId = ADMIN_EXPORT_STATUS_ID_MAP[status];
         if (statusId === undefined) return 0;
@@ -982,6 +1016,23 @@ async function adminExportRenderUI() {
             const start = (adminExportCurrentPage - 1) * ADMIN_EXPORT_ROWS_PER_PAGE;
             adminExportRenderTable(container, combined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
             renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
+        } else if (adminExportCurrentStatus === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: -3 })
+            ]);
+            if (token !== _adminExportFetchToken) return;
+            const p3 = safeParseJson(r3) || {};
+            const p_3 = safeParseJson(r_3) || {};
+            const combined = [...(p3.Results || []), ...(p_3.Results || [])].map(item => ({
+                ...item, _status: ADMIN_EXPORT_STATUS_MAP[item.StatusID] ?? ADMIN_EXPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
+            }));
+            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const total = (p3.RowCount || 0) + (p_3.RowCount || 0);
+            adminExportTotalPages = Math.max(1, Math.ceil(total / ADMIN_EXPORT_ROWS_PER_PAGE));
+            const start = (adminExportCurrentPage - 1) * ADMIN_EXPORT_ROWS_PER_PAGE;
+            adminExportRenderTable(container, combined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
+            renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
         } else {
             const statusId = ADMIN_EXPORT_STATUS_ID_MAP[adminExportCurrentStatus];
             const params   = { page: adminExportCurrentPage, pageSize: ADMIN_EXPORT_ROWS_PER_PAGE, search: searchTerm, statusId };
@@ -1010,7 +1061,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
     const headers = ['', 'Export Request Name', 'Requested By', 'Project Name', 'Requested On'];
     if (selectedStatus === 'Approved')    { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
-    else if (selectedStatus === 'Finalised')   { headers.push('Finalised On'); }
+    else if (selectedStatus === 'Finalised')   { headers.push('Status'); headers.push('Finalised On'); }
     else if (selectedStatus === 'Awaiting Submission') headers.push('Status');
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
@@ -1021,7 +1072,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
         switch (selectedStatus) {
             case 'Approved':            extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':            extra = `<td class="${tdCls}">${item.RejectedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised':           extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised':           extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
         }
 
@@ -1101,7 +1152,8 @@ function adminExportRenderTable(container, data, selectedStatus) {
                                 ${d?.RejectedBy       ? `<p><span class="font-medium text-gray-600">Rejected By:</span> <span class="text-gray-500">${d.RejectedBy}</span></p>` : ''}
                                 ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${d.RejectionMessage}</span></p>` : ''}
                             </div>
-                        </div>`;
+                        </div>
+                        ${d?.StatusID === -3 ? `<div class="mt-3 p-2 bg-gray-50 border-start border-4 border-gray-300 text-gray-600 text-xs italic">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });

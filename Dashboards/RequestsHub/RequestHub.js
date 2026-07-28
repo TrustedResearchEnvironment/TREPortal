@@ -80,6 +80,7 @@ function getStatusBadgeHtml(status) {
         'failed': 'bg-red-100 text-red-800',
         'working': 'bg-purple-100 text-purple-800',
         'awaiting submission': 'bg-yellow-100 text-yellow-800',
+        'superseded': 'bg-gray-200 text-gray-800',
     };
     const cls = map[(status || '').toLowerCase()] || 'bg-gray-100 text-gray-800';
     return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${status || 'Unknown'}</span>`;
@@ -129,6 +130,34 @@ function escapeHtml(value) {
  */
 function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
+}
+
+function updateSupersedeWarning(selectEl, warningElId, jobsArray, projectIdKey) {
+    const warningEl = document.getElementById(warningElId);
+    if (!warningEl) return;
+    const projectId = selectEl?.value;
+    if (!projectId) { warningEl.style.display = 'none'; return; }
+
+    // Exclude terminal statuses: -3 Superseded, -2 Failed, 4 Rejected, 5 Cancelled, 3 Finalised
+    const excluded = [-3, -2, 4, 5, 3];
+    const exists = jobsArray.some(job => {
+        // Check all potential keys for project ID to ensure compatibility with different API returns
+        const jobProjIdArray = [
+            job[projectIdKey], 
+            job.LoomeAssistProjectID, 
+            job.AssistProjectID, 
+            job.ImportProjectID, 
+            job.ExportProjectID,
+            job.ProjectID
+        ];
+        
+        const isMatch = jobProjIdArray.some(id => (id !== undefined && id !== null && id !== '') && String(id) === String(projectId));
+        const statusId = parseInt(job.StatusID ?? 0, 10);
+        
+        return isMatch && !excluded.includes(statusId);
+    });
+
+    warningEl.style.display = exists ? 'block' : 'none';
 }
 
 /** Returns true if the string contains any character outside the allowed whitelist. */
@@ -454,7 +483,7 @@ function accessSetupListeners() {
 // IMPORT TAB  (client-side pagination, fetch all at once)
 // =================================================================
 
-const IMPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
+const IMPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
 const IMPORT_ROWS_PER_PAGE = 5;
 
 let importCurrentPage    = 1;
@@ -472,6 +501,7 @@ function importFilterJobs(status) {
     return importAllJobs.filter(job => {
         const s = importGetStatus(job);
         if (status === 'Awaiting Submission') return s === 'Failed' || s === 'Working' || s === 'Awaiting Submission';
+        if (status === 'Finalised')           return s === 'Finalised' || s === 'Superseded';
         return s === status;
     });
 }
@@ -571,7 +601,7 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
     if (selectedStatus === 'Awaiting Submission') headers.push('Status');
     else if (selectedStatus === 'Approved')  { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')  headers.push('Rejected On');
-    else if (selectedStatus === 'Finalised') headers.push('Finalised On');
+    else if (selectedStatus === 'Finalised') { headers.push('Status'); headers.push('Finalised On'); }
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
 
@@ -582,7 +612,7 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
             case 'Approved':  extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':  extra = `<td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised': extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
         const canDelete = item._status === 'Awaiting Submission' || item._status === 'Failed' || item._status === 'Working';
         const canSubmit = item._status === 'Awaiting Submission';
@@ -649,7 +679,8 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
                                 ${d?.RejectedDate     ? `<p><span class="font-medium text-gray-600">Rejected On:</span> <span class="text-gray-500">${formatDate(d.RejectedDate)}</span></p>` : ''}
                                 ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(d.RejectionMessage)}</span></p>` : ''}
                             </div>
-                        </div>`;
+                        </div>
+                        ${d?.StatusID === -3 ? `<div class="mt-3 p-2 bg-gray-50 border-start border-4 border-gray-300 text-gray-600 text-xs italic">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });
@@ -670,9 +701,7 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
                 const res = await window.loomeApi.runApiRequest('SubmitImportRequestForApproval', { 
                     ImportRequestID: parseInt(btn.dataset.id, 10), 
                     statusID: 1, 
-                    ImportProjectID: parseInt(btn.dataset.importProjectId, 10),
-                    LoomeAssistTenantsID: btn.dataset.loomeAssistTenantsId || 0,
-                    LoomeAssistName: btn.dataset.loomeAssistName || ''
+                    ImportProjectID: parseInt(btn.dataset.importProjectId, 10)
                 });
                 const parsed = safeParseJson(res);
                 dismissToast(t);
@@ -727,10 +756,14 @@ function importSetupListeners() {
     // Import modal wiring
     const importModal = document.getElementById('importModal');
 
-    importModal?.addEventListener('show.bs.modal', () => {
+    importModal?.addEventListener('show.bs.modal', async () => {
         const importNameEl  = importModal.querySelector('#import-request-name');
         const importSelEl   = importModal.querySelector('#import-project-select');
         const importSubmBtn = importModal.querySelector('#import-submit-btn');
+        
+        // Refresh jobs on modal open to ensure warning is based on latest data
+        try { await importFetchAllJobs(); } catch (e) { console.error('Failed to refresh import jobs', e); }
+
         if (!importProjectsFetched) importPopulateProjects();
         if (importNameEl) { importNameEl.value = ''; importNameEl.maxLength = 100; attachCharCounter(importNameEl, 100); }
         if (importSelEl)   importSelEl.value = '';
@@ -738,9 +771,19 @@ function importSetupListeners() {
 
         const checkImportForm = () => {
             if (importSubmBtn) importSubmBtn.disabled = !(importNameEl?.value.trim() && importSelEl?.value);
+            updateSupersedeWarning(importSelEl, 'import-supersede-warning', importAllJobs, 'ImportProjectID');
         };
-        if (importNameEl) importNameEl.oninput  = checkImportForm;
-        if (importSelEl)  importSelEl.onchange = checkImportForm;
+        if (importNameEl) {
+            importNameEl.removeEventListener('input', checkImportForm);
+            importNameEl.addEventListener('input', checkImportForm);
+        }
+        if (importSelEl) {
+            importSelEl.removeEventListener('change', checkImportForm);
+            importSelEl.addEventListener('change', checkImportForm);
+        }
+
+        // Initialize state
+        checkImportForm();
     });
 
     importModal?.addEventListener('click', async (e) => {
@@ -756,8 +799,8 @@ function importSetupListeners() {
         const t = showToast('Creating import request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataImportByAssistProjectID', {
-                ImportRequestName:    name,
                 LoomeAssistProjectID: parseInt(opt.value, 10),
+                ImportRequestName:    name,
                 LoomeAssistName:      opt.dataset.name,
                 LoomeAssistTenantsID: opt.dataset.tenantsId
             });
@@ -787,7 +830,7 @@ function importSetupListeners() {
 // EXPORT TAB  (client-side pagination, fetch all at once)
 // =================================================================
 
-const EXPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
+const EXPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
 const EXPORT_ROWS_PER_PAGE = 5;
 
 let exportCurrentPage     = 1;
@@ -805,6 +848,7 @@ function exportFilterJobs(status) {
     return exportAllJobs.filter(job => {
         const s = exportGetStatus(job);
         if (status === 'Awaiting Submission') return s === 'Failed' || s === 'Working' || s === 'Awaiting Submission';
+        if (status === 'Finalised')           return s === 'Finalised' || s === 'Superseded';
         return s === status;
     });
 }
@@ -904,7 +948,7 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
     if (selectedStatus === 'Awaiting Submission') headers.push('Status');
     else if (selectedStatus === 'Approved')  { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')  headers.push('Rejected On');
-    else if (selectedStatus === 'Finalised') headers.push('Finalised On');
+    else if (selectedStatus === 'Finalised') { headers.push('Status'); headers.push('Finalised On'); }
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
 
@@ -915,12 +959,12 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
             case 'Approved':  extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':  extra = `<td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised': extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
         const canDelete = item._status === 'Awaiting Submission' || item._status === 'Failed' || item._status === 'Working';
         const canSubmit = item._status === 'Awaiting Submission';
         const deleteBtn = canDelete ? `<button class="btn btn-danger btn-sm export-delete-btn" style="display:inline-flex;align-items:center;white-space:nowrap" data-id="${item.ExportRequestID}">${SVG_TRASH}Cancel &amp; Delete</button>` : '';
-        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm export-submit-btn ms-2" data-id="${item.ExportRequestID}">Submit</button>` : '';
+        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm export-submit-btn ms-2" data-id="${item.ExportRequestID}" data-export-project-id="${item.ExportProjectID || item.LoomeAssistProjectID || 0}">Submit</button>` : '';
 
         rows += `
         <tr class="table-hover-row export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="export-detail-${item.ExportRequestID}">
@@ -982,7 +1026,8 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
                                 ${d?.RejectedDate     ? `<p><span class="font-medium text-gray-600">Rejected On:</span> <span class="text-gray-500">${formatDate(d.RejectedDate)}</span></p>` : ''}
                                 ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(d.RejectionMessage)}</span></p>` : ''}
                             </div>
-                        </div>`;
+                        </div>
+                        ${d?.StatusID === -3 ? `<div class="mt-3 p-2 bg-gray-50 border-start border-4 border-gray-300 text-gray-600 text-xs italic">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });
@@ -998,7 +1043,11 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
             if (!confirm('Submit this export request for approval?')) return;
             const t = showToast('Submitting…', 'info');
             try {
-                const res    = await window.loomeApi.runApiRequest('UpdateDataExportRequestStatus', { ExportRequestID: parseInt(btn.dataset.id, 10), statusID: 1 });
+                const res    = await window.loomeApi.runApiRequest('UpdateDataExportRequestStatus', { 
+                    ExportRequestID: parseInt(btn.dataset.id, 10), 
+                    statusID: 1,
+                    ExportProjectID: parseInt(btn.dataset.exportProjectId, 10)
+                });
                 const parsed = safeParseJson(res);
                 dismissToast(t);
                 if (parsed?.StatusID === 1 || parsed?.success) {
@@ -1052,10 +1101,14 @@ function exportSetupListeners() {
     // Export modal wiring
     const exportModal = document.getElementById('exportModal');
 
-    exportModal?.addEventListener('show.bs.modal', () => {
+    exportModal?.addEventListener('show.bs.modal', async () => {
         const exportNameEl  = exportModal.querySelector('#export-request-name');
         const exportSelEl   = exportModal.querySelector('#export-project-select');
         const exportSubmBtn = exportModal.querySelector('#export-submit-btn');
+        
+        // Refresh jobs on modal open to ensure warning is based on latest data
+        try { await exportFetchAllJobs(); } catch (e) { console.error('Failed to refresh export jobs', e); }
+
         if (!exportProjectsFetched) exportPopulateProjects();
         if (exportNameEl) { exportNameEl.value = ''; exportNameEl.maxLength = 100; attachCharCounter(exportNameEl, 100); }
         if (exportSelEl)   exportSelEl.value = '';
@@ -1063,9 +1116,19 @@ function exportSetupListeners() {
 
         const checkExportForm = () => {
             if (exportSubmBtn) exportSubmBtn.disabled = !(exportNameEl?.value.trim() && exportSelEl?.value);
+            updateSupersedeWarning(exportSelEl, 'export-supersede-warning', exportAllJobs, 'ExportProjectID');
         };
-        if (exportNameEl) exportNameEl.oninput  = checkExportForm;
-        if (exportSelEl)  exportSelEl.onchange = checkExportForm;
+        if (exportNameEl) {
+            exportNameEl.removeEventListener('input', checkExportForm);
+            exportNameEl.addEventListener('input', checkExportForm);
+        }
+        if (exportSelEl) {
+            exportSelEl.removeEventListener('change', checkExportForm);
+            exportSelEl.addEventListener('change', checkExportForm);
+        }
+
+        // Initialize state
+        checkExportForm();
     });
 
     exportModal?.addEventListener('click', async (e) => {
@@ -1081,8 +1144,8 @@ function exportSetupListeners() {
         const t = showToast('Creating export request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataExportByAssistProjectID', {
-                ExportRequestName:    name,
                 LoomeAssistProjectID: parseInt(opt.value, 10),
+                ExportRequestName:       name,
                 LoomeAssistName:      opt.dataset.name,
                 LoomeAssistTenantsID: opt.dataset.tenantsId
             });
@@ -1131,7 +1194,9 @@ const TUTORIAL_DATA = {
             { content: 'After submitting, an automated job creates an Import Project and its resources.' },
             { content: 'Once created, your request appears under "Awaiting Submission". Open the Import Project and use the provided command to copy your importdata.zip file into the storage account.' },
             { content: 'After copying the file, return to the Data Import tab and click "Submit" on your request to start the formal approval process.' },
-            { content: 'You can also use "Cancel & Delete" to withdraw your request while it is still "Awaiting Submission".' }
+            { content: 'You can also use "Cancel & Delete" to withdraw your request while it is still "Awaiting Submission".' },
+            { content: 'You can only request one import at a time per project. Once your current import is approved, you can submit another request.' },
+            { content: 'If you submit another request when one is already in progress, the earlier request will be superseded and will not be processed. Please wait for your current request to complete before submitting a new one.' }
         ]
     },
     'export-tab': {
@@ -1139,7 +1204,9 @@ const TUTORIAL_DATA = {
         steps: [
             { content: 'Prepare your data by browsing to your summary repository (starts with "sum-"). Move your export files into a folder named "summarydata" and compress it into a .zip file.' },
             { content: 'Select the Assist Project and click "Submit Request". This triggers an automated job to create a secure "Airlock" project for administrative review.' },
-            { content: 'A Data Manager will review your data via the Airlock link. Once approved, you\'ll be automatically added to the Airlock project to finalize the export.' }
+            { content: 'A Data Manager will review your data via the Airlock link. Once approved, you\'ll be automatically added to the Airlock project to finalize the export.' },
+            { content: 'You can only request one export at a time per project. Once your current export is approved, you can submit another request.' },
+            { content: 'If you submit another request when one is already in progress, the earlier request will be superseded and will not be processed. Please wait for your current request to complete before submitting a new one.' }
         ]
     }
 };

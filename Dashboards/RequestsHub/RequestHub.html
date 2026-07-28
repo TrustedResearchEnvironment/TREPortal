@@ -158,6 +158,9 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div id="import-supersede-warning" class="alert alert-warning mb-3 py-2 px-3" style="display:none; font-size: 0.85rem;">
+                    <strong>Note:</strong> A request already exists for this project. Submitting a new one will supersede and overwrite the existing request.
+                </div>
                 <div class="mb-3">
                     <label for="import-request-name" class="form-label fw-medium">Import Request Name <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="import-request-name" aria-required="true" placeholder="Enter a name for this request">
@@ -188,6 +191,9 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div id="export-supersede-warning" class="alert alert-warning mb-3 py-2 px-3" style="display:none; font-size: 0.85rem;">
+                    <strong>Note:</strong> A request already exists for this project. Submitting a new one will supersede and overwrite the existing request.
+                </div>
                 <div class="mb-3">
                     <label for="export-request-name" class="form-label fw-medium">Export Request Name <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="export-request-name" aria-required="true" placeholder="Enter a name for this request">
