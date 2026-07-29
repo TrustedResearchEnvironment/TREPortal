@@ -773,14 +773,8 @@ function importSetupListeners() {
             if (importSubmBtn) importSubmBtn.disabled = !(importNameEl?.value.trim() && importSelEl?.value);
             updateSupersedeWarning(importSelEl, 'import-supersede-warning', importAllJobs, 'ImportProjectID');
         };
-        if (importNameEl) {
-            importNameEl.removeEventListener('input', checkImportForm);
-            importNameEl.addEventListener('input', checkImportForm);
-        }
-        if (importSelEl) {
-            importSelEl.removeEventListener('change', checkImportForm);
-            importSelEl.addEventListener('change', checkImportForm);
-        }
+        if (importNameEl) importNameEl.oninput = checkImportForm;
+        if (importSelEl)  importSelEl.onchange = checkImportForm;
 
         // Initialize state
         checkImportForm();
