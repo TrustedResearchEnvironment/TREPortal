@@ -598,7 +598,7 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     const normalize = arr => Array.from(new Set((arr || []).map(s => String(s || '').trim().toLowerCase())));
     const actualNorm = normalize(actual);
     const expectedNorm = normalize(expected);
-    // console.log('Normalized Actual Columns:', actualNorm);w
+    // console.log('Normalized Actual Columns:', actualNorm);
     // console.log('Normalized Expected Columns:', expectedNorm);
 
     const missing = expectedNorm.filter(x => !actualNorm.includes(x));
