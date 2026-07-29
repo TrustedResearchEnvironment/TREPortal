@@ -1035,7 +1035,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     </svg>
                 </td>
                 <td class="${tdClasses}">${item.RequestID}</td>
-                <td class="${tdClasses}" ${nameStyle} style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name}</td>
+                <td class="${tdClasses}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
                 <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
                 <td class="${tdClasses}">${item.CreateUser}</td>
                 ${statusSpecificCols}

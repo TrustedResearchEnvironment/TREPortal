@@ -340,7 +340,7 @@ function accessRenderTable(container, data, selectedStatus) {
         <tr class="table-hover-row access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${escapeHtml(item.RequestID)}</td>
-            <td class="${tdCls} font-medium" ${nameStyle} style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${escapeHtml(item.Name) || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
@@ -773,8 +773,10 @@ function importSetupListeners() {
             if (importSubmBtn) importSubmBtn.disabled = !(importNameEl?.value.trim() && importSelEl?.value);
             updateSupersedeWarning(importSelEl, 'import-supersede-warning', importAllJobs, 'ImportProjectID');
         };
-        if (importNameEl) importNameEl.oninput = checkImportForm;
-        if (importSelEl)  importSelEl.onchange = checkImportForm;
+        if (importNameEl) importNameEl.oninput = checkImportForm;
+
+        if (importSelEl)  importSelEl.onchange = checkImportForm;
+
 
         // Initialize state
         checkImportForm();
