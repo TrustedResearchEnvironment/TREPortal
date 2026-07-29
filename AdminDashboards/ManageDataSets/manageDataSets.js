@@ -183,17 +183,17 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
     if (dataSetTypeId == 1) { // Database type
 
         rowsHtml = data.map((col, index) => `
-            <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
-                <td>${col.ColumnName || ''}</td>
+            <tr data-id="${escapeHtml(String(col.DataSetColumnID || col.ColumnName || index))}" data-column-name="${escapeHtml(col.ColumnName || '')}">
+                <td>${escapeHtml(col.ColumnName || '')}</td>
                 <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
-                <td class="editable-cell" data-field="LogicalColumnName" data-raw-value="${col.LogicalColumnName || ''}" title="${escapeHtml(col.LogicalColumnName || '')}">
-                    <div class="cell-text-wrap">${col.LogicalColumnName || ''}</div>
+                <td class="editable-cell" data-field="LogicalColumnName" data-raw-value="${escapeHtml(col.LogicalColumnName || '')}" title="${escapeHtml(col.LogicalColumnName || '')}">
+                    <div class="cell-text-wrap">${escapeHtml(col.LogicalColumnName || '')}</div>
                 </td>
-                <td class="editable-cell" data-field="BusinessDescription" data-raw-value="${col.BusinessDescription || ''}" title="${escapeHtml(col.BusinessDescription || '')}">
-                    <div class="cell-text-wrap">${col.BusinessDescription || ''}</div>
+                <td class="editable-cell" data-field="BusinessDescription" data-raw-value="${escapeHtml(col.BusinessDescription || '')}" title="${escapeHtml(col.BusinessDescription || '')}">
+                    <div class="cell-text-wrap">${escapeHtml(col.BusinessDescription || '')}</div>
                 </td>
-                <td class="editable-cell" data-field="ExampleValue" data-raw-value="${col.ExampleValue || ''}" title="${escapeHtml(col.ExampleValue || '')}">
-                    <div class="cell-text-wrap">${col.ExampleValue || ''}</div>
+                <td class="editable-cell" data-field="ExampleValue" data-raw-value="${escapeHtml(col.ExampleValue || '')}" title="${escapeHtml(col.ExampleValue || '')}">
+                    <div class="cell-text-wrap">${escapeHtml(col.ExampleValue || '')}</div>
                 </td>
 
 
@@ -212,12 +212,12 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
         rowsHtml = data.map((row) => {
             // For REDCap, always use ColumnName as the unique id
             return `
-                <tr data-id="${row.ColumnName}" data-column-name="${row.ColumnName}">
-                    <td>${row.ColumnName || ''}</td>
+                <tr data-id="${escapeHtml(row.ColumnName || '')}" data-column-name="${escapeHtml(row.ColumnName || '')}">
+                    <td>${escapeHtml(row.ColumnName || '')}</td>
                     <td>${escapeHtml(getDisplayColumnType(row.ColumnType) || row.ColumnType || '')}</td>
-                    <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.LogicalColumnName || '')}">${row.LogicalColumnName || ''}</td>
-                    <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.BusinessDescription || '')}">${row.BusinessDescription || ''}</td>
-                    <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.ExampleValue || '')}">${row.ExampleValue || ''}</td>
+                    <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-raw-value="${escapeHtml(row.LogicalColumnName || '')}" title="${escapeHtml(row.LogicalColumnName || '')}">${escapeHtml(row.LogicalColumnName || '')}</td>
+                    <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-raw-value="${escapeHtml(row.BusinessDescription || '')}" title="${escapeHtml(row.BusinessDescription || '')}">${escapeHtml(row.BusinessDescription || '')}</td>
+                    <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-raw-value="${escapeHtml(row.ExampleValue || '')}" title="${escapeHtml(row.ExampleValue || '')}">${escapeHtml(row.ExampleValue || '')}</td>
                     <td class="checkbox-cell">
                         <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
                     </td>
@@ -252,10 +252,10 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
 
                 if (index === 0) {
                     rowsHtml += `
-                        <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
-                            <td rowspan="${rowspan}">${folderName}</td>
-                            <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
+                        <tr data-id="${escapeHtml(col.FolderName || '')}-${escapeHtml(col.FileType || '')}" data-folder-name="${escapeHtml(folderName)}">
+                            <td rowspan="${rowspan}">${escapeHtml(folderName)}</td>
+                            <td data-field="FileType">${escapeHtml(fileExtension)}</td>
+                            <td class="editable-cell" data-field="FileDescription" data-raw-value="${escapeHtml(fileDescription)}">${escapeHtml(fileDescription)}</td>
                             <td class="checkbox-cell">
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
@@ -266,9 +266,9 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
                     `;
                 } else {
                     rowsHtml += `
-                        <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
-                            <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
+                        <tr data-id="${escapeHtml(col.FolderName || '')}-${escapeHtml(col.FileType || '')}" data-folder-name="${escapeHtml(folderName)}">
+                            <td data-field="FileType">${escapeHtml(fileExtension)}</td>
+                            <td class="editable-cell" data-field="FileDescription" data-raw-value="${escapeHtml(fileDescription)}">${escapeHtml(fileDescription)}</td>
                             <td class="checkbox-cell">
                                 <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
                             </td>
@@ -287,7 +287,8 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
 }
 
 function escapeHtml(value) {
-    return (value || '')
+    if (value === null || value === undefined) return '';
+    return String(value)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -2652,6 +2653,7 @@ async function renderManageDataSetPage() {
             // Listener for TABLE NAME dropdown
             dataSetFieldsTable.addEventListener('change', async (event) => {
                 if (event.target.id === 'tableNameSelector') {
+                    if (suppressSelectionChange) return; // Skip during Excel import; it would overwrite imported column data (e.g. ExampleValue) with freshly-fetched DB/schema columns.
                     // Always load the FIRST page when the table changes
                     //await updateColumnsForTable(1);
                     console.log("Table Name Selector Changed");
