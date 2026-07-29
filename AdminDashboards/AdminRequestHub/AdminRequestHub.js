@@ -551,7 +551,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
         rows += `
         <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" data-name="${(item.Name || '').replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium" ${nameStyle} style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.CreateUser || 'N/A'}</td>
             ${extra}
