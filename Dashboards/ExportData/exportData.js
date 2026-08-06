@@ -92,6 +92,67 @@ function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
 }
 
+async function getFromAPI(API_ID, initialParams) {
+    let allResults = [];
+
+    try {
+        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        // Early exit if the response is null, undefined, etc.
+        if (!parsedInitial) {
+            console.log("API returned no data.");
+            return [];
+        }
+
+        let allResults = []; // Initialize as an empty array for a clean state
+
+        // --- DETECTION LOGIC ---
+        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
+
+            // --- PAGINATED PATH ---
+            console.log("Detected a paginated response.");
+
+            allResults = parsedInitial.Results;
+            const totalPages = parsedInitial.PageCount;
+
+            if (totalPages > 1) {
+                for (let page = 2; page <= totalPages; page++) {
+                    console.log(`Fetching page ${page} of ${totalPages}...`);
+
+                    // Construct params for the next page, preserving other initial params
+                    const params = { ...initialParams, "page": page };
+                    console.log(params)
+                    const response = await window.loomeApi.runApiRequest(API_ID, params);
+                    const parsed = safeParseJson(response);
+
+                    if (parsed && parsed.Results) {
+                        allResults = allResults.concat(parsed.Results);
+                    }
+
+                } // end for loop
+            }
+
+        } else {
+            // --- NON-PAGINATED PATH ---
+            console.log("Detected a non-paginated response.");
+
+            if (Array.isArray(parsedInitial)) {
+                allResults = parsedInitial;
+            } else {
+                allResults = [parsedInitial];
+            }
+        }
+
+        console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        return allResults;
+
+    } catch (error) {
+        console.error("An error occurred while fetching data source types:", error);
+        return [];
+    }
+}
+
 function formatDate(inputDate) {
     if (!inputDate) return 'N/A';
     const date = new Date(inputDate);
@@ -115,9 +176,10 @@ async function populateAssistProjectsDropdown() {
     dropdown.innerHTML = '<option value="">Loading...</option>';
 
     try {
-        const response = await window.loomeApi.runApiRequest(EXPORT_REQUEST_API_ID, {});
-        const data = safeParseJson(response);
-        const assistProjects = data.Results;
+        const assistProjects = await this.getFromAPI(EXPORT_REQUEST_API_ID, {
+            "page": 1,
+            "page_size": 50
+        });
 
         dropdown.innerHTML = '<option value="">Select source Assist Project...</option>';
 
