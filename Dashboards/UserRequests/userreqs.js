@@ -1042,7 +1042,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                                 let retryIngestionLog = null;
                                 if (selectedStatus === 'Finalised') {
                                     const ingestionResponse = await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { 
-                                        "request_id": item.RequestID 
+                                        "request_id": item.RequestID
                                     });
                                     const retryLogs = safeParseJson(ingestionResponse);
                                     retryIngestionLog = (Array.isArray(retryLogs) && retryLogs.length > 0) ? retryLogs[0] : (retryLogs || null);
