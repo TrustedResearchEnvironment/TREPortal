@@ -190,6 +190,67 @@ function attachCharCounter(inputEl, max) {
     update();
 }
 
+async function getFromAPI(API_ID, initialParams) {
+    let allResults = [];
+
+    try {
+        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        // Early exit if the response is null, undefined, etc.
+        if (!parsedInitial) {
+            // console.log("API returned no data.");
+            return [];
+        }
+
+        let allResults = []; // Initialize as an empty array for a clean state
+
+        // --- DETECTION LOGIC ---
+        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
+
+            // --- PAGINATED PATH ---
+            // console.log("Detected a paginated response.");
+
+            allResults = parsedInitial.Results;
+            const totalPages = parsedInitial.PageCount;
+
+            if (totalPages > 1) {
+                for (let page = 2; page <= totalPages; page++) {
+                    // console.log(`Fetching page ${page} of ${totalPages}...`);
+
+                    // Construct params for the next page, preserving other initial params
+                    const params = { ...initialParams, "page": page, "page_size": initialParams.page_size || 50 };
+                    // console.log(params)
+                    const response = await window.loomeApi.runApiRequest(API_ID, params);
+                    const parsed = safeParseJson(response);
+
+                    if (parsed && parsed.Results) {
+                        allResults = allResults.concat(parsed.Results);
+                    }
+
+                } // end for loop
+            }
+
+        } else {
+            // --- NON-PAGINATED PATH ---
+            // console.log("Detected a non-paginated response.");
+
+            if (Array.isArray(parsedInitial)) {
+                allResults = parsedInitial;
+            } else {
+                allResults = [parsedInitial];
+            }
+        }
+
+        // console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        return allResults;
+
+    } catch (error) {
+        console.error("An error occurred while fetching data source types:", error);
+        return [];
+    }
+}
+
 // =================================================================
 // ACCESS TAB  (server-side pagination via GetRequests API)
 // =================================================================
@@ -207,10 +268,12 @@ let _accessFetchToken   = 0;
 async function accessGetProjectsMapping() {
     if (accessProjectsCache) return accessProjectsCache;
     try {
-        const res  = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', { page: 1, page_size: 200, search: '' });
-        const data = safeParseJson(res);
+        const projects = await getFromAPI('GetAssistProjectsFilteredByUpn', {
+            "page": 1,
+            "page_size": 50
+        });
         const map  = {};
-        (data?.Results || data || []).forEach(p => {
+        (projects || []).forEach(p => {
             map[p.AssistProjectID]        = { name: p.Name, description: p.Description };
             map[String(p.AssistProjectID)] = { name: p.Name, description: p.Description };
         });
@@ -559,9 +622,10 @@ async function importPopulateProjects() {
     select.innerHTML = '<option value="">Loading…</option>';
     select.disabled = true;
     try {
-        const res      = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', {});
-        const data     = safeParseJson(res);
-        const projects = data?.Results || data || [];
+        const projects = await getFromAPI('GetAssistProjectsFilteredByUpn', {
+            "page": 1,
+            "page_size": 50
+        });
         select.innerHTML = '<option value="">Select a project…</option>';
         projects.forEach(p => {
             const o = document.createElement('option');
@@ -902,9 +966,10 @@ async function exportPopulateProjects() {
     select.innerHTML = '<option value="">Loading…</option>';
     select.disabled  = true;
     try {
-        const res      = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', {});
-        const data     = safeParseJson(res);
-        const projects = data?.Results || data || [];
+        const projects = await getFromAPI('GetAssistProjectsFilteredByUpn', {
+            "page": 1,
+            "page_size": 50
+        });
         select.innerHTML = '<option value="">Select a project…</option>';
         projects.forEach(p => {
             const o = document.createElement('option');
