@@ -499,6 +499,94 @@ function normalizeBooleanFlag(value) {
     return Boolean(value);
 }
 
+
+/**
+ * Extracts values from raw Excel cells, preserving original formatting exactly as entered.
+ * Uses cell.w (formatted text) to keep the user's original format (dates, text, etc.).
+ * For dates with 2-digit years, uses the serial number to restore the full 4-digit year.
+ * @param {Object} sheet - The XLSX sheet object
+ * @param {Array} expectedHeader - Expected header column names
+ * @param {number} startRow - Row to start parsing (0-indexed, typically 1 for data after header)
+ * @returns {Array} Array of objects with parsed data preserving original formatting
+ */
+function parseSheetWithFormattedValues(sheet, expectedHeader, startRow) {
+    const result = [];
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    
+    /**
+     * Converts Excel date serial to get the full 4-digit year
+     */
+    function getFullYearFromSerial(serialNum) {
+        if (typeof serialNum !== 'number' || serialNum < 1 || serialNum > 60000) return null;
+        try {
+            const excelEpoch = new Date(1900, 0, 1);
+            const date = new Date(excelEpoch.getTime() + (serialNum - 1) * 24 * 60 * 60 * 1000);
+            return date.getFullYear();
+        } catch (e) {
+            return null;
+        }
+    }
+    
+    /**
+     * If formatted text has a 2-digit year, replace it with the 4-digit year from serial
+     */
+    function restoreFourDigitYear(formattedText, serialNum) {
+        if (!formattedText || typeof formattedText !== 'string') return formattedText;
+        
+        // Match patterns with 2-digit years at the end
+        // Examples: "9/10/98", "09/10/98", "9-10-98", "Sep 10 98", "9 10 98"
+        const hasTwoDigitYearPattern = /[\/\-\s](\d{1,2})$/.test(formattedText);
+        
+        if (hasTwoDigitYearPattern) {
+            const fullYear = getFullYearFromSerial(serialNum);
+            if (fullYear !== null) {
+                // Replace the last 1-2 digit number (the 2-digit year) with full 4-digit year
+                return formattedText.replace(/(\d{1,2})$/, String(fullYear));
+            }
+        }
+        
+        return formattedText;
+    }
+    
+    for (let row = startRow; row <= range.e.r; row++) {
+        const rowObj = {};
+        let hasData = false;
+        
+        for (let col = range.s.c; col < Math.min(range.e.c + 1, expectedHeader.length); col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+            const cell = sheet[cellAddress];
+            const header = expectedHeader[col];
+            
+            if (header) {
+                // Use cell.w (formatted text display) to preserve original formatting
+                let cellValue = '';
+                if (cell) {
+                    cellValue = cell.w ? cell.w : (cell.v !== undefined && cell.v !== null ? String(cell.v) : '');
+                    
+                    // If we have formatted text AND a numeric value (indicates it's likely a date),
+                    // check if the formatted text has a 2-digit year and restore it
+                    if (cell.w && typeof cell.v === 'number' && cell.v > 0) {
+                        cellValue = restoreFourDigitYear(cell.w, cell.v);
+                    }
+                    
+                    if (cellValue) hasData = true;
+                } else {
+                    cellValue = '';
+                }
+                rowObj[header] = cellValue;
+            }
+        }
+        
+        // Only include rows that have at least some data
+        if (hasData) {
+            result.push(rowObj);
+        }
+    }
+    
+    return result;
+}
+
+
 /**
  * Validate that uploaded DataSetColumns exactly match the expected columns.
  * - parsedCols: array of rows from DataSetColumns sheet (objects with ColumnName)
@@ -2321,8 +2409,9 @@ async function renderManageDataSetPage() {
                     }
 
                     // Success - parse and import rows into UI
-                    const parsedCols = XLSX.utils.sheet_to_json(colsSheet, { header: expectedColsHeader, range: 1, defval: '' });
-                    const parsedMeta = XLSX.utils.sheet_to_json(metaSheet, { header: expectedMetaHeader, range: 1, defval: '' });
+                    // Use raw cell data to preserve original formatting (dates, text, etc.)
+                    const parsedCols = parseSheetWithFormattedValues(colsSheet, expectedColsHeader, 1);
+                    const parsedMeta = parseSheetWithFormattedValues(metaSheet, expectedMetaHeader, 1);
 
                     // Enforce exactly one metadata row
                     if (!Array.isArray(parsedMeta) || parsedMeta.length !== 1) {
@@ -2338,7 +2427,21 @@ async function renderManageDataSetPage() {
                     if (!validation.valid) {
                         console.warn('Upload validation failed:', validation);
                         // show detailed feedback to the user
-                        showToast(validation.message || 'Column validation failed.', 'error');
+                        // Handle both string messages and arrays of error objects
+                        let errorMessage = 'Column validation failed.';
+                        if (validation.message) {
+                            if (Array.isArray(validation.message)) {
+                                // Convert array of errors to readable list
+                                errorMessage = validation.message
+                                    .map(err => typeof err === 'string' ? err : (err.message || JSON.stringify(err)))
+                                    .join('; ');
+                            } else if (typeof validation.message === 'object') {
+                                errorMessage = JSON.stringify(validation.message);
+                            } else {
+                                errorMessage = String(validation.message);
+                            }
+                        }
+                        showToast(errorMessage, 'error');
                         // Optionally surface missing/extra in console or UI
                         // console.log('Column validation details:', validation);
                         hideColumnsLoader();
@@ -2353,7 +2456,7 @@ async function renderManageDataSetPage() {
                         ColumnType: r.ColumnType || '',
                         LogicalColumnName: r.LogicalColumnName || '',
                         BusinessDescription: r.BusinessDescription || '',
-                        ExampleValue: r.ExampleValue || '',
+                        ExampleValue: String(r.ExampleValue || '').trim(),
                         Deidentify: normalizeBooleanFlag(r.Deidentify),
                         TokenIdentifierType: Number(r.TokenIdentifierType) || 0,
                         Redact: normalizeBooleanFlag(r.Redact),
