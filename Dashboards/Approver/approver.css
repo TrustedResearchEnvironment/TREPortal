@@ -848,3 +848,72 @@ tbody td {
     padding: 12px 16px;
     border-top: 1px solid #e5e7eb;
 }
+
+
+/* Container & CSS Reset Basics */
+.details-card {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    color: #1e293b;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Responsive Grid */
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+/* Group & Field Layout */
+.details-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.field-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+}
+
+.field-value {
+    font-size: 15px;
+    color: #0f172a;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+/* Alert / Deletion Banner */
+.alert-deleted {
+    margin-top: 6px;
+    padding: 8px 12px;
+    background-color: #fef2f2;
+    border-left: 3px solid #ef4444;
+    border-radius: 4px;
+    color: #991b1b;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Optional Divider */
+.details-divider {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 24px 0;
+}

@@ -80,6 +80,7 @@ function getStatusBadgeHtml(status) {
         'failed': 'bg-red-100 text-red-800',
         'working': 'bg-purple-100 text-purple-800',
         'awaiting submission': 'bg-yellow-100 text-yellow-800',
+        'superseded': 'bg-gray-200 text-gray-800',
     };
     const cls = map[(status || '').toLowerCase()] || 'bg-gray-100 text-gray-800';
     return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${status || 'Unknown'}</span>`;
@@ -131,6 +132,34 @@ function sanitizeInput(value) {
     return (value || '').replace(/[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/g, '');
 }
 
+function updateSupersedeWarning(selectEl, warningElId, jobsArray, projectIdKey) {
+    const warningEl = document.getElementById(warningElId);
+    if (!warningEl) return;
+    const projectId = selectEl?.value;
+    if (!projectId) { warningEl.style.display = 'none'; return; }
+
+    // Exclude terminal statuses: -3 Superseded, -2 Failed, 4 Rejected, 5 Cancelled, 3 Finalised
+    const excluded = [-3, -2, 4, 5, 3];
+    const exists = jobsArray.some(job => {
+        // Check all potential keys for project ID to ensure compatibility with different API returns
+        const jobProjIdArray = [
+            job[projectIdKey], 
+            job.LoomeAssistProjectID, 
+            job.AssistProjectID, 
+            job.ImportProjectID, 
+            job.ExportProjectID,
+            job.ProjectID
+        ];
+        
+        const isMatch = jobProjIdArray.some(id => (id !== undefined && id !== null && id !== '') && String(id) === String(projectId));
+        const statusId = parseInt(job.StatusID ?? 0, 10);
+        
+        return isMatch && !excluded.includes(statusId);
+    });
+
+    warningEl.style.display = exists ? 'block' : 'none';
+}
+
 /** Returns true if the string contains any character outside the allowed whitelist. */
 function containsInvalidChars(value) {
     return /[^a-zA-Z0-9 \-_,.'()!?:\n\r\t]/.test(value || '');
@@ -161,6 +190,67 @@ function attachCharCounter(inputEl, max) {
     update();
 }
 
+async function getFromAPI(API_ID, initialParams) {
+    let allResults = [];
+
+    try {
+        const initialResponse = await window.loomeApi.runApiRequest(API_ID, initialParams);
+        const parsedInitial = safeParseJson(initialResponse);
+
+        // Early exit if the response is null, undefined, etc.
+        if (!parsedInitial) {
+            // console.log("API returned no data.");
+            return [];
+        }
+
+        let allResults = []; // Initialize as an empty array for a clean state
+
+        // --- DETECTION LOGIC ---
+        if (parsedInitial.PageCount !== undefined && Array.isArray(parsedInitial.Results)) {
+
+            // --- PAGINATED PATH ---
+            // console.log("Detected a paginated response.");
+
+            allResults = parsedInitial.Results;
+            const totalPages = parsedInitial.PageCount;
+
+            if (totalPages > 1) {
+                for (let page = 2; page <= totalPages; page++) {
+                    // console.log(`Fetching page ${page} of ${totalPages}...`);
+
+                    // Construct params for the next page, preserving other initial params
+                    const params = { ...initialParams, "page": page, "page_size": initialParams.page_size || 50 };
+                    // console.log(params)
+                    const response = await window.loomeApi.runApiRequest(API_ID, params);
+                    const parsed = safeParseJson(response);
+
+                    if (parsed && parsed.Results) {
+                        allResults = allResults.concat(parsed.Results);
+                    }
+
+                } // end for loop
+            }
+
+        } else {
+            // --- NON-PAGINATED PATH ---
+            // console.log("Detected a non-paginated response.");
+
+            if (Array.isArray(parsedInitial)) {
+                allResults = parsedInitial;
+            } else {
+                allResults = [parsedInitial];
+            }
+        }
+
+        // console.log(`Finished fetching for API ID ${API_ID}. Total items: ${allResults.length}`);
+        return allResults;
+
+    } catch (error) {
+        console.error("An error occurred while fetching data source types:", error);
+        return [];
+    }
+}
+
 // =================================================================
 // ACCESS TAB  (server-side pagination via GetRequests API)
 // =================================================================
@@ -178,12 +268,14 @@ let _accessFetchToken   = 0;
 async function accessGetProjectsMapping() {
     if (accessProjectsCache) return accessProjectsCache;
     try {
-        const res  = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', { page: 1, page_size: 200, search: '' });
-        const data = safeParseJson(res);
+        const projects = await getFromAPI('GetAssistProjectsFilteredByUpn', {
+            "page": 1,
+            "page_size": 50
+        });
         const map  = {};
-        (data?.Results || data || []).forEach(p => {
-            map[p.AssistProjectID]        = { name: p.Name, description: p.Description };
-            map[String(p.AssistProjectID)] = { name: p.Name, description: p.Description };
+        (projects || []).forEach(p => {
+            map[p.AssistProjectID]        = { name: p.Name, description: p.Description, DeletedDate: p.DeletedDate };
+            map[String(p.AssistProjectID)] = { name: p.Name, description: p.Description, DeletedDate: p.DeletedDate };
         });
         accessProjectsCache = map;
         return map;
@@ -248,8 +340,23 @@ async function accessRenderUI() {
         const res      = await window.loomeApi.runApiRequest('GetRequests', params);
         if (token !== _accessFetchToken) return;
         const parsed   = safeParseJson(res);
-        const data     = (parsed?.Results || []).map(item => ({ ...item, _status: ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
+        let data       = (parsed?.Results || []).map(item => ({ ...item, _status: ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
         const total    = parsed?.RowCount || 0;
+
+        if (accessCurrentStatus === 'Finalised') {
+            const logsPromises = data.map(item =>
+                window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID })
+                    .then(safeParseJson)
+                    .catch(() => null)
+            );
+            const logsResults = await Promise.all(logsPromises);
+            data = data.map((item, idx) => {
+                const logs = logsResults[idx];
+                const hasError = Array.isArray(logs) && logs.length > 0 && !!logs[0].ErrorDescription;
+                return { ...item, IngestionError: hasError, _log: (Array.isArray(logs) && logs.length > 0) ? logs[0] : null };
+            });
+        }
+
         accessTotalPages = Math.max(1, Math.ceil(total / ACCESS_ROWS_PER_PAGE));
         accessRenderTable(container, data, accessCurrentStatus);
         renderPaginationHtml('access-pagination', total, ACCESS_ROWS_PER_PAGE, accessCurrentPage);
@@ -266,6 +373,7 @@ function accessRenderTable(container, data, selectedStatus) {
         container.innerHTML = buildEmptyState('No requests found for this status.');
         return;
     }
+
     const tdCls = 'px-6 py-4 text-sm text-gray-700';
     const headers = ['', 'Request ID', 'Request Name', 'Requested On'];
     if (selectedStatus === 'Pending Approval') headers.push('Approvers');
@@ -284,6 +392,9 @@ function accessRenderTable(container, data, selectedStatus) {
             case 'Rejected':         extra = `<td class="${tdCls}">${escapeHtml(item.RejectedBy) || 'N/A'}</td><td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
             case 'Finalised':        extra = `<td class="${tdCls}">${escapeHtml(item.CurrentlyApproved) || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
+
+        const nameStyle = (selectedStatus === 'Finalised' && item.IngestionError) ? 'style="color:#dc3545"' : '';
+
         const deleteBtn = selectedStatus === 'Pending Approval'
             ? `<button class="btn btn-danger btn-sm access-delete-btn" style="display:inline-flex;align-items:center;white-space:nowrap" data-id="${item.RequestID}" data-name="${escapeHtml(item.Name || '')}">${SVG_TRASH}Cancel &amp; Delete</button>`
             : '';
@@ -292,16 +403,18 @@ function accessRenderTable(container, data, selectedStatus) {
         <tr class="table-hover-row access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
             <td class="${tdCls}">${escapeHtml(item.RequestID)}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${escapeHtml(item.Name) || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
         <tr class="access-detail-row hidden" id="access-detail-${item.RequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="d-flex justify-content-end mb-2">${deleteBtn}</div>
-                    <div class="bg-white rounded p-3 shadow-sm access-detail-content">
-                        <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                    <div class="accordion-card">
+                        <div class="access-detail-content">
+                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                        </div>
+                        ${deleteBtn ? `<div class="accordion-actions">${deleteBtn}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -333,29 +446,63 @@ function accessRenderTable(container, data, selectedStatus) {
                 loaded = true;
                 const content = detailRow.querySelector('.access-detail-content');
                 try {
-                    const [reqRes, projectsMap] = await Promise.all([
+                    const rowData = data.find(d => String(d.RequestID) === String(row.dataset.id));
+                    const promises = [
                         window.loomeApi.runApiRequest('GetRequestID', { RequestID: row.dataset.id }).then(safeParseJson),
                         accessGetProjectsMapping()
-                    ]);
+                    ];
+                    
+                    // Reuse the log if we already fetched it during RenderUI
+                    const [reqRes, projectsMap] = await Promise.all(promises);
+                    let log = rowData?._log;
+
+                    // Fallback
+                    if (selectedStatus === 'Finalised' && !log) {
+                        const logs = safeParseJson(await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: row.dataset.id }));
+                        log = (Array.isArray(logs) && logs.length > 0) ? logs[0] : null;
+                    }
+
                     const dsRes = row.dataset.datasetId
                         ? safeParseJson(await window.loomeApi.runApiRequest('GetDataSetID', { DataSetID: row.dataset.datasetId }))
                         : null;
                     const proj = reqRes?.ProjectID
                         ? (projectsMap[reqRes.ProjectID] || projectsMap[String(reqRes.ProjectID)] || { name: 'Unknown Project' })
                         : { name: 'N/A' };
+                    
+                    let ingestionHtml = '';
+                    if (log && log.ErrorDescription) {
+                        ingestionHtml = `
+                            <div class="mt-3 px-3 py-2 bg-red-50 border-l-4 border-red-500 rounded text-sm">
+                                <div class="flex items-center gap-2 text-red-700 font-medium">
+                                    <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.163c.75 1.334-.213 2.98-1.743 2.98H3.72c-1.53 0-2.492-1.646-1.743-2.98L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>Ingestion Error — contact a data administrator</span>
+                                </div>
+                                <code class="block mt-2 bg-white/60 border border-red-200 rounded px-2 py-1 text-xs text-red-800 overflow-auto" style="max-height:100px; white-space:pre-wrap;">${escapeHtml(log.ErrorDescription)}</code>
+                            </div>`;
+                    }
+
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                ${dsRes ? `<p><span class="font-medium text-gray-600">Dataset:</span> <span class="text-gray-500">${escapeHtml(dsRes.Name) || 'N/A'}</span></p>
-                                           <p><span class="font-medium text-gray-600">Description:</span> <span class="text-gray-500">${escapeHtml(dsRes.Description) || 'N/A'}</span></p>` : ''}
-                                <p><span class="font-medium text-gray-600">Target Project:</span> <span class="text-gray-500">${escapeHtml(proj.name)}</span></p>
-                                ${reqRes?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${escapeHtml(reqRes.Purpose)}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    ${dsRes ? `<div class="field-group"><span class="field-label">Dataset</span><span class="field-value">${escapeHtml(dsRes.Name) || 'N/A'}</span></div>
+                                    <div class="field-group"><span class="field-label">Description</span><span class="field-value">${escapeHtml(dsRes.Description) || 'N/A'}</span></div>` : ''}
+                                    <div class="field-group">
+                                        <span class="field-label">Target Project Name</span>
+                                        <span class="field-value">${escapeHtml(proj.name)}</span>
+                                        ${proj.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(proj.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    </div>
+                                    ${reqRes?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(reqRes.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${reqRes?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(reqRes.ApprovalMessage)}</span></div>` : ''}
+                                    ${reqRes?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(reqRes.RejectionMessage)}</span></div>` : ''}
+                                    ${reqRes?.FinalisedBy ? `<div class="field-group"><span class="field-label">Finalised By</span><span class="field-value">${escapeHtml(reqRes.FinalisedBy)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${reqRes?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${escapeHtml(reqRes.ApprovalMessage)}</span></p>` : ''}
-                                ${reqRes?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(reqRes.RejectionMessage)}</span></p>` : ''}
-                                ${reqRes?.FinalisedBy      ? `<p><span class="font-medium text-gray-600">Finalised By:</span> <span class="text-gray-500">${escapeHtml(reqRes.FinalisedBy)}</span></p>` : ''}
-                            </div>
+                            ${ingestionHtml ? `<hr class="details-divider"><div>${ingestionHtml}</div>` : ''}
                         </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
@@ -407,7 +554,7 @@ function accessSetupListeners() {
 // IMPORT TAB  (client-side pagination, fetch all at once)
 // =================================================================
 
-const IMPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
+const IMPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
 const IMPORT_ROWS_PER_PAGE = 5;
 
 let importCurrentPage    = 1;
@@ -425,6 +572,7 @@ function importFilterJobs(status) {
     return importAllJobs.filter(job => {
         const s = importGetStatus(job);
         if (status === 'Awaiting Submission') return s === 'Failed' || s === 'Working' || s === 'Awaiting Submission';
+        if (status === 'Finalised')           return s === 'Finalised' || s === 'Superseded';
         return s === status;
     });
 }
@@ -439,11 +587,27 @@ async function importFetchAllJobs() {
     try {
         const r1   = await window.loomeApi.runApiRequest('GetDataImportFromDBbyUpn', { page: 1, pageSize: 1, search: '' });
         const d1   = safeParseJson(r1);
+        
+        // Handle cases where API returns an array directly
+        if (Array.isArray(d1)) {
+            importAllJobs = d1.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+            return;
+        }
+
         const total = d1?.RowCount || 0;
-        if (!total) { importAllJobs = []; return; }
+        if (!total) {
+            // Check if results are present even if RowCount is missing
+            if (d1?.Results && Array.isArray(d1.Results)) {
+                importAllJobs = d1.Results.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+                return;
+            }
+            importAllJobs = []; 
+            return; 
+        }
+
         const r2   = await window.loomeApi.runApiRequest('GetDataImportFromDBbyUpn', { page: 1, pageSize: total, search: '' });
         const d2   = safeParseJson(r2);
-        importAllJobs = (d2?.Results || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+        importAllJobs = (d2?.Results || d2 || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
     } catch (e) { importAllJobs = []; }
 }
 
@@ -466,9 +630,10 @@ async function importPopulateProjects() {
     select.innerHTML = '<option value="">Loading…</option>';
     select.disabled = true;
     try {
-        const res      = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', {});
-        const data     = safeParseJson(res);
-        const projects = data?.Results || data || [];
+        const projects = await getFromAPI('GetAssistProjectsFilteredByUpn', {
+            "page": 1,
+            "page_size": 50
+        });
         select.innerHTML = '<option value="">Select a project…</option>';
         projects.forEach(p => {
             const o = document.createElement('option');
@@ -508,7 +673,7 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
     if (selectedStatus === 'Awaiting Submission') headers.push('Status');
     else if (selectedStatus === 'Approved')  { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')  headers.push('Rejected On');
-    else if (selectedStatus === 'Finalised') headers.push('Finalised On');
+    else if (selectedStatus === 'Finalised') { headers.push('Status'); headers.push('Finalised On'); }
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
 
@@ -519,12 +684,12 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
             case 'Approved':  extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':  extra = `<td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised': extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
         const canDelete = item._status === 'Awaiting Submission' || item._status === 'Failed' || item._status === 'Working';
         const canSubmit = item._status === 'Awaiting Submission';
         const deleteBtn = canDelete ? `<button class="btn btn-danger btn-sm import-delete-btn" style="display:inline-flex;align-items:center;white-space:nowrap" data-id="${item.ImportRequestID}">${SVG_TRASH}Cancel &amp; Delete</button>` : '';
-        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm import-submit-btn ms-2" data-id="${item.ImportRequestID}">Submit</button>` : '';
+        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm import-submit-btn ms-2" data-id="${item.ImportRequestID}" data-import-project-id="${item.ImportProjectID || 0}">Submit</button>` : '';
 
         rows += `
         <tr class="table-hover-row import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="import-detail-${item.ImportRequestID}">
@@ -537,9 +702,11 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         <tr class="import-detail-row hidden" id="import-detail-${item.ImportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="d-flex justify-content-end mb-2">${deleteBtn}${submitBtn}</div>
-                    <div class="bg-white rounded p-3 shadow-sm import-detail-content">
-                        <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                    <div class="accordion-card">
+                        <div class="import-detail-content">
+                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                        </div>
+                        ${deleteBtn || submitBtn ? `<div class="accordion-actions">${deleteBtn}${submitBtn}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -572,20 +739,24 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
                 try {
                     const d = safeParseJson(await window.loomeApi.runApiRequest('GetImportRequestByID', { RequestID: row.dataset.id }));
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Import Request ID:</span> <span class="text-gray-500">${escapeHtml(d?.ImportRequestID) || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${escapeHtml(d?.ProjectName) || 'N/A'}</span></p>
-                                ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${escapeHtml(d.Purpose)}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    <div class="field-group"><span class="field-label">Import Request ID</span><span class="field-value">${escapeHtml(d?.ImportRequestID) || 'N/A'}</span></div>
+                                    <div class="field-group"><span class="field-label">Project Name</span><span class="field-value">${escapeHtml(d?.ProjectName) || 'N/A'}</span></div>
+                                    ${d?.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(d.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    ${d?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(d.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${d?.ApprovedBy ? `<div class="field-group"><span class="field-label">Approved By</span><span class="field-value">${escapeHtml(d.ApprovedBy)}</span></div>` : ''}
+                                    ${d?.ApprovedDate ? `<div class="field-group"><span class="field-label">Approved On</span><span class="field-value">${formatDate(d.ApprovedDate)}</span></div>` : ''}
+                                    ${d?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(d.ApprovalMessage)}</span></div>` : ''}
+                                    ${d?.RejectedBy ? `<div class="field-group"><span class="field-label">Rejected By</span><span class="field-value">${escapeHtml(d.RejectedBy)}</span></div>` : ''}
+                                    ${d?.RejectedDate ? `<div class="field-group"><span class="field-label">Rejected On</span><span class="field-value">${formatDate(d.RejectedDate)}</span></div>` : ''}
+                                    ${d?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(d.RejectionMessage)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${d?.ApprovedBy       ? `<p><span class="font-medium text-gray-600">Approved By:</span> <span class="text-gray-500">${escapeHtml(d.ApprovedBy)}</span></p>` : ''}
-                                ${d?.ApprovedDate     ? `<p><span class="font-medium text-gray-600">Approved On:</span> <span class="text-gray-500">${formatDate(d.ApprovedDate)}</span></p>` : ''}
-                                ${d?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${escapeHtml(d.ApprovalMessage)}</span></p>` : ''}
-                                ${d?.RejectedBy       ? `<p><span class="font-medium text-gray-600">Rejected By:</span> <span class="text-gray-500">${escapeHtml(d.RejectedBy)}</span></p>` : ''}
-                                ${d?.RejectedDate     ? `<p><span class="font-medium text-gray-600">Rejected On:</span> <span class="text-gray-500">${formatDate(d.RejectedDate)}</span></p>` : ''}
-                                ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(d.RejectionMessage)}</span></p>` : ''}
-                            </div>
+                            ${d?.StatusID === -3 ? `<div class="alert-deleted">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}
                         </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
@@ -596,13 +767,19 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         btn.addEventListener('click', e => { e.stopPropagation(); importDeleteJob(btn.dataset.id); });
     });
 
+    // Dashboards/RequestsHub/RequestHub.js L649
     container.querySelectorAll('.import-submit-btn').forEach(btn => {
         btn.addEventListener('click', async e => {
             e.stopPropagation();
             if (!confirm('Submit this import request for approval?')) return;
             const t = showToast('Submitting…', 'info');
             try {
-                const res    = await window.loomeApi.runApiRequest('UpdateDataImportRequestStatus', { ImportRequestID: parseInt(btn.dataset.id, 10), statusID: 1 });
+                // Updated to use btn.dataset.importProjectId
+                const res = await window.loomeApi.runApiRequest('SubmitImportRequestForApproval', { 
+                    ImportRequestID: parseInt(btn.dataset.id, 10), 
+                    statusID: 1, 
+                    ImportProjectID: parseInt(btn.dataset.importProjectId, 10)
+                });
                 const parsed = safeParseJson(res);
                 dismissToast(t);
                 if (parsed?.StatusID === 1 || parsed?.success) {
@@ -656,10 +833,14 @@ function importSetupListeners() {
     // Import modal wiring
     const importModal = document.getElementById('importModal');
 
-    importModal?.addEventListener('show.bs.modal', () => {
+    importModal?.addEventListener('show.bs.modal', async () => {
         const importNameEl  = importModal.querySelector('#import-request-name');
         const importSelEl   = importModal.querySelector('#import-project-select');
         const importSubmBtn = importModal.querySelector('#import-submit-btn');
+        
+        // Refresh jobs on modal open to ensure warning is based on latest data
+        try { await importFetchAllJobs(); } catch (e) { console.error('Failed to refresh import jobs', e); }
+
         if (!importProjectsFetched) importPopulateProjects();
         if (importNameEl) { importNameEl.value = ''; importNameEl.maxLength = 100; attachCharCounter(importNameEl, 100); }
         if (importSelEl)   importSelEl.value = '';
@@ -667,9 +848,15 @@ function importSetupListeners() {
 
         const checkImportForm = () => {
             if (importSubmBtn) importSubmBtn.disabled = !(importNameEl?.value.trim() && importSelEl?.value);
+            updateSupersedeWarning(importSelEl, 'import-supersede-warning', importAllJobs, 'ImportProjectID');
         };
-        if (importNameEl) importNameEl.oninput  = checkImportForm;
+        if (importNameEl) importNameEl.oninput = checkImportForm;
+
         if (importSelEl)  importSelEl.onchange = checkImportForm;
+
+
+        // Initialize state
+        checkImportForm();
     });
 
     importModal?.addEventListener('click', async (e) => {
@@ -685,8 +872,8 @@ function importSetupListeners() {
         const t = showToast('Creating import request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataImportByAssistProjectID', {
-                ImportRequestName:    name,
                 LoomeAssistProjectID: parseInt(opt.value, 10),
+                ImportRequestName:    name,
                 LoomeAssistName:      opt.dataset.name,
                 LoomeAssistTenantsID: opt.dataset.tenantsId
             });
@@ -716,7 +903,7 @@ function importSetupListeners() {
 // EXPORT TAB  (client-side pagination, fetch all at once)
 // =================================================================
 
-const EXPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
+const EXPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
 const EXPORT_ROWS_PER_PAGE = 5;
 
 let exportCurrentPage     = 1;
@@ -734,6 +921,7 @@ function exportFilterJobs(status) {
     return exportAllJobs.filter(job => {
         const s = exportGetStatus(job);
         if (status === 'Awaiting Submission') return s === 'Failed' || s === 'Working' || s === 'Awaiting Submission';
+        if (status === 'Finalised')           return s === 'Finalised' || s === 'Superseded';
         return s === status;
     });
 }
@@ -748,11 +936,27 @@ async function exportFetchAllJobs() {
     try {
         const r1    = await window.loomeApi.runApiRequest('GetDataExportFromDBbyUpn', { page: 1, pageSize: 1, search: '' });
         const d1    = safeParseJson(r1);
+
+        // Handle cases where API returns an array directly
+        if (Array.isArray(d1)) {
+            exportAllJobs = d1.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+            return;
+        }
+
         const total = d1?.RowCount || 0;
-        if (!total) { exportAllJobs = []; return; }
+        if (!total) {
+            // Check if results are present even if RowCount is missing
+            if (d1?.Results && Array.isArray(d1.Results)) {
+                exportAllJobs = d1.Results.sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+                return;
+            }
+            exportAllJobs = []; 
+            return; 
+        }
+
         const r2 = await window.loomeApi.runApiRequest('GetDataExportFromDBbyUpn', { page: 1, pageSize: total, search: '' });
         const d2 = safeParseJson(r2);
-        exportAllJobs = (d2?.Results || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
+        exportAllJobs = (d2?.Results || d2 || []).sort((a, b) => new Date(b.CreateDate || 0) - new Date(a.CreateDate || 0));
     } catch (e) { exportAllJobs = []; }
 }
 
@@ -775,9 +979,10 @@ async function exportPopulateProjects() {
     select.innerHTML = '<option value="">Loading…</option>';
     select.disabled  = true;
     try {
-        const res      = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', {});
-        const data     = safeParseJson(res);
-        const projects = data?.Results || data || [];
+        const projects = await getFromAPI('GetAssistProjectsFilteredByUpn', {
+            "page": 1,
+            "page_size": 50
+        });
         select.innerHTML = '<option value="">Select a project…</option>';
         projects.forEach(p => {
             const o = document.createElement('option');
@@ -817,7 +1022,7 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
     if (selectedStatus === 'Awaiting Submission') headers.push('Status');
     else if (selectedStatus === 'Approved')  { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')  headers.push('Rejected On');
-    else if (selectedStatus === 'Finalised') headers.push('Finalised On');
+    else if (selectedStatus === 'Finalised') { headers.push('Status'); headers.push('Finalised On'); }
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
 
@@ -828,12 +1033,12 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
             case 'Approved':  extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':  extra = `<td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised': extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
         const canDelete = item._status === 'Awaiting Submission' || item._status === 'Failed' || item._status === 'Working';
         const canSubmit = item._status === 'Awaiting Submission';
         const deleteBtn = canDelete ? `<button class="btn btn-danger btn-sm export-delete-btn" style="display:inline-flex;align-items:center;white-space:nowrap" data-id="${item.ExportRequestID}">${SVG_TRASH}Cancel &amp; Delete</button>` : '';
-        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm export-submit-btn ms-2" data-id="${item.ExportRequestID}">Submit</button>` : '';
+        const submitBtn = canSubmit ? `<button class="btn btn-outline-primary btn-sm export-submit-btn ms-2" data-id="${item.ExportRequestID}" data-export-project-id="${item.ExportProjectID || item.LoomeAssistProjectID || 0}">Submit</button>` : '';
 
         rows += `
         <tr class="table-hover-row export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="export-detail-${item.ExportRequestID}">
@@ -846,9 +1051,11 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
         <tr class="export-detail-row hidden" id="export-detail-${item.ExportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="d-flex justify-content-end mb-2">${deleteBtn}${submitBtn}</div>
-                    <div class="bg-white rounded p-3 shadow-sm export-detail-content">
-                        <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                    <div class="accordion-card">
+                        <div class="export-detail-content">
+                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                        </div>
+                        ${deleteBtn || submitBtn ? `<div class="accordion-actions">${deleteBtn}${submitBtn}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -881,20 +1088,24 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
                 try {
                     const d = safeParseJson(await window.loomeApi.runApiRequest('GetExportRequestByID', { ExportRequestID: parseInt(row.dataset.id, 10) }));
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Export Request ID:</span> <span class="text-gray-500">${escapeHtml(d?.ExportRequestID) || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${escapeHtml(d?.ProjectName) || 'N/A'}</span></p>
-                                ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${escapeHtml(d.Purpose)}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    <div class="field-group"><span class="field-label">Export Request ID</span><span class="field-value">${escapeHtml(d?.ExportRequestID) || 'N/A'}</span></div>
+                                    <div class="field-group"><span class="field-label">Project Name</span><span class="field-value">${escapeHtml(d?.ProjectName) || 'N/A'}</span></div>
+                                    ${d?.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(d.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    ${d?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(d.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${d?.ApprovedBy ? `<div class="field-group"><span class="field-label">Approved By</span><span class="field-value">${escapeHtml(d.ApprovedBy)}</span></div>` : ''}
+                                    ${d?.ApprovedDate ? `<div class="field-group"><span class="field-label">Approved On</span><span class="field-value">${formatDate(d.ApprovedDate)}</span></div>` : ''}
+                                    ${d?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(d.ApprovalMessage)}</span></div>` : ''}
+                                    ${d?.RejectedBy ? `<div class="field-group"><span class="field-label">Rejected By</span><span class="field-value">${escapeHtml(d.RejectedBy)}</span></div>` : ''}
+                                    ${d?.RejectedDate ? `<div class="field-group"><span class="field-label">Rejected On</span><span class="field-value">${formatDate(d.RejectedDate)}</span></div>` : ''}
+                                    ${d?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(d.RejectionMessage)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${d?.ApprovedBy       ? `<p><span class="font-medium text-gray-600">Approved By:</span> <span class="text-gray-500">${escapeHtml(d.ApprovedBy)}</span></p>` : ''}
-                                ${d?.ApprovedDate     ? `<p><span class="font-medium text-gray-600">Approved On:</span> <span class="text-gray-500">${formatDate(d.ApprovedDate)}</span></p>` : ''}
-                                ${d?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${escapeHtml(d.ApprovalMessage)}</span></p>` : ''}
-                                ${d?.RejectedBy       ? `<p><span class="font-medium text-gray-600">Rejected By:</span> <span class="text-gray-500">${escapeHtml(d.RejectedBy)}</span></p>` : ''}
-                                ${d?.RejectedDate     ? `<p><span class="font-medium text-gray-600">Rejected On:</span> <span class="text-gray-500">${formatDate(d.RejectedDate)}</span></p>` : ''}
-                                ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(d.RejectionMessage)}</span></p>` : ''}
-                            </div>
+                            ${d?.StatusID === -3 ? `<div class="alert-deleted">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}
                         </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
@@ -911,7 +1122,11 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
             if (!confirm('Submit this export request for approval?')) return;
             const t = showToast('Submitting…', 'info');
             try {
-                const res    = await window.loomeApi.runApiRequest('UpdateDataExportRequestStatus', { ExportRequestID: parseInt(btn.dataset.id, 10), statusID: 1 });
+                const res    = await window.loomeApi.runApiRequest('UpdateDataExportRequestStatus', { 
+                    ExportRequestID: parseInt(btn.dataset.id, 10), 
+                    statusID: 1,
+                    ExportProjectID: parseInt(btn.dataset.exportProjectId, 10)
+                });
                 const parsed = safeParseJson(res);
                 dismissToast(t);
                 if (parsed?.StatusID === 1 || parsed?.success) {
@@ -965,10 +1180,14 @@ function exportSetupListeners() {
     // Export modal wiring
     const exportModal = document.getElementById('exportModal');
 
-    exportModal?.addEventListener('show.bs.modal', () => {
+    exportModal?.addEventListener('show.bs.modal', async () => {
         const exportNameEl  = exportModal.querySelector('#export-request-name');
         const exportSelEl   = exportModal.querySelector('#export-project-select');
         const exportSubmBtn = exportModal.querySelector('#export-submit-btn');
+        
+        // Refresh jobs on modal open to ensure warning is based on latest data
+        try { await exportFetchAllJobs(); } catch (e) { console.error('Failed to refresh export jobs', e); }
+
         if (!exportProjectsFetched) exportPopulateProjects();
         if (exportNameEl) { exportNameEl.value = ''; exportNameEl.maxLength = 100; attachCharCounter(exportNameEl, 100); }
         if (exportSelEl)   exportSelEl.value = '';
@@ -976,9 +1195,19 @@ function exportSetupListeners() {
 
         const checkExportForm = () => {
             if (exportSubmBtn) exportSubmBtn.disabled = !(exportNameEl?.value.trim() && exportSelEl?.value);
+            updateSupersedeWarning(exportSelEl, 'export-supersede-warning', exportAllJobs, 'ExportProjectID');
         };
-        if (exportNameEl) exportNameEl.oninput  = checkExportForm;
-        if (exportSelEl)  exportSelEl.onchange = checkExportForm;
+        if (exportNameEl) {
+            exportNameEl.removeEventListener('input', checkExportForm);
+            exportNameEl.addEventListener('input', checkExportForm);
+        }
+        if (exportSelEl) {
+            exportSelEl.removeEventListener('change', checkExportForm);
+            exportSelEl.addEventListener('change', checkExportForm);
+        }
+
+        // Initialize state
+        checkExportForm();
     });
 
     exportModal?.addEventListener('click', async (e) => {
@@ -994,8 +1223,8 @@ function exportSetupListeners() {
         const t = showToast('Creating export request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataExportByAssistProjectID', {
-                ExportRequestName:    name,
                 LoomeAssistProjectID: parseInt(opt.value, 10),
+                ExportRequestName:       name,
                 LoomeAssistName:      opt.dataset.name,
                 LoomeAssistTenantsID: opt.dataset.tenantsId
             });
@@ -1022,6 +1251,109 @@ function exportSetupListeners() {
 }
 
 // =================================================================
+// TUTORIAL SYSTEM
+// =================================================================
+
+const TUTORIAL_DATA = {
+    'access-tab': {
+        title: 'Data Access Guide',
+        steps: [
+            { content: 'Welcome to the Data Access tab! Here you can view and manage your requests for workspace datasets.' },
+            { content: 'Use the status chips (Pending Approval, Approved, etc.) to filter requests and track their progress.' },
+            { content: 'Click any row to expand its details, including the dataset description and your original request purpose.' },
+            { content: 'While a request is still Pending Approval, you can use "Cancel & Delete" to withdraw it.' }
+        ]
+    },
+    'import-tab': {
+        title: 'Data Import Guide',
+        steps: [
+            { content: 'The Data Import tab lets you bring external data into your secure environment from Assist projects.' },
+            { content: 'Prepare your data by organizing it into a zip file named "importdata.zip".' },
+            { content: 'Click "+ New Import Request" to begin. You\'ll need to provide a descriptive name and select a source project.' },
+            { content: 'After submitting, an automated job creates an Import Project and its resources.' },
+            { content: 'Once created, your request appears under "Awaiting Submission". Open the Import Project and use the provided command to copy your importdata.zip file into the storage account.' },
+            { content: 'After copying the file, return to the Data Import tab and click "Submit" on your request to start the formal approval process.' },
+            { content: 'You can also use "Cancel & Delete" to withdraw your request while it is still "Awaiting Submission".' },
+            { content: 'You can only request one import at a time per project. Once your current import is approved, you can submit another request.' },
+            { content: 'If you submit another request when one is already in progress, the earlier request will be superseded and will not be processed. Please wait for your current request to complete before submitting a new one.' }
+        ]
+    },
+    'export-tab': {
+        title: 'Data Export Guide',
+        steps: [
+            { content: 'Prepare your data by browsing to your summary repository (starts with "sum-"). Move your export files into a folder named "summarydata" and compress it into a .zip file.' },
+            { content: 'Select the Assist Project and click "Submit Request". This triggers an automated job to create a secure "Airlock" project for administrative review.' },
+            { content: 'A Data Manager will review your data via the Airlock link. Once approved, you\'ll be automatically added to the Airlock project to finalize the export.' },
+            { content: 'You can only request one export at a time per project. Once your current export is approved, you can submit another request.' },
+            { content: 'If you submit another request when one is already in progress, the earlier request will be superseded and will not be processed. Please wait for your current request to complete before submitting a new one.' }
+        ]
+    }
+};
+
+let currTutorialStep = 0;
+let currTutorialSet = null;
+
+function renderTutorialStep() {
+    const data = TUTORIAL_DATA[currTutorialSet];
+    if (!data) return;
+
+    const step = data.steps[currTutorialStep];
+    const isLast = currTutorialStep === data.steps.length - 1;
+
+    document.getElementById('tutorialModalTitle').textContent = data.title;
+    document.getElementById('tutorial-content').textContent = step.content;
+    document.getElementById('tutorial-progress').textContent = `Step ${currTutorialStep + 1} of ${data.steps.length}`;
+
+    const backBtn = document.getElementById('tutorial-back');
+    const nextBtn = document.getElementById('tutorial-next');
+
+    // Hide back button on first step
+    backBtn.style.visibility = currTutorialStep === 0 ? 'hidden' : 'visible';
+    
+    // Change "Next" to "Finish" on last step
+    nextBtn.textContent = isLast ? 'Finish' : 'Next';
+}
+
+function setupTutorialListeners() {
+    document.getElementById('tutorial-btn')?.addEventListener('click', () => {
+        // Find which tab is currently active
+        const activeTabEl = document.querySelector('#requestTabs .nav-link.active');
+        const activeTabId = activeTabEl?.id;
+
+        if (!activeTabId || !TUTORIAL_DATA[activeTabId]) {
+            showToast('Tutorial not available for this tab.', 'info');
+            return;
+        }
+
+        currTutorialSet = activeTabId;
+        currTutorialStep = 0;
+        renderTutorialStep();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal'));
+        modal.show();
+    });
+
+    document.getElementById('tutorial-next')?.addEventListener('click', () => {
+        const data = TUTORIAL_DATA[currTutorialSet];
+        if (!data) return;
+
+        if (currTutorialStep < data.steps.length - 1) {
+            currTutorialStep++;
+            renderTutorialStep();
+        } else {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal')).hide();
+        }
+    });
+
+    document.getElementById('tutorial-back')?.addEventListener('click', () => {
+        if (currTutorialStep > 0) {
+            currTutorialStep--;
+            renderTutorialStep();
+        }
+    });
+}
+
+// =================================================================
 // INITIALIZATION
 // =================================================================
 
@@ -1029,6 +1361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     accessSetupListeners();
     importSetupListeners();
     exportSetupListeners();
+    setupTutorialListeners();
 
     if (sessionStorage.getItem('showRequestPendingHint')) {
         sessionStorage.removeItem('showRequestPendingHint');

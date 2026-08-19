@@ -708,7 +708,8 @@ async function getProjectsMapping() {
             data.forEach(project => {
                 mapping[project.AssistProjectID] = {
                     name: project.Name,
-                    description: project.Description
+                    description: project.Description,
+                    DeletedDate: project.DeletedDate
                 };
             });
         }
@@ -729,8 +730,9 @@ async function getProjectsMapping() {
  * @param {HTMLElement} container - The container element
  * @param {object} requestDetails - The request details
  * @param {object} datasetDetails - The dataset details
+ * @param {object} [ingestionLog] - Optional ingestion log details
  */
-async function displayCombinedDetails(container, requestDetails, datasetDetails) {
+async function displayCombinedDetails(container, requestDetails, datasetDetails, ingestionLog) {
     // Check if we have valid details
     if ((!requestDetails || Object.keys(requestDetails).length === 0) && 
         (!datasetDetails || Object.keys(datasetDetails).length === 0)) {
@@ -747,58 +749,81 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
         const projectInfo = requestDetails && requestDetails.ProjectID ? 
             (projectsMapping[requestDetails.ProjectID] || { name: 'Unknown Project', description: '' }) : 
             { name: 'Unknown Project', description: '' };
+
+        let ingestionHtml = '';
+        if (ingestionLog && ingestionLog.ErrorDescription) {
+            ingestionHtml = `
+                <div class="mt-4 px-3 py-2 bg-red-50 border-l-4 border-red-500 rounded text-sm">
+                    <div class="flex items-center gap-2 text-red-700 font-medium">
+                        <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.163c.75 1.334-.213 2.98-1.743 2.98H3.72c-1.53 0-2.492-1.646-1.743-2.98L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Ingestion Error — contact a data administrator</span>
+                    </div>
+                    <code class="block mt-2 bg-white/60 border border-red-200 rounded px-2 py-1 text-xs text-red-800 overflow-auto" style="max-height:100px; white-space:pre-wrap;">${escapeHtml(ingestionLog.ErrorDescription)}</code>
+                </div>`;
+        }
         
         // Start building HTML
         let html = `
-            <div class="grid grid-cols-2 gap-5">
-                <div>
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Requested Dataset</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Name || 'N/A'}</span>
-                        </div>
+        <div class="details-card">
+            <div class="details-grid">
+                <!-- Left Column: Primary Metadata -->
+                <div class="details-section">
+                    <div class="field-group">
+                        <span class="field-label">Requested Dataset</span>
+                        <span class="field-value" style="font-weight: 600;">${datasetDetails.Name || 'N/A'}</span>
+                    </div>
 
-                        ${datasetDetails.Description ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Dataset Description</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Description}</span>
+                    ${datasetDetails.Description ? `
+                    <div class="field-group">
+                        <span class="field-label">Dataset Description</span>
+                        <span class="field-value">${datasetDetails.Description}</span>
+                    </div>` : ''}
+                    
+                    <div class="field-group">
+                        <span class="field-label">Data Source ID</span>
+                        <span class="field-value"><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px;">${datasetDetails.DataSource || datasetDetails.DataSourceID || 'N/A'}</code></span>
+                    </div>
+
+                    <div class="field-group">
+                        <span class="field-label">Target Project Name</span>
+                        <span class="field-value">${projectInfo.name}</span>
+                        ${projectInfo.DeletedDate ? `
+                        <div class="alert-deleted">
+                            Target Project Deleted on: ${new Date(projectInfo.DeletedDate).toLocaleDateString()}
                         </div>` : ''}
-                        
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Data Source ID</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.DataSource || datasetDetails.DataSourceID || 'N/A'}</span>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Target Project Name</span>
-                            <span class="text-sm text-gray-500">${projectInfo.name}</span>
-                        </div>
                     </div>
                 </div>
-                <div>
-                    <div class="space-y-3">
-                        ${requestDetails.Purpose ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Purpose</span>
-                            <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
-                        </div>` : ''}
 
-                        ${requestDetails.ApprovalMessage ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Approval Message</span>
-                            <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
-                        </div>` : ''}
+                <!-- Right Column: Status & Request Notes -->
+                <div class="details-section">
+                    ${requestDetails.Purpose ? `
+                    <div class="field-group">
+                        <span class="field-label">Purpose</span>
+                        <span class="field-value">${requestDetails.Purpose}</span>
+                    </div>` : ''}
 
-                        ${requestDetails.RejectionMessage ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Rejection Message</span>
-                            <span class="text-sm text-gray-500">${requestDetails.RejectionMessage}</span>
-                        </div>` : ''}
-                    </div>
+                    ${requestDetails.ApprovalMessage ? `
+                    <div class="field-group" style="background: #f0fdf4; padding: 12px; border-radius: 6px; border: 1px solid #bbf7d0;">
+                        <span class="field-label" style="color: #166534;">Approval Message</span>
+                        <span class="field-value" style="color: #14532d;">${requestDetails.ApprovalMessage}</span>
+                    </div>` : ''}
+
+                    ${requestDetails.RejectionMessage ? `
+                    <div class="field-group" style="background: #fef2f2; padding: 12px; border-radius: 6px; border: 1px solid #fecaca;">
+                        <span class="field-label" style="color: #991b1b;">Rejection Message</span>
+                        <span class="field-value" style="color: #7f1d1d;">${requestDetails.RejectionMessage}</span>
+                    </div>` : ''}
                 </div>
             </div>
-        `;
-        
+
+            ${ingestionHtml ? `
+                <hr class="details-divider">
+                <div>${ingestionHtml}</div>
+            ` : ''}
+        </div>
+    `;
         // Update the container
         container.innerHTML = html;
         
@@ -822,6 +847,16 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails)
  */
 function safeParseJson(response) {
     return typeof response === 'string' ? JSON.parse(response) : response;
+}
+
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 /**
@@ -986,11 +1021,13 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
         data.forEach(item => {
             const row = document.createElement('tr');
             row.classList.add('cursor-pointer', 'hover:bg-gray-50'); // Add visual indication this row is clickable
+            row.dataset.id = item.RequestID; // Ensure data-id is set for selection
             row.setAttribute('role', 'button');
             row.setAttribute('tabindex', '0');
             row.setAttribute('aria-expanded', 'false');
             row.setAttribute('aria-controls', `approver-detail-${item.RequestID}`);
             const tdClasses = 'px-6 py-4 whitespace-nowrap text-sm text-gray-800';
+            const nameStyle = (selectedStatus === 'Finalised' && item.IngestionError) ? 'style="color:#dc3545"' : '';
             
             let statusSpecificCols = '';
             switch (item.status) {
@@ -1007,7 +1044,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                     </svg>
                 </td>
                 <td class="${tdClasses}">${item.RequestID}</td>
-                <td class="${tdClasses}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name}</td>
+                <td class="${tdClasses}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
                 <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
                 <td class="${tdClasses}">${item.CreateUser}</td>
                 ${statusSpecificCols}
@@ -1023,9 +1060,13 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 <td colspan="${headers.length + 1}" class="p-0"> <!-- +1 for chevron column -->
                     <div class="bg-gray-50 p-4 m-2 rounded">
                         <div class="grid grid-cols-1 gap-4">
-                            <div class="flex justify-end mb-1">
-                                <div class="btn-group">                                  
-                                    <button class="btn btn-success action-approve px-3 py-1 mr-2" data-bs-toggle="modal" data-bs-target="#approveRequestModal">
+                            <!-- Combined Information Card -->
+                            <div class="bg-white p-5 rounded-md shadow-sm">
+                                <div id="combined-details-${item.RequestID}" class="combined-content">
+                                    <p class="text-center text-gray-500">Loading details...</p>
+                                </div>
+                                <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
+                                    <button class="btn btn-success action-approve px-3 py-1" data-bs-toggle="modal" data-bs-target="#approveRequestModal">
                                         <i class="fa fa-thumbs-up mr-2"></i>
                                         Approve
                                     </button>
@@ -1033,13 +1074,6 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                                         <i class="fa fa-thumbs-down mr-2"></i>
                                         Reject
                                     </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Combined Information Card -->
-                            <div class="bg-white p-5 rounded-md shadow-sm">
-                                <div id="combined-details-${item.RequestID}" class="combined-content">
-                                    <p class="text-center text-gray-500">Loading details...</p>
                                 </div>
                             </div>
                         </div>
@@ -1112,15 +1146,33 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                             console.error('Error fetching dataset details:', datasetError);
                             datasetDetails = null;
                         }
+
+// Reuse the log if we already fetched it during RenderUI
+                    let ingestionLogs = item._log ? [item._log] : null;
+                    
+                    if (selectedStatus === 'Finalised' && !ingestionLogs) {
+                            try {
+                                ingestionLogs = safeParseJson(await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID }));
+                            } catch (e) {
+                                console.error('Error fetching ingestion logs:', e);
+                            }
+                        }
                         
                         // Check if we have at least one set of details
                         if (!requestDetails && !datasetDetails) {
                             throw new Error('Failed to fetch both request and dataset details');
                         }
+
+                        const log = (Array.isArray(ingestionLogs) && ingestionLogs.length > 0) ? ingestionLogs[0] : null;
+
+                        if (log) {
+                            const nameCell = row.querySelector('td:nth-child(3)');
+                            if (nameCell) nameCell.style.color = '#dc3545';
+                        }
                         
                         // Display whatever details we have
                         // console.log('Displaying combined details');
-                        displayCombinedDetails(combinedDetailsContainer, requestDetails, datasetDetails);
+                        displayCombinedDetails(combinedDetailsContainer, requestDetails, datasetDetails, log);
                         
                     } catch (error) {
                         console.error("Error loading details:", error);
@@ -1199,6 +1251,78 @@ async function getCounts(status) {
     return parsedResponse.RowCount;
 }
 
+// =================================================================
+// TUTORIAL SYSTEM
+// =================================================================
+
+const TUTORIAL_DATA = {
+    'approver-guide': {
+        title: 'Approver Guide',
+        steps: [
+            { content: 'Welcome to the Approver Dashboard! As an approver, you review and manage user requests for datasets.' },
+            { content: 'Use the status filters (like "Pending Approval") to identify requests that require your immediate action.' },
+            { content: 'Expand any row to see full details. Use the "Approve" or "Reject" buttons to process a request.' },
+            { content: 'When approving or rejecting, you must provide a message that will be shared with the requesting user.' },
+            { content: 'After approval, the system will automatically handle data access provisioning. Once you approve or reject a request, the user will be notified with your reason.' },
+            { content: 'Remember to check the "Finalised" tab to see completed requests and any associated logs for auditing purposes.' }
+        ]
+    }
+};
+
+let currTutorialStep = 0;
+let currTutorialSet = null;
+
+function renderTutorialStep() {
+    const data = TUTORIAL_DATA[currTutorialSet];
+    if (!data) return;
+
+    const step = data.steps[currTutorialStep];
+    const isLast = currTutorialStep === data.steps.length - 1;
+
+    document.getElementById('tutorialModalTitle').textContent = data.title;
+    document.getElementById('tutorial-content').textContent = step.content;
+    document.getElementById('tutorial-progress').textContent = `Step ${currTutorialStep + 1} of ${data.steps.length}`;
+
+    const backBtn = document.getElementById('tutorial-back');
+    const nextBtn = document.getElementById('tutorial-next');
+
+    // Hide back button on first step
+    backBtn.style.visibility = currTutorialStep === 0 ? 'hidden' : 'visible';
+    
+    // Change "Next" to "Finish" on last step
+    nextBtn.textContent = isLast ? 'Finish' : 'Next';
+}
+
+function setupTutorialListeners() {
+    document.getElementById('tutorial-btn')?.addEventListener('click', () => {
+        currTutorialSet = 'approver-guide';
+        currTutorialStep = 0;
+        renderTutorialStep();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal'));
+        modal.show();
+    });
+
+    document.getElementById('tutorial-next')?.addEventListener('click', () => {
+        const data = TUTORIAL_DATA[currTutorialSet];
+        if (!data) return;
+
+        if (currTutorialStep < data.steps.length - 1) {
+            currTutorialStep++;
+            renderTutorialStep();
+        } else {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal')).hide();
+        }
+    });
+
+    document.getElementById('tutorial-back')?.addEventListener('click', () => {
+        if (currTutorialStep > 0) {
+            currTutorialStep--;
+            renderTutorialStep();
+        }
+    });
+}
+
 /**
  * Main function to orchestrate all rendering based on the current state.
  * It filters, paginates, and renders the table and controls.
@@ -1237,16 +1361,36 @@ async function renderUI() {
         if (token !== _fetchToken) return;
 
     const parsedResponse = safeParseJson(response)
-    const rawData = parsedResponse.Results;
+    let rawData = parsedResponse.Results;
     const totalItems = parsedResponse.RowCount;
     // console.log(rawData)
 
+    // Pre-fetch ingestion logs if finalised to color the names red if error exists
+    if (selectedStatus === 'Finalised') {
+        const logsPromises = rawData.map(item =>
+            window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID })
+                .then(safeParseJson)
+                .catch(() => null)
+        );
+        const logsResults = await Promise.all(logsPromises);
+        rawData = rawData.map((item, idx) => {
+            const logs = logsResults[idx];
+            const hasError = Array.isArray(logs) && logs.length > 0 && !!logs[0].ErrorDescription;
+            return { 
+                ...item, 
+                IngestionError: hasError, 
+                _log: (Array.isArray(logs) && logs.length > 0) ? logs[0] : null 
+            };
+        });
+    }
 
     // --- 2. PREPARE THE MASTER DATA ARRAY ---
     // Transform the raw data just once into the format our UI needs.
     allRequests = rawData.map(item => ({
         ...item,
-        status: statusIdToNameMap[item.StatusID] || 'Unknown'
+        status: statusIdToNameMap[item.StatusID] || 'Unknown',
+        IngestionError: item.IngestionError || false,
+        _log: item._log || null
     }));
     // console.log(allRequests)
 
@@ -1296,6 +1440,7 @@ async function refreshPageData() {
  */
 async function renderApproversPage() {
     try {
+        setupTutorialListeners();
 
         // --- 3. UPDATE ALL CHIP COUNTS ONCE ---
         // This is the logic you wanted. It calculates counts from the unfiltered master array.

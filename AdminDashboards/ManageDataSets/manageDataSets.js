@@ -18,6 +18,7 @@ const API_GET_REDCAP_DATA = 'SyncREDCapData';
 const API_EXPORT_DATASET_COLUMNS_EXCEL = 'ExportDataSetColumnsToExcel';
 const API_GET_METADATA = 'GetMetadata';
 const API_VERIFY_UPLOAD_SHEET = 'VerifyUploadedSheet';
+const API_GET_REQUESTS_BY_DATASET_ID = 'GetRequestByDataSetID';
 
 const API_GET_PORTAL_TOKEN = 'Portal - GetToken';
 const API_GET_ASSET_BY_NAME = 'Portal - GetAssetByName';
@@ -244,9 +245,15 @@ function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to 
             <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
                 <td>${col.ColumnName || ''}</td>
                 <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
-                <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.LogicalColumnName || '')}">${col.LogicalColumnName || ''}</td>
-                <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.BusinessDescription || '')}">${col.BusinessDescription || ''}</td>
-                <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(col.ExampleValue || '')}">${col.ExampleValue || ''}</td>
+                <td class="editable-cell" data-field="LogicalColumnName" data-raw-value="${col.LogicalColumnName || ''}" title="${escapeHtml(col.LogicalColumnName || '')}">
+                    <div class="cell-text-wrap">${col.LogicalColumnName || ''}</div>
+                </td>
+                <td class="editable-cell" data-field="BusinessDescription" data-raw-value="${col.BusinessDescription || ''}" title="${escapeHtml(col.BusinessDescription || '')}">
+                    <div class="cell-text-wrap">${col.BusinessDescription || ''}</div>
+                </td>
+                <td class="editable-cell" data-field="ExampleValue" data-raw-value="${col.ExampleValue || ''}" title="${escapeHtml(col.ExampleValue || '')}">
+                    <div class="cell-text-wrap">${col.ExampleValue || ''}</div>
+                </td>
                 <td class="checkbox-cell">
                     <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
                 </td>
@@ -491,6 +498,94 @@ function normalizeBooleanFlag(value) {
     }
     return Boolean(value);
 }
+
+
+/**
+ * Extracts values from raw Excel cells, preserving original formatting exactly as entered.
+ * Uses cell.w (formatted text) to keep the user's original format (dates, text, etc.).
+ * For dates with 2-digit years, uses the serial number to restore the full 4-digit year.
+ * @param {Object} sheet - The XLSX sheet object
+ * @param {Array} expectedHeader - Expected header column names
+ * @param {number} startRow - Row to start parsing (0-indexed, typically 1 for data after header)
+ * @returns {Array} Array of objects with parsed data preserving original formatting
+ */
+function parseSheetWithFormattedValues(sheet, expectedHeader, startRow) {
+    const result = [];
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    
+    /**
+     * Converts Excel date serial to get the full 4-digit year
+     */
+    function getFullYearFromSerial(serialNum) {
+        if (typeof serialNum !== 'number' || serialNum < 1 || serialNum > 60000) return null;
+        try {
+            const excelEpoch = new Date(1900, 0, 1);
+            const date = new Date(excelEpoch.getTime() + (serialNum - 1) * 24 * 60 * 60 * 1000);
+            return date.getFullYear();
+        } catch (e) {
+            return null;
+        }
+    }
+    
+    /**
+     * If formatted text has a 2-digit year, replace it with the 4-digit year from serial
+     */
+    function restoreFourDigitYear(formattedText, serialNum) {
+        if (!formattedText || typeof formattedText !== 'string') return formattedText;
+        
+        // Match patterns with 2-digit years at the end
+        // Examples: "9/10/98", "09/10/98", "9-10-98", "Sep 10 98", "9 10 98"
+        const hasTwoDigitYearPattern = /[\/\-\s](\d{1,2})$/.test(formattedText);
+        
+        if (hasTwoDigitYearPattern) {
+            const fullYear = getFullYearFromSerial(serialNum);
+            if (fullYear !== null) {
+                // Replace the last 1-2 digit number (the 2-digit year) with full 4-digit year
+                return formattedText.replace(/(\d{1,2})$/, String(fullYear));
+            }
+        }
+        
+        return formattedText;
+    }
+    
+    for (let row = startRow; row <= range.e.r; row++) {
+        const rowObj = {};
+        let hasData = false;
+        
+        for (let col = range.s.c; col < Math.min(range.e.c + 1, expectedHeader.length); col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+            const cell = sheet[cellAddress];
+            const header = expectedHeader[col];
+            
+            if (header) {
+                // Use cell.w (formatted text display) to preserve original formatting
+                let cellValue = '';
+                if (cell) {
+                    cellValue = cell.w ? cell.w : (cell.v !== undefined && cell.v !== null ? String(cell.v) : '');
+                    
+                    // If we have formatted text AND a numeric value (indicates it's likely a date),
+                    // check if the formatted text has a 2-digit year and restore it
+                    if (cell.w && typeof cell.v === 'number' && cell.v > 0) {
+                        cellValue = restoreFourDigitYear(cell.w, cell.v);
+                    }
+                    
+                    if (cellValue) hasData = true;
+                } else {
+                    cellValue = '';
+                }
+                rowObj[header] = cellValue;
+            }
+        }
+        
+        // Only include rows that have at least some data
+        if (hasData) {
+            result.push(rowObj);
+        }
+    }
+    
+    return result;
+}
+
 
 /**
  * Validate that uploaded DataSetColumns exactly match the expected columns.
@@ -1896,7 +1991,7 @@ function updateTableHeader(dataSourceType) {
 
     const buildHeaderCell = (def) => {
         if (def.sortKey === 'column-name') {
-            const arrow = columnNameSortDirection === 'desc' ? '▲' : '▼';
+            const arrow = columnNameSortDirection === 'desc' ? '\u25B2' : '\u25BC';// '▲' : '▼';
             const ariaLabel = columnNameSortDirection === 'desc' ? 'Sort ascending' : 'Sort descending';
             const ariaSortValue = columnNameSortDirection === 'asc' ? 'ascending' : 'descending';
             const listHtml = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
@@ -2314,8 +2409,9 @@ async function renderManageDataSetPage() {
                     }
 
                     // Success - parse and import rows into UI
-                    const parsedCols = XLSX.utils.sheet_to_json(colsSheet, { header: expectedColsHeader, range: 1, defval: '' });
-                    const parsedMeta = XLSX.utils.sheet_to_json(metaSheet, { header: expectedMetaHeader, range: 1, defval: '' });
+                    // Use raw cell data to preserve original formatting (dates, text, etc.)
+                    const parsedCols = parseSheetWithFormattedValues(colsSheet, expectedColsHeader, 1);
+                    const parsedMeta = parseSheetWithFormattedValues(metaSheet, expectedMetaHeader, 1);
 
                     // Enforce exactly one metadata row
                     if (!Array.isArray(parsedMeta) || parsedMeta.length !== 1) {
@@ -2331,7 +2427,21 @@ async function renderManageDataSetPage() {
                     if (!validation.valid) {
                         console.warn('Upload validation failed:', validation);
                         // show detailed feedback to the user
-                        showToast(validation.message || 'Column validation failed.', 'error');
+                        // Handle both string messages and arrays of error objects
+                        let errorMessage = 'Column validation failed.';
+                        if (validation.message) {
+                            if (Array.isArray(validation.message)) {
+                                // Convert array of errors to readable list
+                                errorMessage = validation.message
+                                    .map(err => typeof err === 'string' ? err : (err.message || JSON.stringify(err)))
+                                    .join('; ');
+                            } else if (typeof validation.message === 'object') {
+                                errorMessage = JSON.stringify(validation.message);
+                            } else {
+                                errorMessage = String(validation.message);
+                            }
+                        }
+                        showToast(errorMessage, 'error');
                         // Optionally surface missing/extra in console or UI
                         // console.log('Column validation details:', validation);
                         hideColumnsLoader();
@@ -2346,7 +2456,7 @@ async function renderManageDataSetPage() {
                         ColumnType: r.ColumnType || '',
                         LogicalColumnName: r.LogicalColumnName || '',
                         BusinessDescription: r.BusinessDescription || '',
-                        ExampleValue: r.ExampleValue || '',
+                        ExampleValue: String(r.ExampleValue || '').trim(),
                         Deidentify: normalizeBooleanFlag(r.Deidentify),
                         TokenIdentifierType: Number(r.TokenIdentifierType) || 0,
                         Redact: normalizeBooleanFlag(r.Redact),
@@ -2569,6 +2679,11 @@ async function renderManageDataSetPage() {
                 Deleting…`;
 
             try {
+                // Before Cancelling a DataSet (Catalogue Asset or from the Database) there are guards that must be passed
+                // 1. Check if there is a matching asset in the Portal Catalogue and delete it if it exists. 
+                //      This ensures we don't leave orphaned assets that point to deleted datasets, which would cause confusion and clutter in the catalogue.
+                // 2. Check if there are any existing requests for the DataSet and prevent deletion if so, 
+                //      since that would orphan requests and cause errors for users who have requested access to this data.
 
                 // These API calls update the Portal Catalogue list
                 const datasetName = nameInput.value.trim();
@@ -2582,10 +2697,11 @@ async function renderManageDataSetPage() {
                     }
                 );
                 const asset = returnedAssets?.items?.[0];
+
+                // Check if the asset exists in the catalogue before attempting to delete it
+                let inCatalogue = false;
                 if (asset && asset.id) {
-                    const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
-                        assetId: asset.id, token: token.access_token 
-                    });
+                    inCatalogue = true;
                     // console.log('Deleted catalogue asset:', deletedDataSet);
                 } else {
                     showToast(`No matching catalogue asset found for "${datasetName}" (${dataSourceTypeLabel}). Database was not modified.`, 'error');
@@ -2594,22 +2710,45 @@ async function renderManageDataSetPage() {
                     return;
                 }
 
-                const safeSelectedId = safeParseId(selectedId);
-                if (safeSelectedId === null) { showToast('Invalid dataset ID.', 'error'); return; }
-                const params = { id: safeSelectedId };
-                // Use the low-level runApiRequest so we can inspect error payloads directly
-                // This API call updates the database
-                const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);
-                const parsed = safeParseJson(raw);
+                // Check if the asset has existing requests
+                let hasExistingRequests = await window.loomeApi.runApiRequest(API_GET_REQUESTS_BY_DATASET_ID, { data_set_id: selectedId });
 
-                // If the API responded with a detail message, treat it as an error
-                if (parsed && parsed.detail) {
-                    showToast(parsed.detail, 'error');
+                // If there are no requests, set hasExistingRequests to false
+                if (hasExistingRequests) {
+                    showToast(`Cannot delete Data Set "${datasetName}" because there are existing requests associated with it. Please resolve or remove those requests before attempting deletion.`, 'error');
                     deleteBtn.disabled = false;
                     deleteBtn.innerHTML = originalHtml;
                     return;
                 }
 
+                // Proceed with cancellation of both Catalogue Asset and Database entry 
+                // if it has a catalogue entry and no existing requests
+                if (inCatalogue && !hasExistingRequests) {
+                    // Proceed with cancellation of both Catalogue Asset and Database entry
+                    // if it has a catalogue entry and no existing requests
+                    
+                    // Cancel from Database Entry
+                    const safeSelectedId = safeParseId(selectedId);
+                    if (safeSelectedId === null) { showToast('Invalid dataset ID.', 'error'); return; }
+                    const params = { id: safeSelectedId };
+                    // Use the low-level runApiRequest so we can inspect error payloads directly
+                    // This API call updates the database
+                    const raw = await window.loomeApi.runApiRequest(API_CANCEL_DATASET, params);
+                    const parsed = safeParseJson(raw);
+
+                    // If the API responded with a detail message, treat it as an error
+                    if (parsed && parsed.detail) {
+                        showToast(parsed.detail, 'error');
+                        deleteBtn.disabled = false;
+                        deleteBtn.innerHTML = originalHtml;
+                        return;
+                    }
+
+                    // Remove from Catalogue Asset List
+                    const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
+                        assetId: asset.id, token: token.access_token 
+                    });
+                }
 
                 // Some APIs may return a truthy success value or empty array; consider that success
                 showToast('Data Set deleted successfully.', 'success');
@@ -3350,6 +3489,111 @@ async function renderManageDataSetPage() {
         } catch (error) {
             console.error("Failed to fetch data sets:", error);
             // You could display an error message to the user here.
+        }
+    });
+
+    document.getElementById('dataSetColsBody').addEventListener('click', function(e) {
+        const cell = e.target.closest('.editable-cell');
+        if (!cell) return;
+        if (document.querySelector('.floating-downward-editor')) return;
+
+        // FIX: Fallback to the inner text if data-raw-value hasn't been set yet
+        const originalText = cell.getAttribute('data-raw-value') !== null 
+            ? cell.getAttribute('data-raw-value') 
+            : cell.innerText.trim();
+        
+        const rect = cell.getBoundingClientRect();
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+
+        const editorContainer = document.createElement('div');
+        editorContainer.className = 'floating-downward-editor';
+        editorContainer.style.top = `${rect.top + scrollTop}px`;
+        editorContainer.style.left = `${rect.left + scrollLeft}px`;
+        editorContainer.style.width = `${rect.width}px`;
+
+        editorContainer.innerHTML = `<textarea rows="1"></textarea>`;
+        const textarea = editorContainer.querySelector('textarea');
+        textarea.value = originalText; // Safely populates the text container
+
+        document.body.appendChild(editorContainer);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        const autoGrow = () => {
+            textarea.style.height = 'auto';
+            
+            // Capture computed maximum height configured in the CSS styles block
+            const maxHeight = parseInt(window.getComputedStyle(textarea).maxHeight);
+
+            if (textarea.scrollHeight > maxHeight) {
+                // If text content climbs past max threshold, lock height and reveal scrollbar
+                textarea.style.height = maxHeight + 'px';
+                textarea.style.overflowY = 'auto'; 
+            } else {
+                // Otherwise scale naturally and hide scrollbars to look crisp
+                textarea.style.height = textarea.scrollHeight + 'px';
+                textarea.style.overflowY = 'hidden';
+            }
+        };
+        textarea.addEventListener('input', autoGrow);
+        autoGrow();
+
+        const closeAndSave = () => {
+            const newValue = textarea.value.trim();
+            
+            // Save raw text value securely to the attribute for future edits
+            cell.setAttribute('data-raw-value', newValue);
+            
+            // Update the visible layout
+            cell.innerHTML = `<div class="cell-text-wrap"></div>`;
+            cell.querySelector('.cell-text-wrap').textContent = newValue;
+            cell.setAttribute('title', newValue);
+            
+            editorContainer.remove();
+        };
+
+        textarea.addEventListener('blur', closeAndSave);
+        
+        textarea.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                textarea.blur();
+            }
+            if (event.key === 'Escape') {
+                textarea.value = originalText;
+                textarea.blur();
+            }
+        });
+    });
+
+    const toggleBtn = document.getElementById('toggleFullscreenBtn');
+    // Target the shared parent wrapper container instead of just the table
+    const workspaceWrapper = document.getElementById('tableWorkspaceWrapper');
+
+    const expandIcon = toggleBtn.querySelector('.icon-expand');
+    const collapseIcon = toggleBtn.querySelector('.icon-collapse');
+
+    function toggleTableFullscreen() {
+        // Toggles class on parent container so both table and pagination expand together
+        const isFullscreen = workspaceWrapper.classList.toggle('table-fullscreen-active');
+        
+        if (isFullscreen) {
+            expandIcon.style.display = 'none';
+            collapseIcon.style.display = 'block';
+        } else {
+            expandIcon.style.display = 'block';
+            collapseIcon.style.display = 'none';
+        }
+    }
+
+    toggleBtn.addEventListener('click', toggleTableFullscreen);
+
+    window.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' || event.key === 'Esc') {
+            if (workspaceWrapper.classList.contains('table-fullscreen-active')) {
+                toggleTableFullscreen();
+            }
         }
     });
 

@@ -14,6 +14,16 @@ function safeParseJson(response) {
     return response;
 }
 
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 /**
  * Returns a debounced version of fn that delays invocation by `wait` ms.
  */
@@ -85,6 +95,7 @@ function getStatusBadgeHtml(status) {
         'failed':           'bg-red-100 text-red-800',
         'working':          'bg-purple-100 text-purple-800',
         'awaiting submission': 'bg-yellow-100 text-yellow-800',
+        'superseded':          'bg-gray-200 text-gray-800',
     };
     const cls = map[(status || '').toLowerCase()] || 'bg-gray-100 text-gray-800';
     return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${status || 'Unknown'}</span>`;
@@ -335,6 +346,101 @@ function setupActionModalConfirm() {
 }
 
 // =================================================================
+// TUTORIAL SYSTEM
+// =================================================================
+const TUTORIAL_DATA = {
+    'admin-access-tab': {
+        title: 'Admin: Data Access Guide',
+        steps: [
+            { content: 'Welcome to the Admin Request Hub! As an administrator, you can view all access, import, and export requests. Expand any row to see full details.' },
+            { content: 'You cannot approve access requests, but you can reject them. A reason is required whenever you reject a request.' },
+            { content: 'When you reject a request, the user is automatically notified with your reason.' },
+            { content: 'Check the "Finalised" tab for completed requests and their associated logs, useful for auditing purposes.' }
+        ]
+    },
+    'admin-import-tab': {
+        title: 'Admin: Data Import Guide',
+        steps: [
+            { content: 'Review data import requests to ensure only authorized data enters the secure environment.' },
+            { content: 'Approving an import request automatically triggers the data transfer job to the user\'s designated project.' },
+            { content: 'If a transfer fails, check the "Finalised" or "Failed" logs for details (where available).' },
+            { content: 'A researcher can only have one import request in progress at a time per project. If they submit another request while one is pending, the earlier request will be superseded and not processed.' }
+        ]
+    },
+    'admin-export-tab': {
+        title: 'Admin: Data Export Guide',
+        steps: [
+            { content: 'Once a user submits an export request, a secure "Airlock" project is automatically created, containing an "Export sum-..." resource with the user\'s data.' },
+            { content: 'To inspect the files, click the down arrow on the Export resource in the Airlock project and select "Go to URL" to download and review the zipped data.' },
+            { content: 'If the data is compliant and you approve the request, a background job automatically adds the user to the Airlock project to finalize the transfer.' },
+            { content: 'A researcher can only have one export request in progress at a time per project. If they submit another request while one is pending, the earlier request will be superseded and not processed.' }
+        ]
+    }
+};
+
+let currTutorialStep = 0;
+let currTutorialSet = null;
+
+function renderTutorialStep() {
+    const data = TUTORIAL_DATA[currTutorialSet];
+    if (!data) return;
+
+    const step = data.steps[currTutorialStep];
+    const isLast = currTutorialStep === data.steps.length - 1;
+
+    document.getElementById('tutorialModalTitle').textContent = data.title;
+    document.getElementById('tutorial-content').textContent = step.content;
+    document.getElementById('tutorial-progress').textContent = `Step ${currTutorialStep + 1} of ${data.steps.length}`;
+
+    const backBtn = document.getElementById('tutorial-back');
+    const nextBtn = document.getElementById('tutorial-next');
+
+    // Hide back button on first step
+    backBtn.style.visibility = currTutorialStep === 0 ? 'hidden' : 'visible';
+    
+    // Change "Next" to "Finish" on last step
+    nextBtn.textContent = isLast ? 'Finish' : 'Next';
+}
+
+function setupTutorialListeners() {
+    document.getElementById('tutorial-btn')?.addEventListener('click', () => {
+        const activeTabEl = document.querySelector('#adminTabs .nav-link.active');
+        const activeTabId = activeTabEl?.id;
+
+        if (!activeTabId || !TUTORIAL_DATA[activeTabId]) {
+            showToast('Tutorial not available for this tab.', 'info');
+            return;
+        }
+
+        currTutorialSet = activeTabId;
+        currTutorialStep = 0;
+        renderTutorialStep();
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal'));
+        modal.show();
+    });
+
+    document.getElementById('tutorial-next')?.addEventListener('click', () => {
+        const data = TUTORIAL_DATA[currTutorialSet];
+        if (!data) return;
+
+        if (currTutorialStep < data.steps.length - 1) {
+            currTutorialStep++;
+            renderTutorialStep();
+        } else {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('tutorialModal')).hide();
+        }
+    });
+
+    document.getElementById('tutorial-back')?.addEventListener('click', () => {
+        if (currTutorialStep > 0) {
+            currTutorialStep--;
+            renderTutorialStep();
+        }
+    });
+}
+
+// =================================================================
 // ACCESS TAB (Admin)  — server-side pagination via GetAllRequests
 // =================================================================
 
@@ -354,8 +460,8 @@ async function adminAccessGetProjectsMapping() {
         const data = safeParseJson(res);
         const map  = {};
         (data?.Results || data || []).forEach(p => {
-            map[p.AssistProjectID]         = { name: p.Name };
-            map[String(p.AssistProjectID)] = { name: p.Name };
+            map[p.AssistProjectID]         = { name: p.Name, DeletedDate: p.DeletedDate };
+            map[String(p.AssistProjectID)] = { name: p.Name, DeletedDate: p.DeletedDate };
         });
         adminAccessProjectsCache = map;
         return map;
@@ -391,13 +497,29 @@ async function adminAccessRenderUI() {
         const res      = await window.loomeApi.runApiRequest('GetAllRequests', params);
         if (token !== _adminAccessFetchToken) return;
         const parsed   = safeParseJson(res);
-        const data     = (parsed?.Results || []).map(item => ({ ...item, _status: ADMIN_ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
+        let data       = (parsed?.Results || []).map(item => ({ ...item, _status: ADMIN_ACCESS_STATUS_MAP[item.StatusID] || 'Unknown' }));
         const total    = parsed?.RowCount || 0;
+
+        if (adminAccessCurrentStatus === 'Finalised') {
+            const logsPromises = data.map(item =>
+                window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: item.RequestID })
+                    .then(safeParseJson)
+                    .catch(() => null)
+            );
+            const logsResults = await Promise.all(logsPromises);
+            data = data.map((item, idx) => {
+                const logs = logsResults[idx];
+                const hasError = Array.isArray(logs) && logs.length > 0 && !!logs[0].ErrorDescription;
+                return { ...item, IngestionError: hasError, _log: (Array.isArray(logs) && logs.length > 0) ? logs[0] : null };
+            });
+        }
+
         adminAccessTotalPages = Math.max(1, Math.ceil(total / ADMIN_ACCESS_ROWS_PER_PAGE));
         adminAccessRenderTable(container, data, adminAccessCurrentStatus);
         renderPaginationHtml('admin-access-pagination', total, ADMIN_ACCESS_ROWS_PER_PAGE, adminAccessCurrentPage);
     } catch (e) {
         if (token !== _adminAccessFetchToken) return;
+
         container.innerHTML = `<p class="text-center py-4 text-red-500 text-sm">Error loading requests: ${e.message}</p>`;
     } finally {
         if (token === _adminAccessFetchToken) document.querySelectorAll('#admin-access-pagination [data-page]').forEach(b => { b.disabled = false; });
@@ -407,7 +529,7 @@ async function adminAccessRenderUI() {
 function adminAccessRenderTable(container, data, selectedStatus) {
     if (!data.length) { container.innerHTML = buildEmptyState('No requests found for this status.'); return; }
     const tdCls = 'px-6 py-4 text-sm text-gray-700';
-    const headers = ['', 'Request ID', 'Request Name', 'Requested On', 'Requested By'];
+    const headers = ['', 'Request Name', 'Requested On', 'Requested By'];
     if (selectedStatus === 'Pending Approval') headers.push('Approvers');
     else if (selectedStatus === 'Approved')    { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
@@ -425,28 +547,29 @@ function adminAccessRenderTable(container, data, selectedStatus) {
             case 'Finalised':  extra = `<td class="${tdCls}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
         }
 
+        const nameStyle = (selectedStatus === 'Finalised' && item.IngestionError) ? 'style="color:#dc3545"' : '';
+
         rows += `
-        <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
+        <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" data-name="${(item.Name || '').replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls}">${item.RequestID}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.Name || '').replace(/"/g, '&quot;')}">${item.Name || 'N/A'}</td>
-            <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
-            <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${formatDate(item.CreateDate)}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.CreateUser || 'N/A'}</td>
             ${extra}
         </tr>
         <tr class="admin-access-detail-row hidden" id="admin-access-detail-${item.RequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="bg-white rounded shadow-sm position-relative">
+                    <div class="accordion-card">
+                        <div class="admin-access-detail-content">
+                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                        </div>
                         ${selectedStatus === 'Pending Approval' ? `
-                        <div class="position-absolute" style="top:12px;right:12px;z-index:1">
+                        <div class="accordion-actions">
                             <button class="btn btn-danger px-3 py-1 admin-reject-btn" data-id="${item.RequestID}" data-name="${(item.Name || '').replace(/"/g, '&quot;')}">
                                 <i class="fa fa-thumbs-down me-2"></i>Reject
                             </button>
                         </div>` : ''}
-                        <div class="p-3 admin-access-detail-content">
-                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
-                        </div>
                     </div>
                 </div>
             </td>
@@ -454,10 +577,12 @@ function adminAccessRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+        <div class="overflow-x-auto border rounded shadow-sm">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>${thead}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+            </table>
+        </div>`;
 
     container.querySelectorAll('.admin-access-row').forEach(row => {
         const detailRow = row.nextElementSibling;
@@ -477,29 +602,67 @@ function adminAccessRenderTable(container, data, selectedStatus) {
                 loaded = true;
                 const content = detailRow.querySelector('.admin-access-detail-content');
                 try {
-                    const [reqRes, projectsMap] = await Promise.all([
+                    const rowData = data.find(d => String(d.RequestID) === String(row.dataset.id));
+                    const promises = [
                         window.loomeApi.runApiRequest('GetRequestID', { RequestID: row.dataset.id }).then(safeParseJson),
                         adminAccessGetProjectsMapping()
-                    ]);
+                    ];
+
+                    // Reuse the log if we already fetched it during RenderUI
+                    const [reqRes, projectsMap] = await Promise.all(promises);
+                    let log = rowData?._log;
+
+                    // Fallback in case RenderUI didn't fetch it (e.g. status change or race)
+                    if (selectedStatus === 'Finalised' && !log) {
+                        const logs = safeParseJson(await window.loomeApi.runApiRequest('GetIngestionLogByRequestID', { request_id: row.dataset.id }));
+                        log = (Array.isArray(logs) && logs.length > 0) ? logs[0] : null;
+                    }
+
                     const dsRes = row.dataset.datasetId
                         ? safeParseJson(await window.loomeApi.runApiRequest('GetDataSetID', { DataSetID: row.dataset.datasetId }))
                         : null;
                     const proj = reqRes?.ProjectID
                         ? (projectsMap[reqRes.ProjectID] || projectsMap[String(reqRes.ProjectID)] || { name: 'Unknown Project' })
                         : { name: 'N/A' };
+
+                    let ingestionHtml = '';
+                    if (log && log.ErrorDescription) {
+                        ingestionHtml = `
+                            <div class="mt-3 px-3 py-2 bg-red-50 border-l-4 border-red-500 rounded text-sm">
+                                <div class="flex items-center gap-2 text-red-700 font-medium">
+                                    <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.163c.75 1.334-.213 2.98-1.743 2.98H3.72c-1.53 0-2.492-1.646-1.743-2.98L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>Ingestion Error — contact a data administrator</span>
+                                </div>
+                                <code class="block mt-2 bg-white/60 border border-red-200 rounded px-2 py-1 text-xs text-red-800 overflow-auto" style="max-height:100px; white-space:pre-wrap;">${escapeHtml(log.ErrorDescription)}</code>
+                            </div>`;
+                    }
+
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Request Name:</span> <span class="text-gray-500">${reqRes?.Name || item.dataset?.name || 'N/A'}</span></p>
-                                ${dsRes ? `<p><span class="font-medium text-gray-600">Dataset:</span> <span class="text-gray-500">${dsRes.Name || 'N/A'}</span></p>
-                                           <p><span class="font-medium text-gray-600">Description:</span> <span class="text-gray-500">${dsRes.Description || 'N/A'}</span></p>` : ''}
-                                <p><span class="font-medium text-gray-600">Target Project:</span> <span class="text-gray-500">${proj.name}</span></p>
-                                ${reqRes?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${reqRes.Purpose}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    <div class="field-group">
+                                        <span class="field-label">Request Name</span>
+                                        <span class="field-value">${escapeHtml(reqRes?.Name || row.dataset.name || 'N/A')}</span>
+                                    </div>
+                                    ${dsRes ? `<div class="field-group"><span class="field-label">Dataset</span><span class="field-value">${escapeHtml(dsRes.Name || 'N/A')}</span></div>
+                                    <div class="field-group"><span class="field-label">Description</span><span class="field-value">${escapeHtml(dsRes.Description || 'N/A')}</span></div>` : ''}
+                                    <div class="field-group">
+                                        <span class="field-label">Target Project Name</span>
+                                        <span class="field-value">${escapeHtml(proj.name)}</span>
+                                        ${proj.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(proj.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    </div>
+                                    ${reqRes?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(reqRes.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${reqRes?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(reqRes.ApprovalMessage)}</span></div>` : ''}
+                                    ${reqRes?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(reqRes.RejectionMessage)}</span></div>` : ''}
+                                    ${reqRes?.FinalisedBy ? `<div class="field-group"><span class="field-label">Finalised By</span><span class="field-value">${escapeHtml(reqRes.FinalisedBy)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${reqRes?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${reqRes.ApprovalMessage}</span></p>` : ''}
-                                ${reqRes?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${reqRes.RejectionMessage}</span></p>` : ''}
-                            </div>
+                            ${ingestionHtml ? `<hr class="details-divider"><div>${ingestionHtml}</div>` : ''}
                         </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
@@ -546,8 +709,8 @@ function adminAccessSetupListeners() {
 // IMPORT TAB (Admin)  — server-side pagination via GetAllImportRequests
 // =================================================================
 
-const ADMIN_IMPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
-const ADMIN_IMPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2 };
+const ADMIN_IMPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
+const ADMIN_IMPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2, 'Superseded': -3, 'Cancelled': 5 };
 const ADMIN_IMPORT_ROWS_PER_PAGE = 5;
 
 let adminImportCurrentPage   = 1;
@@ -563,6 +726,13 @@ async function adminImportGetCount(status) {
                 window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 1, search: '', statusId: -1 })
             ]);
             return (safeParseJson(r0)?.RowCount || 0) + (safeParseJson(rW)?.RowCount || 0);
+        }
+        if (status === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 1, search: '', statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 1, search: '', statusId: -3 })
+            ]);
+            return (safeParseJson(r3)?.RowCount || 0) + (safeParseJson(r_3)?.RowCount || 0);
         }
         const statusId = ADMIN_IMPORT_STATUS_ID_MAP[status];
         if (statusId === undefined) return 0;
@@ -604,6 +774,23 @@ async function adminImportRenderUI() {
             const start = (adminImportCurrentPage - 1) * ADMIN_IMPORT_ROWS_PER_PAGE;
             adminImportRenderTable(container, combined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
             renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
+        } else if (adminImportCurrentStatus === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllImportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: -3 })
+            ]);
+            if (token !== _adminImportFetchToken) return;
+            const p3 = safeParseJson(r3) || {};
+            const p_3 = safeParseJson(r_3) || {};
+            const combined = [...(p3.Results || []), ...(p_3.Results || [])].map(item => ({
+                ...item, _status: ADMIN_IMPORT_STATUS_MAP[item.StatusID] ?? ADMIN_IMPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
+            }));
+            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const total = (p3.RowCount || 0) + (p_3.RowCount || 0);
+            adminImportTotalPages = Math.max(1, Math.ceil(total / ADMIN_IMPORT_ROWS_PER_PAGE));
+            const start = (adminImportCurrentPage - 1) * ADMIN_IMPORT_ROWS_PER_PAGE;
+            adminImportRenderTable(container, combined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
+            renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
         } else {
             const statusId = ADMIN_IMPORT_STATUS_ID_MAP[adminImportCurrentStatus];
             const params   = { page: adminImportCurrentPage, pageSize: ADMIN_IMPORT_ROWS_PER_PAGE, search: searchTerm, statusId };
@@ -632,7 +819,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
     const headers = ['', 'Import Request Name', 'Requested By', 'Project Name', 'Requested On'];
     if (selectedStatus === 'Approved')    { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
-    else if (selectedStatus === 'Finalised')   { headers.push('Finalised On'); }
+    else if (selectedStatus === 'Finalised')   { headers.push('Status'); headers.push('Finalised On'); }
     else if (selectedStatus === 'Awaiting Submission') headers.push('Status');
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
@@ -643,37 +830,35 @@ function adminImportRenderTable(container, data, selectedStatus) {
         switch (selectedStatus) {
             case 'Approved':            extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':            extra = `<td class="${tdCls}">${item.RejectedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised':           extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised':           extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
         }
 
         rows += `
         <tr class="table-hover-row admin-import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-import-detail-${item.ImportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">${item.ImportRequestName || 'N/A'}</td>
-            <td class="${tdCls}">${item.CreateUser || item.UserPrincipalName || 'N/A'}</td>
-            <td class="${tdCls}">${item.ImportProjectName || item.ProjectName || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="width:25%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.ImportRequestName)}">${item.ImportRequestName || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.CreateUser || item.UserPrincipalName)}">${item.CreateUser || item.UserPrincipalName || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.ImportProjectName || item.ProjectName)}">${item.ImportProjectName || item.ProjectName || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
         <tr class="admin-import-detail-row hidden" id="admin-import-detail-${item.ImportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="bg-white rounded shadow-sm position-relative">
-                        ${selectedStatus === 'Pending Approval' ? `
-                        <div class="position-absolute" style="top:12px;right:12px;z-index:1">
-                            <div class="btn-group">
-                                <button class="btn btn-success px-3 py-1 me-2 admin-import-approve-btn" data-id="${item.ImportRequestID}" data-name="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">
-                                    <i class="fa fa-thumbs-up me-2"></i>Approve
-                                </button>
-                                <button class="btn btn-danger px-3 py-1 admin-import-reject-btn" data-id="${item.ImportRequestID}" data-name="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">
-                                    <i class="fa fa-thumbs-down me-2"></i>Reject
-                                </button>
-                            </div>
-                        </div>` : ''}
-                        <div class="p-3 admin-import-detail-content">
+                    <div class="accordion-card">
+                        <div class="admin-import-detail-content">
                             <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
                         </div>
+                        ${selectedStatus === 'Pending Approval' ? `
+                        <div class="accordion-actions">
+                            <button class="btn btn-success px-3 py-1 admin-import-approve-btn" data-id="${item.ImportRequestID}" data-name="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">
+                                <i class="fa fa-thumbs-up me-2"></i>Approve
+                            </button>
+                            <button class="btn btn-danger px-3 py-1 admin-import-reject-btn" data-id="${item.ImportRequestID}" data-name="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">
+                                <i class="fa fa-thumbs-down me-2"></i>Reject
+                            </button>
+                        </div>` : ''}
                     </div>
                 </div>
             </td>
@@ -681,10 +866,16 @@ function adminImportRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+    <div class="overflow-x-auto border rounded shadow-sm">
+        <table class="w-full divide-y divide-gray-200" style="table-layout: fixed; min-width: 800px;">
+            <thead class="bg-gray-50">
+                <tr>${thead}</tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                ${rows}
+            </tbody>
+        </table>
+    </div>`;
 
     container.querySelectorAll('.admin-import-row').forEach(row => {
         const detailRow = row.nextElementSibling;
@@ -706,18 +897,21 @@ function adminImportRenderTable(container, data, selectedStatus) {
                 try {
                     const d = safeParseJson(await window.loomeApi.runApiRequest('GetImportRequestByID', { RequestID: row.dataset.id }));
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Import Request Name:</span> <span class="text-gray-500">${d?.ImportRequestName || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Import Request ID:</span> <span class="text-gray-500">${d?.ImportRequestID || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${d?.ProjectName || 'N/A'}</span></p>
-                                ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${d.Purpose}</span></p>` : ''}
-                            </div>
-                            <div class="space-y-2">
-                                ${d?.ApprovedBy       ? `<p><span class="font-medium text-gray-600">Approved By:</span> <span class="text-gray-500">${d.ApprovedBy}</span></p>` : ''}
-                                ${d?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${d.ApprovalMessage}</span></p>` : ''}
-                                ${d?.RejectedBy       ? `<p><span class="font-medium text-gray-600">Rejected By:</span> <span class="text-gray-500">${d.RejectedBy}</span></p>` : ''}
-                                ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${d.RejectionMessage}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    <div class="field-group"><span class="field-label">Import Request Name</span><span class="field-value">${escapeHtml(d?.ImportRequestName || 'N/A')}</span></div>
+                                    <div class="field-group"><span class="field-label">Import Request ID</span><span class="field-value">${escapeHtml(d?.ImportRequestID || 'N/A')}</span></div>
+                                    <div class="field-group"><span class="field-label">Project Name</span><span class="field-value">${escapeHtml(d?.ProjectName || 'N/A')}</span></div>
+                                    ${d?.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(d.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    ${d?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(d.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${d?.ApprovedBy ? `<div class="field-group"><span class="field-label">Approved By</span><span class="field-value">${escapeHtml(d.ApprovedBy)}</span></div>` : ''}
+                                    ${d?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(d.ApprovalMessage)}</span></div>` : ''}
+                                    ${d?.RejectedBy ? `<div class="field-group"><span class="field-label">Rejected By</span><span class="field-value">${escapeHtml(d.RejectedBy)}</span></div>` : ''}
+                                    ${d?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(d.RejectionMessage)}</span></div>` : ''}
+                                </div>
                             </div>
                         </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
@@ -768,8 +962,8 @@ function adminImportSetupListeners() {
 // EXPORT TAB (Admin)  — server-side pagination via GetAllExportRequests
 // =================================================================
 
-const ADMIN_EXPORT_STATUS_MAP    = { '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected' };
-const ADMIN_EXPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2 };
+const ADMIN_EXPORT_STATUS_MAP    = { '-3': 'Superseded', '-2': 'Failed', '-1': 'Working', 0: 'Awaiting Submission', 1: 'Pending Approval', 2: 'Approved', 3: 'Finalised', 4: 'Rejected', 5: 'Cancelled' };
+const ADMIN_EXPORT_STATUS_ID_MAP = { 'Awaiting Submission': 0, 'Pending Approval': 1, 'Approved': 2, 'Finalised': 3, 'Rejected': 4, 'Working': -1, 'Failed': -2, 'Superseded': -3, 'Cancelled': 5 };
 const ADMIN_EXPORT_ROWS_PER_PAGE = 5;
 
 let adminExportCurrentPage   = 1;
@@ -785,6 +979,13 @@ async function adminExportGetCount(status) {
                 window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 1, search: '', statusId: -1 })
             ]);
             return (safeParseJson(r0)?.RowCount || 0) + (safeParseJson(rW)?.RowCount || 0);
+        }
+        if (status === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 1, search: '', statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 1, search: '', statusId: -3 })
+            ]);
+            return (safeParseJson(r3)?.RowCount || 0) + (safeParseJson(r_3)?.RowCount || 0);
         }
         const statusId = ADMIN_EXPORT_STATUS_ID_MAP[status];
         if (statusId === undefined) return 0;
@@ -826,6 +1027,23 @@ async function adminExportRenderUI() {
             const start = (adminExportCurrentPage - 1) * ADMIN_EXPORT_ROWS_PER_PAGE;
             adminExportRenderTable(container, combined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
             renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
+        } else if (adminExportCurrentStatus === 'Finalised') {
+            const [r3, r_3] = await Promise.all([
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: 3 }),
+                window.loomeApi.runApiRequest('GetAllExportRequests', { page: 1, pageSize: 200, search: searchTerm, statusId: -3 })
+            ]);
+            if (token !== _adminExportFetchToken) return;
+            const p3 = safeParseJson(r3) || {};
+            const p_3 = safeParseJson(r_3) || {};
+            const combined = [...(p3.Results || []), ...(p_3.Results || [])].map(item => ({
+                ...item, _status: ADMIN_EXPORT_STATUS_MAP[item.StatusID] ?? ADMIN_EXPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
+            }));
+            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const total = (p3.RowCount || 0) + (p_3.RowCount || 0);
+            adminExportTotalPages = Math.max(1, Math.ceil(total / ADMIN_EXPORT_ROWS_PER_PAGE));
+            const start = (adminExportCurrentPage - 1) * ADMIN_EXPORT_ROWS_PER_PAGE;
+            adminExportRenderTable(container, combined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
+            renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
         } else {
             const statusId = ADMIN_EXPORT_STATUS_ID_MAP[adminExportCurrentStatus];
             const params   = { page: adminExportCurrentPage, pageSize: ADMIN_EXPORT_ROWS_PER_PAGE, search: searchTerm, statusId };
@@ -854,7 +1072,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
     const headers = ['', 'Export Request Name', 'Requested By', 'Project Name', 'Requested On'];
     if (selectedStatus === 'Approved')    { headers.push('Approved By'); headers.push('Approved On'); }
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
-    else if (selectedStatus === 'Finalised')   { headers.push('Finalised On'); }
+    else if (selectedStatus === 'Finalised')   { headers.push('Status'); headers.push('Finalised On'); }
     else if (selectedStatus === 'Awaiting Submission') headers.push('Status');
 
     const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
@@ -865,37 +1083,35 @@ function adminExportRenderTable(container, data, selectedStatus) {
         switch (selectedStatus) {
             case 'Approved':            extra = `<td class="${tdCls}">${item.ApprovedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.ApprovedDate)}</td>`; break;
             case 'Rejected':            extra = `<td class="${tdCls}">${item.RejectedBy || 'N/A'}</td><td class="${tdCls}">${formatDate(item.RejectedDate)}</td>`; break;
-            case 'Finalised':           extra = `<td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
+            case 'Finalised':           extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td><td class="${tdCls}">${formatDate(item.FinalisedDate)}</td>`; break;
             case 'Awaiting Submission': extra = `<td class="${tdCls}">${getStatusBadgeHtml(item._status)}</td>`; break;
         }
 
         rows += `
         <tr class="table-hover-row admin-export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-export-detail-${item.ExportRequestID}">
             <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
-            <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${item.ExportRequestName || 'N/A'}</td>
-            <td class="${tdCls}">${item.CreateUser || 'N/A'}</td>
-            <td class="${tdCls}">${item.ExportProjectName || item.ProjectName || 'N/A'}</td>
+            <td class="${tdCls} font-medium" style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${item.ExportRequestName || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.CreateUser || 'N/A'}</td>
+            <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.ExportProjectName || item.ProjectName || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             ${extra}
         </tr>
         <tr class="admin-export-detail-row hidden" id="admin-export-detail-${item.ExportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="bg-white rounded shadow-sm position-relative">
-                        ${selectedStatus === 'Pending Approval' ? `
-                        <div class="position-absolute" style="top:12px;right:12px;z-index:1">
-                            <div class="btn-group">
-                                <button class="btn btn-success px-3 py-1 me-2 admin-export-approve-btn" data-id="${item.ExportRequestID}" data-name="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}" data-project-id="${item.ExportProjectID || ''}" data-create-user="${item.CreateUser || ''}">
-                                    <i class="fa fa-thumbs-up me-2"></i>Approve
-                                </button>
-                                <button class="btn btn-danger px-3 py-1 admin-export-reject-btn" data-id="${item.ExportRequestID}" data-name="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">
-                                    <i class="fa fa-thumbs-down me-2"></i>Reject
-                                </button>
-                            </div>
-                        </div>` : ''}
-                        <div class="p-3 admin-export-detail-content">
+                    <div class="accordion-card">
+                        <div class="admin-export-detail-content">
                             <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
                         </div>
+                        ${selectedStatus === 'Pending Approval' ? `
+                        <div class="accordion-actions">
+                            <button class="btn btn-success px-3 py-1 admin-export-approve-btn" data-id="${item.ExportRequestID}" data-name="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}" data-project-id="${item.ExportProjectID || ''}" data-create-user="${item.CreateUser || ''}">
+                                <i class="fa fa-thumbs-up me-2"></i>Approve
+                            </button>
+                            <button class="btn btn-danger px-3 py-1 admin-export-reject-btn" data-id="${item.ExportRequestID}" data-name="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">
+                                <i class="fa fa-thumbs-down me-2"></i>Reject
+                            </button>
+                        </div>` : ''}
                     </div>
                 </div>
             </td>
@@ -903,10 +1119,12 @@ function adminExportRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+        <div class="overflow-x-auto border rounded shadow-sm">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>${thead}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+            </table>
+        </div>`;
 
     container.querySelectorAll('.admin-export-row').forEach(row => {
         const detailRow = row.nextElementSibling;
@@ -930,19 +1148,23 @@ function adminExportRenderTable(container, data, selectedStatus) {
                     if (exportRowId === null) throw new Error('Invalid export request ID.');
                     const d = safeParseJson(await window.loomeApi.runApiRequest('GetExportRequestByID', { ExportRequestID: exportRowId }));
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Export Request Name:</span> <span class="text-gray-500">${d?.ExportRequestName || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Export Request ID:</span> <span class="text-gray-500">${d?.ExportRequestID || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${d?.ProjectName || 'N/A'}</span></p>
-                                ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${d.Purpose}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    <div class="field-group"><span class="field-label">Export Request Name</span><span class="field-value">${escapeHtml(d?.ExportRequestName || 'N/A')}</span></div>
+                                    <div class="field-group"><span class="field-label">Export Request ID</span><span class="field-value">${escapeHtml(d?.ExportRequestID || 'N/A')}</span></div>
+                                    <div class="field-group"><span class="field-label">Project Name</span><span class="field-value">${escapeHtml(d?.ProjectName || 'N/A')}</span></div>
+                                    ${d?.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(d.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    ${d?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(d.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${d?.ApprovedBy ? `<div class="field-group"><span class="field-label">Approved By</span><span class="field-value">${escapeHtml(d.ApprovedBy)}</span></div>` : ''}
+                                    ${d?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(d.ApprovalMessage)}</span></div>` : ''}
+                                    ${d?.RejectedBy ? `<div class="field-group"><span class="field-label">Rejected By</span><span class="field-value">${escapeHtml(d.RejectedBy)}</span></div>` : ''}
+                                    ${d?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(d.RejectionMessage)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${d?.ApprovedBy       ? `<p><span class="font-medium text-gray-600">Approved By:</span> <span class="text-gray-500">${d.ApprovedBy}</span></p>` : ''}
-                                ${d?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${d.ApprovalMessage}</span></p>` : ''}
-                                ${d?.RejectedBy       ? `<p><span class="font-medium text-gray-600">Rejected By:</span> <span class="text-gray-500">${d.RejectedBy}</span></p>` : ''}
-                                ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${d.RejectionMessage}</span></p>` : ''}
-                            </div>
+                            ${d?.StatusID === -3 ? `<div class="alert-deleted">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}
                         </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
@@ -997,6 +1219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     adminImportSetupListeners();
     adminExportSetupListeners();
     setupActionModalConfirm();
+    setupTutorialListeners();
 
     // Refresh button
     document.getElementById('refresh-btn')?.addEventListener('click', async () => {
