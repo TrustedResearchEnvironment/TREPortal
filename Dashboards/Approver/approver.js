@@ -708,7 +708,8 @@ async function getProjectsMapping() {
             data.forEach(project => {
                 mapping[project.AssistProjectID] = {
                     name: project.Name,
-                    description: project.Description
+                    description: project.Description,
+                    DeletedDate: project.DeletedDate
                 };
             });
         }
@@ -765,56 +766,64 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails,
         
         // Start building HTML
         let html = `
-            <div class="grid grid-cols-2 gap-5">
-                <div>
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Requested Dataset</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Name || 'N/A'}</span>
-                        </div>
+        <div class="details-card">
+            <div class="details-grid">
+                <!-- Left Column: Primary Metadata -->
+                <div class="details-section">
+                    <div class="field-group">
+                        <span class="field-label">Requested Dataset</span>
+                        <span class="field-value" style="font-weight: 600;">${datasetDetails.Name || 'N/A'}</span>
+                    </div>
 
-                        ${datasetDetails.Description ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Dataset Description</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.Description}</span>
+                    ${datasetDetails.Description ? `
+                    <div class="field-group">
+                        <span class="field-label">Dataset Description</span>
+                        <span class="field-value">${datasetDetails.Description}</span>
+                    </div>` : ''}
+                    
+                    <div class="field-group">
+                        <span class="field-label">Data Source ID</span>
+                        <span class="field-value"><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px;">${datasetDetails.DataSource || datasetDetails.DataSourceID || 'N/A'}</code></span>
+                    </div>
+
+                    <div class="field-group">
+                        <span class="field-label">Target Project Name</span>
+                        <span class="field-value">${projectInfo.name}</span>
+                        ${projectInfo.DeletedDate ? `
+                        <div class="alert-deleted">
+                            Target Project Deleted on: ${new Date(projectInfo.DeletedDate).toLocaleDateString()}
                         </div>` : ''}
-                        
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Data Source ID</span>
-                            <span class="text-sm text-gray-500">${datasetDetails.DataSource || datasetDetails.DataSourceID || 'N/A'}</span>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Target Project Name</span>
-                            <span class="text-sm text-gray-500">${projectInfo.name}</span>
-                        </div>
                     </div>
                 </div>
-                <div>
-                    <div class="space-y-3">
-                        ${requestDetails.Purpose ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Purpose</span>
-                            <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
-                        </div>` : ''}
 
-                        ${requestDetails.ApprovalMessage ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Approval Message</span>
-                            <span class="text-sm text-gray-500">${requestDetails.ApprovalMessage}</span>
-                        </div>` : ''}
+                <!-- Right Column: Status & Request Notes -->
+                <div class="details-section">
+                    ${requestDetails.Purpose ? `
+                    <div class="field-group">
+                        <span class="field-label">Purpose</span>
+                        <span class="field-value">${requestDetails.Purpose}</span>
+                    </div>` : ''}
 
-                        ${requestDetails.RejectionMessage ? `
-                        <div class="grid grid-cols-1 gap-1">
-                            <span class="font-medium">Rejection Message</span>
-                            <span class="text-sm text-gray-500">${requestDetails.RejectionMessage}</span>
-                        </div>` : ''}
-                    </div>
+                    ${requestDetails.ApprovalMessage ? `
+                    <div class="field-group" style="background: #f0fdf4; padding: 12px; border-radius: 6px; border: 1px solid #bbf7d0;">
+                        <span class="field-label" style="color: #166534;">Approval Message</span>
+                        <span class="field-value" style="color: #14532d;">${requestDetails.ApprovalMessage}</span>
+                    </div>` : ''}
+
+                    ${requestDetails.RejectionMessage ? `
+                    <div class="field-group" style="background: #fef2f2; padding: 12px; border-radius: 6px; border: 1px solid #fecaca;">
+                        <span class="field-label" style="color: #991b1b;">Rejection Message</span>
+                        <span class="field-value" style="color: #7f1d1d;">${requestDetails.RejectionMessage}</span>
+                    </div>` : ''}
                 </div>
             </div>
-            ${ingestionHtml}
-        `;
-        
+
+            ${ingestionHtml ? `
+                <hr class="details-divider">
+                <div>${ingestionHtml}</div>
+            ` : ''}
+        </div>
+    `;
         // Update the container
         container.innerHTML = html;
         
@@ -1051,9 +1060,13 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 <td colspan="${headers.length + 1}" class="p-0"> <!-- +1 for chevron column -->
                     <div class="bg-gray-50 p-4 m-2 rounded">
                         <div class="grid grid-cols-1 gap-4">
-                            <div class="flex justify-end mb-1">
-                                <div class="btn-group">                                  
-                                    <button class="btn btn-success action-approve px-3 py-1 mr-2" data-bs-toggle="modal" data-bs-target="#approveRequestModal">
+                            <!-- Combined Information Card -->
+                            <div class="bg-white p-5 rounded-md shadow-sm">
+                                <div id="combined-details-${item.RequestID}" class="combined-content">
+                                    <p class="text-center text-gray-500">Loading details...</p>
+                                </div>
+                                <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
+                                    <button class="btn btn-success action-approve px-3 py-1" data-bs-toggle="modal" data-bs-target="#approveRequestModal">
                                         <i class="fa fa-thumbs-up mr-2"></i>
                                         Approve
                                     </button>
@@ -1061,13 +1074,6 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                                         <i class="fa fa-thumbs-down mr-2"></i>
                                         Reject
                                     </button>
-                                </div>
-                            </div>
-                            
-                            <!-- Combined Information Card -->
-                            <div class="bg-white p-5 rounded-md shadow-sm">
-                                <div id="combined-details-${item.RequestID}" class="combined-content">
-                                    <p class="text-center text-gray-500">Loading details...</p>
                                 </div>
                             </div>
                         </div>

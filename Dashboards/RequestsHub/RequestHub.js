@@ -274,8 +274,8 @@ async function accessGetProjectsMapping() {
         });
         const map  = {};
         (projects || []).forEach(p => {
-            map[p.AssistProjectID]        = { name: p.Name, description: p.Description };
-            map[String(p.AssistProjectID)] = { name: p.Name, description: p.Description };
+            map[p.AssistProjectID]        = { name: p.Name, description: p.Description, DeletedDate: p.DeletedDate };
+            map[String(p.AssistProjectID)] = { name: p.Name, description: p.Description, DeletedDate: p.DeletedDate };
         });
         accessProjectsCache = map;
         return map;
@@ -410,9 +410,11 @@ function accessRenderTable(container, data, selectedStatus) {
         <tr class="access-detail-row hidden" id="access-detail-${item.RequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="d-flex justify-content-end mb-2">${deleteBtn}</div>
-                    <div class="bg-white rounded p-3 shadow-sm access-detail-content">
-                        <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                    <div class="accordion-card">
+                        <div class="access-detail-content">
+                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                        </div>
+                        ${deleteBtn ? `<div class="accordion-actions">${deleteBtn}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -482,20 +484,26 @@ function accessRenderTable(container, data, selectedStatus) {
                     }
 
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                ${dsRes ? `<p><span class="font-medium text-gray-600">Dataset:</span> <span class="text-gray-500">${escapeHtml(dsRes.Name) || 'N/A'}</span></p>
-                                           <p><span class="font-medium text-gray-600">Description:</span> <span class="text-gray-500">${escapeHtml(dsRes.Description) || 'N/A'}</span></p>` : ''}
-                                <p><span class="font-medium text-gray-600">Target Project:</span> <span class="text-gray-500">${escapeHtml(proj.name)}</span></p>
-                                ${reqRes?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${escapeHtml(reqRes.Purpose)}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    ${dsRes ? `<div class="field-group"><span class="field-label">Dataset</span><span class="field-value">${escapeHtml(dsRes.Name) || 'N/A'}</span></div>
+                                    <div class="field-group"><span class="field-label">Description</span><span class="field-value">${escapeHtml(dsRes.Description) || 'N/A'}</span></div>` : ''}
+                                    <div class="field-group">
+                                        <span class="field-label">Target Project Name</span>
+                                        <span class="field-value">${escapeHtml(proj.name)}</span>
+                                        ${proj.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(proj.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    </div>
+                                    ${reqRes?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(reqRes.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${reqRes?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(reqRes.ApprovalMessage)}</span></div>` : ''}
+                                    ${reqRes?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(reqRes.RejectionMessage)}</span></div>` : ''}
+                                    ${reqRes?.FinalisedBy ? `<div class="field-group"><span class="field-label">Finalised By</span><span class="field-value">${escapeHtml(reqRes.FinalisedBy)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${reqRes?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${escapeHtml(reqRes.ApprovalMessage)}</span></p>` : ''}
-                                ${reqRes?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(reqRes.RejectionMessage)}</span></p>` : ''}
-                                ${reqRes?.FinalisedBy      ? `<p><span class="font-medium text-gray-600">Finalised By:</span> <span class="text-gray-500">${escapeHtml(reqRes.FinalisedBy)}</span></p>` : ''}
-                            </div>
-                        </div>
-                        ${ingestionHtml}`;
+                            ${ingestionHtml ? `<hr class="details-divider"><div>${ingestionHtml}</div>` : ''}
+                        </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });
@@ -694,9 +702,11 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
         <tr class="import-detail-row hidden" id="import-detail-${item.ImportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="d-flex justify-content-end mb-2">${deleteBtn}${submitBtn}</div>
-                    <div class="bg-white rounded p-3 shadow-sm import-detail-content">
-                        <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                    <div class="accordion-card">
+                        <div class="import-detail-content">
+                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                        </div>
+                        ${deleteBtn || submitBtn ? `<div class="accordion-actions">${deleteBtn}${submitBtn}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -729,22 +739,25 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
                 try {
                     const d = safeParseJson(await window.loomeApi.runApiRequest('GetImportRequestByID', { RequestID: row.dataset.id }));
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Import Request ID:</span> <span class="text-gray-500">${escapeHtml(d?.ImportRequestID) || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${escapeHtml(d?.ProjectName) || 'N/A'}</span></p>
-                                ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${escapeHtml(d.Purpose)}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    <div class="field-group"><span class="field-label">Import Request ID</span><span class="field-value">${escapeHtml(d?.ImportRequestID) || 'N/A'}</span></div>
+                                    <div class="field-group"><span class="field-label">Project Name</span><span class="field-value">${escapeHtml(d?.ProjectName) || 'N/A'}</span></div>
+                                    ${d?.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(d.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    ${d?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(d.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${d?.ApprovedBy ? `<div class="field-group"><span class="field-label">Approved By</span><span class="field-value">${escapeHtml(d.ApprovedBy)}</span></div>` : ''}
+                                    ${d?.ApprovedDate ? `<div class="field-group"><span class="field-label">Approved On</span><span class="field-value">${formatDate(d.ApprovedDate)}</span></div>` : ''}
+                                    ${d?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(d.ApprovalMessage)}</span></div>` : ''}
+                                    ${d?.RejectedBy ? `<div class="field-group"><span class="field-label">Rejected By</span><span class="field-value">${escapeHtml(d.RejectedBy)}</span></div>` : ''}
+                                    ${d?.RejectedDate ? `<div class="field-group"><span class="field-label">Rejected On</span><span class="field-value">${formatDate(d.RejectedDate)}</span></div>` : ''}
+                                    ${d?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(d.RejectionMessage)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${d?.ApprovedBy       ? `<p><span class="font-medium text-gray-600">Approved By:</span> <span class="text-gray-500">${escapeHtml(d.ApprovedBy)}</span></p>` : ''}
-                                ${d?.ApprovedDate     ? `<p><span class="font-medium text-gray-600">Approved On:</span> <span class="text-gray-500">${formatDate(d.ApprovedDate)}</span></p>` : ''}
-                                ${d?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${escapeHtml(d.ApprovalMessage)}</span></p>` : ''}
-                                ${d?.RejectedBy       ? `<p><span class="font-medium text-gray-600">Rejected By:</span> <span class="text-gray-500">${escapeHtml(d.RejectedBy)}</span></p>` : ''}
-                                ${d?.RejectedDate     ? `<p><span class="font-medium text-gray-600">Rejected On:</span> <span class="text-gray-500">${formatDate(d.RejectedDate)}</span></p>` : ''}
-                                ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(d.RejectionMessage)}</span></p>` : ''}
-                            </div>
-                        </div>
-                        ${d?.StatusID === -3 ? `<div class="mt-3 p-2 bg-gray-50 border-start border-4 border-gray-300 text-gray-600 text-xs italic">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}`;
+                            ${d?.StatusID === -3 ? `<div class="alert-deleted">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}
+                        </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });
@@ -1038,9 +1051,11 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
         <tr class="export-detail-row hidden" id="export-detail-${item.ExportRequestID}" aria-hidden="true">
             <td colspan="${headers.length}" class="p-0">
                 <div class="accordion-detail">
-                    <div class="d-flex justify-content-end mb-2">${deleteBtn}${submitBtn}</div>
-                    <div class="bg-white rounded p-3 shadow-sm export-detail-content">
-                        <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                    <div class="accordion-card">
+                        <div class="export-detail-content">
+                            <p class="text-center text-gray-400 text-sm mb-0">Loading details…</p>
+                        </div>
+                        ${deleteBtn || submitBtn ? `<div class="accordion-actions">${deleteBtn}${submitBtn}</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -1073,22 +1088,25 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
                 try {
                     const d = safeParseJson(await window.loomeApi.runApiRequest('GetExportRequestByID', { ExportRequestID: parseInt(row.dataset.id, 10) }));
                     content.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div class="space-y-2">
-                                <p><span class="font-medium text-gray-600">Export Request ID:</span> <span class="text-gray-500">${escapeHtml(d?.ExportRequestID) || 'N/A'}</span></p>
-                                <p><span class="font-medium text-gray-600">Project Name:</span> <span class="text-gray-500">${escapeHtml(d?.ProjectName) || 'N/A'}</span></p>
-                                ${d?.Purpose ? `<p><span class="font-medium text-gray-600">Purpose:</span> <span class="text-gray-500">${escapeHtml(d.Purpose)}</span></p>` : ''}
+                        <div class="details-card${selectedStatus === 'Pending Approval' ? ' pending-approval-details' : ''}">
+                            <div class="details-grid">
+                                <div class="details-section">
+                                    <div class="field-group"><span class="field-label">Export Request ID</span><span class="field-value">${escapeHtml(d?.ExportRequestID) || 'N/A'}</span></div>
+                                    <div class="field-group"><span class="field-label">Project Name</span><span class="field-value">${escapeHtml(d?.ProjectName) || 'N/A'}</span></div>
+                                    ${d?.DeletedDate ? `<div class="alert-deleted">Target Project Deleted on: ${new Date(d.DeletedDate).toLocaleDateString()}</div>` : ''}
+                                    ${d?.Purpose ? `<div class="field-group"><span class="field-label">Purpose</span><span class="field-value">${escapeHtml(d.Purpose)}</span></div>` : ''}
+                                </div>
+                                <div class="details-section">
+                                    ${d?.ApprovedBy ? `<div class="field-group"><span class="field-label">Approved By</span><span class="field-value">${escapeHtml(d.ApprovedBy)}</span></div>` : ''}
+                                    ${d?.ApprovedDate ? `<div class="field-group"><span class="field-label">Approved On</span><span class="field-value">${formatDate(d.ApprovedDate)}</span></div>` : ''}
+                                    ${d?.ApprovalMessage ? `<div class="field-group approval-message"><span class="field-label">Approval Message</span><span class="field-value">${escapeHtml(d.ApprovalMessage)}</span></div>` : ''}
+                                    ${d?.RejectedBy ? `<div class="field-group"><span class="field-label">Rejected By</span><span class="field-value">${escapeHtml(d.RejectedBy)}</span></div>` : ''}
+                                    ${d?.RejectedDate ? `<div class="field-group"><span class="field-label">Rejected On</span><span class="field-value">${formatDate(d.RejectedDate)}</span></div>` : ''}
+                                    ${d?.RejectionMessage ? `<div class="field-group rejection-message"><span class="field-label">Rejection Message</span><span class="field-value">${escapeHtml(d.RejectionMessage)}</span></div>` : ''}
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                ${d?.ApprovedBy       ? `<p><span class="font-medium text-gray-600">Approved By:</span> <span class="text-gray-500">${escapeHtml(d.ApprovedBy)}</span></p>` : ''}
-                                ${d?.ApprovedDate     ? `<p><span class="font-medium text-gray-600">Approved On:</span> <span class="text-gray-500">${formatDate(d.ApprovedDate)}</span></p>` : ''}
-                                ${d?.ApprovalMessage  ? `<p><span class="font-medium text-gray-600">Approval Message:</span> <span class="text-gray-500">${escapeHtml(d.ApprovalMessage)}</span></p>` : ''}
-                                ${d?.RejectedBy       ? `<p><span class="font-medium text-gray-600">Rejected By:</span> <span class="text-gray-500">${escapeHtml(d.RejectedBy)}</span></p>` : ''}
-                                ${d?.RejectedDate     ? `<p><span class="font-medium text-gray-600">Rejected On:</span> <span class="text-gray-500">${formatDate(d.RejectedDate)}</span></p>` : ''}
-                                ${d?.RejectionMessage ? `<p><span class="font-medium text-gray-600">Rejection Message:</span> <span class="text-gray-500">${escapeHtml(d.RejectionMessage)}</span></p>` : ''}
-                            </div>
-                        </div>
-                        ${d?.StatusID === -3 ? `<div class="mt-3 p-2 bg-gray-50 border-start border-4 border-gray-300 text-gray-600 text-xs italic">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}`;
+                            ${d?.StatusID === -3 ? `<div class="alert-deleted">Note: This request has been superseded by a subsequent submission. Any associated data has been updated accordingly.</div>` : ''}
+                        </div>`;
                 } catch (err) { content.innerHTML = `<p class="text-red-500 text-sm">Error loading details.</p>`; }
             }
         });
