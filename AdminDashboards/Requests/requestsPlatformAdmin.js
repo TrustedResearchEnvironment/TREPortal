@@ -733,6 +733,12 @@ async function displayCombinedDetails(container, requestDetails, datasetDetails,
                             <span class="text-sm text-gray-500">${requestDetails.Purpose}</span>
                         </div>` : ''}
 
+                        ${requestDetails.ApprovedDate ? `
+                        <div class="grid grid-cols-1 gap-1">
+                            <span class="font-medium">Approved On</span>
+                            <span class="text-sm text-gray-500">${formatDate(requestDetails.ApprovedDate)}</span>
+                        </div>` : ''}
+
                         ${requestDetails.ApprovalMessage ? `
                         <div class="grid grid-cols-1 gap-1">
                             <span class="font-medium">Approval Message</span>
@@ -912,11 +918,11 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     headerRow.appendChild(chevronTh);
     
     // Define headers based on the selected status
-    const headers = ['Request ID', 'Request Name', 'Requested On'];
+    const headers = ['Request ID', 'Request Name', 'Requested On', 'Requested By'];
     if (selectedStatus === 'Pending Approval') headers.push('Approvers');
     else if (selectedStatus === 'Approved') { headers.push('Approved by'); headers.push('Approved on'); }
     else if (selectedStatus === 'Rejected') { headers.push('Rejected by'); headers.push('Rejected on'); }
-    else if (selectedStatus === 'Finalised') { headers.push('Approved by'); headers.push('Approved on'); headers.push('Finalised on'); }
+    else if (selectedStatus === 'Finalised') { headers.push('Approved by'); headers.push('Finalised on'); }
             
     
     headers.forEach(headerText => {
@@ -949,7 +955,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 case 'Pending Approval': statusSpecificCols = `<td class="${tdClasses}">${item.Approvers || 'N/A'}</td>`; break;
                 case 'Rejected': statusSpecificCols = `<td class="${tdClasses}">${item.RejectedBy || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.RejectedDate)}</td>`; break;
                 case 'Approved': statusSpecificCols = `<td class="${tdClasses}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td>`; break;
-                case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.ApprovedDate)}</td><td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
+                case 'Finalised': statusSpecificCols = `<td class="${tdClasses}">${item.CurrentlyApproved || 'N/A'}</td><td class="${tdClasses}">${formatDate(item.FinalisedDate)}</td>`; break;
             }
 
             // Add chevron as first column
@@ -963,6 +969,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 <td class="${tdClasses}">${item.RequestID}</td>
                 <td class="${tdClasses}" ${nameStyle}>${item.Name}</td>
                 <td class="${tdClasses}">${formatDate(item.CreateDate)}</td>
+                <td class="${tdClasses}">${item.CreateUser || 'N/A'}</td>
                 ${statusSpecificCols}
             `;
             
