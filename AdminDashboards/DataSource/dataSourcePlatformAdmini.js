@@ -1531,10 +1531,10 @@ async function renderPlatformAdminDataSourcePage() {
 
     const refreshBtn = document.getElementById('refreshDatasourceBtn');
     if (refreshBtn) {
+        const refreshIcon = refreshBtn.querySelector('svg');
         refreshBtn.addEventListener('click', async () => {
-            const originalHtml = refreshBtn.innerHTML;
             refreshBtn.disabled = true;
-            refreshBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing…`;
+            refreshIcon?.classList.add('animate-spin');
             try {
                 await fetchAndRenderPage(tableConfig, currentPage, searchInput?.value || '');
                 showToast('Data refreshed.', 'success');
@@ -1542,7 +1542,7 @@ async function renderPlatformAdminDataSourcePage() {
                 showToast('Failed to refresh data.', 'error');
             } finally {
                 refreshBtn.disabled = false;
-                refreshBtn.innerHTML = originalHtml;
+                refreshIcon?.classList.remove('animate-spin');
             }
         });
     }
