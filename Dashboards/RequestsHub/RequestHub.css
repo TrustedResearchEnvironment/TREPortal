@@ -83,6 +83,38 @@
     background-color: #f8f9fa !important;
 }
 
+/* ── Sortable Table Headers ──────────────────────────────────── */
+.access-sort-header,
+.import-sort-header,
+.export-sort-header {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.access-sort-header:hover,
+.import-sort-header:hover,
+.export-sort-header:hover {
+    background-color: #f3f4f6;
+    color: #1f2937;
+}
+
+.sort-icon {
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: middle;
+    transition: opacity 0.2s ease;
+    color: #6b7280;
+}
+
+.access-sort-header:focus,
+.import-sort-header:focus,
+.export-sort-header:focus {
+    outline: 2px solid #1AABA3;
+    outline-offset: -2px;
+}
+
 /* ── Accordion Detail Rows ───────────────────────────────────── */
 .detail-row td {
     padding: 0;

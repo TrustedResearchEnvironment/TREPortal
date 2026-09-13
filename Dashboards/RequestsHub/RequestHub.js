@@ -124,6 +124,47 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+function sortByRequestedOnDesc(items) {
+    return [...(items || [])].sort((a, b) => new Date(b?.CreateDate || 0) - new Date(a?.CreateDate || 0));
+}
+
+/**
+ * Generic sort comparator for different data types.
+ * Handles dates, numbers, and strings intelligently.
+ */
+function compareValues(a, b, isAscending = true) {
+    // Handle nulls/undefined
+    if (a == null && b == null) return 0;
+    if (a == null) return isAscending ? 1 : -1;
+    if (b == null) return isAscending ? -1 : 1;
+
+    // Try date parsing
+    const aDate = new Date(a);
+    const bDate = new Date(b);
+    if (!isNaN(aDate.getTime()) && !isNaN(bDate.getTime())) {
+        return isAscending ? aDate - bDate : bDate - aDate;
+    }
+
+    // Try numeric
+    const aNum = parseFloat(a);
+    const bNum = parseFloat(b);
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+        return isAscending ? aNum - bNum : bNum - aNum;
+    }
+
+    // String comparison
+    const aStr = String(a).toLowerCase();
+    const bStr = String(b).toLowerCase();
+    return isAscending ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+}
+
+/**
+ * SVG sort icons for table headers.
+ */
+const SVG_SORT_UP = `<svg class="sort-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-left:4px;display:inline;flex-shrink:0"><path d="M6 2L1 7h10z" /></svg>`;
+const SVG_SORT_DOWN = `<svg class="sort-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-left:4px;display:inline;flex-shrink:0"><path d="M6 10L1 5h10z" /></svg>`;
+const SVG_SORT_BOTH = `<svg class="sort-icon" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-left:4px;display:inline;opacity:0.4;flex-shrink:0"><path d="M6 2L1 7h10z"/><path d="M6 10L1 5h10z"/></svg>`;
+
 /**
  * Strips characters outside the safe whitelist to guard against injection.
  * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
@@ -264,6 +305,8 @@ let accessTotalPages    = 1;
 let accessCurrentStatus = 'Pending Approval';
 let accessProjectsCache = null;
 let _accessFetchToken   = 0;
+let accessSortKey       = 'CreateDate';
+let accessSortDir       = 'desc';
 
 async function accessGetProjectsMapping() {
     if (accessProjectsCache) return accessProjectsCache;
@@ -357,6 +400,9 @@ async function accessRenderUI() {
             });
         }
 
+        // Apply sort (unless server already sorted)
+        data = accessApplySort(data);
+
         accessTotalPages = Math.max(1, Math.ceil(total / ACCESS_ROWS_PER_PAGE));
         accessRenderTable(container, data, accessCurrentStatus);
         renderPaginationHtml('access-pagination', total, ACCESS_ROWS_PER_PAGE, accessCurrentPage);
@@ -366,6 +412,23 @@ async function accessRenderUI() {
     } finally {
         if (token === _accessFetchToken) document.querySelectorAll('#access-pagination [data-page]').forEach(b => { b.disabled = false; });
     }
+}
+
+function accessApplySort(data) {
+    const keyMap = {
+        'Request ID': 'RequestID',
+        'Request Name': 'Name',
+        'Requested On': 'CreateDate',
+        'Approvers': 'Approvers',
+        'Approved By': 'CurrentlyApproved',
+        'Approved On': 'ApprovedDate',
+        'Rejected By': 'RejectedBy',
+        'Rejected On': 'RejectedDate',
+        'Finalised On': 'FinalisedDate'
+    };
+    const key = keyMap[accessSortKey] || accessSortKey;
+    const isAsc = accessSortDir === 'asc';
+    return [...data].sort((a, b) => compareValues(a[key], b[key], isAsc));
 }
 
 function accessRenderTable(container, data, selectedStatus) {
@@ -381,7 +444,13 @@ function accessRenderTable(container, data, selectedStatus) {
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
     else if (selectedStatus === 'Finalised')   { headers.push('Approved By'); headers.push('Approved On'); headers.push('Finalised On'); }
 
-    const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
+    const thead = headers.map(h => {
+        if (h === '') return `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`;
+        const isActive = accessSortKey === h;
+        const icon = !isActive ? SVG_SORT_BOTH : (accessSortDir === 'asc' ? SVG_SORT_UP : SVG_SORT_DOWN);
+        const tooltip = isActive ? `Click to sort ${accessSortDir === 'asc' ? 'descending' : 'ascending'}` : 'Click to sort';
+        return `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition access-sort-header" data-sort-key="${h}" title="${tooltip}" role="button" tabindex="0">${h}${icon}</th>`;
+    }).join('');
 
     let rows = '';
     data.forEach(item => {
@@ -516,6 +585,27 @@ function accessRenderTable(container, data, selectedStatus) {
             accessShowDeleteModal(btn.dataset.id, btn.dataset.name);
         });
     });
+
+    // Sort header clicks
+    container.querySelectorAll('.access-sort-header').forEach(th => {
+        th.addEventListener('click', (e) => {
+            const newKey = th.dataset.sortKey;
+            if (accessSortKey === newKey) {
+                accessSortDir = accessSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                accessSortKey = newKey;
+                accessSortDir = 'asc';
+            }
+            accessCurrentPage = 1;
+            accessRenderUI();
+        });
+        th.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                th.click();
+            }
+        });
+    });
 }
 
 function accessSetupListeners() {
@@ -562,6 +652,8 @@ let importTotalPages     = 1;
 let importCurrentStatus  = 'Awaiting Submission';
 let importAllJobs        = [];
 let importProjectsFetched = false;
+let importSortKey       = 'CreateDate';
+let importSortDir       = 'desc';
 
 function importGetStatus(job) {
     const id = job.StatusID ?? 0;
@@ -649,11 +741,27 @@ async function importPopulateProjects() {
     } finally { select.disabled = false; }
 }
 
+function importApplySort(data) {
+    const keyMap = {
+        'Import Request Name': 'ImportRequestName',
+        'Requested On': 'CreateDate',
+        'Project Name': 'ImportProjectName',
+        'Status': '_status',
+        'Approved By': 'ApprovedBy',
+        'Approved On': 'ApprovedDate',
+        'Rejected On': 'RejectedDate'
+    };
+    const key = keyMap[importSortKey] || importSortKey;
+    const isAsc = importSortDir === 'asc';
+    return [...data].sort((a, b) => compareValues(a[key], b[key], isAsc));
+}
+
 function importRenderUI() {
     const container  = document.getElementById('import-table-area');
     const searchTerm = (document.getElementById('import-search')?.value || '').toLowerCase().trim();
     let filtered = importFilterJobs(importCurrentStatus);
     if (searchTerm) filtered = filtered.filter(j => String(j.ImportRequestName || '').toLowerCase().includes(searchTerm));
+    filtered = importApplySort(filtered);
     const total = filtered.length;
     importTotalPages    = Math.max(1, Math.ceil(total / IMPORT_ROWS_PER_PAGE));
     if (importCurrentPage > importTotalPages) importCurrentPage = importTotalPages;
@@ -675,7 +783,13 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
     else if (selectedStatus === 'Rejected')  headers.push('Rejected On');
     else if (selectedStatus === 'Finalised') { headers.push('Status'); headers.push('Finalised On'); }
 
-    const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
+    const thead = headers.map(h => {
+        if (h === '') return `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`;
+        const isActive = importSortKey === h;
+        const icon = !isActive ? SVG_SORT_BOTH : (importSortDir === 'asc' ? SVG_SORT_UP : SVG_SORT_DOWN);
+        const tooltip = isActive ? `Click to sort ${importSortDir === 'asc' ? 'descending' : 'ascending'}` : 'Click to sort';
+        return `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition import-sort-header" data-sort-key="${h}" title="${tooltip}" role="button" tabindex="0">${h}${icon}</th>`;
+    }).join('');
 
     let rows = '';
     data.forEach(item => {
@@ -789,6 +903,27 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
                     importRenderUI();
                 } else { showToast('Submission may have failed — please refresh.', 'warning'); }
             } catch (err) { dismissToast(t); showToast('Failed to submit import request.', 'error'); }
+        });
+    });
+
+    // Sort header clicks
+    container.querySelectorAll('.import-sort-header').forEach(th => {
+        th.addEventListener('click', (e) => {
+            const newKey = th.dataset.sortKey;
+            if (importSortKey === newKey) {
+                importSortDir = importSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                importSortKey = newKey;
+                importSortDir = 'asc';
+            }
+            importCurrentPage = 1;
+            importRenderUI();
+        });
+        th.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                th.click();
+            }
         });
     });
 }
@@ -911,6 +1046,8 @@ let exportTotalPages      = 1;
 let exportCurrentStatus   = 'Awaiting Submission';
 let exportAllJobs         = [];
 let exportProjectsFetched = false;
+let exportSortKey       = 'CreateDate';
+let exportSortDir       = 'desc';
 
 function exportGetStatus(job) {
     const id = job.StatusID ?? 0;
@@ -998,11 +1135,28 @@ async function exportPopulateProjects() {
     } finally { select.disabled = false; }
 }
 
+function exportApplySort(data) {
+    const keyMap = {
+        'Export Request Name': 'ExportRequestName',
+        'Requested On': 'CreateDate',
+        'Project Name': 'ExportProjectName',
+        'Status': '_status',
+        'Approved By': 'ApprovedBy',
+        'Approved On': 'ApprovedDate',
+        'Rejected On': 'RejectedDate',
+        'Finalised On': 'FinalisedDate'
+    };
+    const key = keyMap[exportSortKey] || exportSortKey;
+    const isAsc = exportSortDir === 'asc';
+    return [...data].sort((a, b) => compareValues(a[key], b[key], isAsc));
+}
+
 function exportRenderUI() {
     const container  = document.getElementById('export-table-area');
     const searchTerm = (document.getElementById('export-search')?.value || '').toLowerCase().trim();
     let filtered = exportFilterJobs(exportCurrentStatus);
     if (searchTerm) filtered = filtered.filter(j => String(j.ExportRequestName || '').toLowerCase().includes(searchTerm));
+    filtered = exportApplySort(filtered);
     const total = filtered.length;
     exportTotalPages    = Math.max(1, Math.ceil(total / EXPORT_ROWS_PER_PAGE));
     if (exportCurrentPage > exportTotalPages) exportCurrentPage = exportTotalPages;
@@ -1024,7 +1178,13 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
     else if (selectedStatus === 'Rejected')  headers.push('Rejected On');
     else if (selectedStatus === 'Finalised') { headers.push('Status'); headers.push('Finalised On'); }
 
-    const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
+    const thead = headers.map(h => {
+        if (h === '') return `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`;
+        const isActive = exportSortKey === h;
+        const icon = !isActive ? SVG_SORT_BOTH : (exportSortDir === 'asc' ? SVG_SORT_UP : SVG_SORT_DOWN);
+        const tooltip = isActive ? `Click to sort ${exportSortDir === 'asc' ? 'descending' : 'ascending'}` : 'Click to sort';
+        return `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition export-sort-header" data-sort-key="${h}" title="${tooltip}" role="button" tabindex="0">${h}${icon}</th>`;
+    }).join('');
 
     let rows = '';
     data.forEach(item => {
@@ -1136,6 +1296,27 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
                     exportRenderUI();
                 } else { showToast('Submission may have failed — please refresh.', 'warning'); }
             } catch (err) { dismissToast(t); showToast('Failed to submit export request.', 'error'); }
+        });
+    });
+
+    // Sort header clicks
+    container.querySelectorAll('.export-sort-header').forEach(th => {
+        th.addEventListener('click', (e) => {
+            const newKey = th.dataset.sortKey;
+            if (exportSortKey === newKey) {
+                exportSortDir = exportSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                exportSortKey = newKey;
+                exportSortDir = 'asc';
+            }
+            exportCurrentPage = 1;
+            exportRenderUI();
+        });
+        th.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                th.click();
+            }
         });
     });
 }
