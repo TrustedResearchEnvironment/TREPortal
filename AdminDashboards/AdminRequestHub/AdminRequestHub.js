@@ -132,6 +132,55 @@ function buildEmptyState(message) {
     return `<p class="text-center py-5 text-gray-400 text-sm">${message}</p>`;
 }
 
+function compareValues(a, b, isAscending = true) {
+    if (a == null && b == null) return 0;
+    if (a == null) return isAscending ? 1 : -1;
+    if (b == null) return isAscending ? -1 : 1;
+
+    const aDate = new Date(a);
+    const bDate = new Date(b);
+    if (!isNaN(aDate.getTime()) && !isNaN(bDate.getTime())) {
+        return isAscending ? aDate - bDate : bDate - aDate;
+    }
+
+    const aNum = parseFloat(a);
+    const bNum = parseFloat(b);
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+        return isAscending ? aNum - bNum : bNum - aNum;
+    }
+
+    const aText = String(a).toLowerCase();
+    const bText = String(b).toLowerCase();
+    return isAscending ? aText.localeCompare(bText) : bText.localeCompare(aText);
+}
+
+const SVG_SORT_UP = `<svg class="sort-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 2L1 7h10z" /></svg>`;
+const SVG_SORT_DOWN = `<svg class="sort-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 10L1 5h10z" /></svg>`;
+const SVG_SORT_BOTH = `<svg class="sort-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 2L1 7h10z"/><path d="M6 10L1 5h10z"/></svg>`;
+
+function renderSortableHeader(label, sortKey, activeKey, activeDirection, className) {
+    const isActive = activeKey === sortKey;
+    const icon = !isActive ? SVG_SORT_BOTH : (activeDirection === 'asc' ? SVG_SORT_UP : SVG_SORT_DOWN);
+    const nextDirection = isActive && activeDirection === 'asc' ? 'descending' : 'ascending';
+    const tooltip = isActive ? `Click to sort ${nextDirection}` : 'Click to sort';
+    return `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${className}"
+        data-sort-key="${sortKey}" title="${tooltip}" aria-sort="${isActive ? (activeDirection === 'asc' ? 'ascending' : 'descending') : 'none'}"
+        role="button" tabindex="0">${label}${icon}</th>`;
+}
+
+function attachSortHeaderListeners(container, selector, onSort) {
+    container.querySelectorAll(selector).forEach(header => {
+        const sort = () => onSort(header.dataset.sortKey);
+        header.addEventListener('click', sort);
+        header.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                sort();
+            }
+        });
+    });
+}
+
 /**
  * Strips characters outside the safe whitelist to guard against injection.
  * Allowed: letters, digits, space, - _ , . ' ( ) ! ? : and standard whitespace.
@@ -452,6 +501,8 @@ let adminAccessTotalPages    = 1;
 let adminAccessCurrentStatus = 'Pending Approval';
 let adminAccessProjectsCache = null;
 let _adminAccessFetchToken   = 0;
+let adminAccessSortKey       = 'CreateDate';
+let adminAccessSortDir       = 'desc';
 
 async function adminAccessGetProjectsMapping() {
     if (adminAccessProjectsCache) return adminAccessProjectsCache;
@@ -514,6 +565,8 @@ async function adminAccessRenderUI() {
             });
         }
 
+        data = adminAccessApplySort(data);
+
         adminAccessTotalPages = Math.max(1, Math.ceil(total / ADMIN_ACCESS_ROWS_PER_PAGE));
         adminAccessRenderTable(container, data, adminAccessCurrentStatus);
         renderPaginationHtml('admin-access-pagination', total, ADMIN_ACCESS_ROWS_PER_PAGE, adminAccessCurrentPage);
@@ -526,6 +579,22 @@ async function adminAccessRenderUI() {
     }
 }
 
+function adminAccessApplySort(data) {
+    const keyMap = {
+        'Request Name': 'Name',
+        'Requested On': 'CreateDate',
+        'Requested By': 'CreateUser',
+        'Approvers': 'Approvers',
+        'Approved By': 'CurrentlyApproved',
+        'Approved On': 'ApprovedDate',
+        'Rejected By': 'RejectedBy',
+        'Rejected On': 'RejectedDate',
+        'Finalised On': 'FinalisedDate'
+    };
+    const key = keyMap[adminAccessSortKey] || adminAccessSortKey;
+    return [...data].sort((a, b) => compareValues(a[key], b[key], adminAccessSortDir === 'asc'));
+}
+
 function adminAccessRenderTable(container, data, selectedStatus) {
     if (!data.length) { container.innerHTML = buildEmptyState('No requests found for this status.'); return; }
     const tdCls = 'px-6 py-4 text-sm text-gray-700';
@@ -535,7 +604,10 @@ function adminAccessRenderTable(container, data, selectedStatus) {
     else if (selectedStatus === 'Rejected')    { headers.push('Rejected By'); headers.push('Rejected On'); }
     else if (selectedStatus === 'Finalised')   { headers.push('Approved By'); headers.push('Finalised On'); }
 
-    const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
+    const thead = headers.map(h => h === ''
+        ? `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`
+        : renderSortableHeader(h, h, adminAccessSortKey, adminAccessSortDir, 'admin-access-sort-header')
+    ).join('');
 
     let rows = '';
     data.forEach(item => {
@@ -672,6 +744,17 @@ function adminAccessRenderTable(container, data, selectedStatus) {
     container.querySelectorAll('.admin-reject-btn').forEach(btn => {
         btn.addEventListener('click', e => { e.stopPropagation(); openActionModal('reject', 'access', btn.dataset.id, btn.dataset.name); });
     });
+
+    attachSortHeaderListeners(container, '.admin-access-sort-header', sortKey => {
+        if (adminAccessSortKey === sortKey) {
+            adminAccessSortDir = adminAccessSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            adminAccessSortKey = sortKey;
+            adminAccessSortDir = 'asc';
+        }
+        adminAccessCurrentPage = 1;
+        adminAccessRenderUI();
+    });
 }
 
 function adminAccessSetupListeners() {
@@ -717,6 +800,8 @@ let adminImportCurrentPage   = 1;
 let adminImportTotalPages    = 1;
 let adminImportCurrentStatus = 'Awaiting Submission';
 let _adminImportFetchToken   = 0;
+let adminImportSortKey       = 'CreateDate';
+let adminImportSortDir       = 'desc';
 
 async function adminImportGetCount(status) {
     try {
@@ -768,11 +853,11 @@ async function adminImportRenderUI() {
             const combined = [...(p0.Results || []), ...(pW.Results || [])].map(item => ({
                 ...item, _status: ADMIN_IMPORT_STATUS_MAP[item.StatusID] ?? ADMIN_IMPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
             }));
-            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const sortedCombined = adminImportApplySort(combined);
             const total = (p0.RowCount || 0) + (pW.RowCount || 0);
             adminImportTotalPages = Math.max(1, Math.ceil(total / ADMIN_IMPORT_ROWS_PER_PAGE));
             const start = (adminImportCurrentPage - 1) * ADMIN_IMPORT_ROWS_PER_PAGE;
-            adminImportRenderTable(container, combined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
+            adminImportRenderTable(container, sortedCombined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
             renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
         } else if (adminImportCurrentStatus === 'Finalised') {
             const [r3, r_3] = await Promise.all([
@@ -785,11 +870,11 @@ async function adminImportRenderUI() {
             const combined = [...(p3.Results || []), ...(p_3.Results || [])].map(item => ({
                 ...item, _status: ADMIN_IMPORT_STATUS_MAP[item.StatusID] ?? ADMIN_IMPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
             }));
-            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const sortedCombined = adminImportApplySort(combined);
             const total = (p3.RowCount || 0) + (p_3.RowCount || 0);
             adminImportTotalPages = Math.max(1, Math.ceil(total / ADMIN_IMPORT_ROWS_PER_PAGE));
             const start = (adminImportCurrentPage - 1) * ADMIN_IMPORT_ROWS_PER_PAGE;
-            adminImportRenderTable(container, combined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
+            adminImportRenderTable(container, sortedCombined.slice(start, start + ADMIN_IMPORT_ROWS_PER_PAGE), adminImportCurrentStatus);
             renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
         } else {
             const statusId = ADMIN_IMPORT_STATUS_ID_MAP[adminImportCurrentStatus];
@@ -800,9 +885,10 @@ async function adminImportRenderUI() {
             const data     = (parsed?.Results || []).map(item => ({
                 ...item, _status: ADMIN_IMPORT_STATUS_MAP[item.StatusID] ?? ADMIN_IMPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
             }));
+            const sortedData = adminImportApplySort(data);
             const total = parsed?.RowCount || 0;
             adminImportTotalPages = Math.max(1, Math.ceil(total / ADMIN_IMPORT_ROWS_PER_PAGE));
-            adminImportRenderTable(container, data, adminImportCurrentStatus);
+            adminImportRenderTable(container, sortedData, adminImportCurrentStatus);
             renderPaginationHtml('admin-import-pagination', total, ADMIN_IMPORT_ROWS_PER_PAGE, adminImportCurrentPage);
         }
     } catch (e) {
@@ -811,6 +897,23 @@ async function adminImportRenderUI() {
     } finally {
         if (token === _adminImportFetchToken) document.querySelectorAll('#admin-import-pagination [data-page]').forEach(b => { b.disabled = false; });
     }
+}
+
+function adminImportApplySort(data) {
+    const keyMap = {
+        'Import Request Name': 'ImportRequestName',
+        'Requested By': 'CreateUser',
+        'Project Name': 'ImportProjectName',
+        'Requested On': 'CreateDate',
+        'Approved By': 'ApprovedBy',
+        'Approved On': 'ApprovedDate',
+        'Rejected By': 'RejectedBy',
+        'Rejected On': 'RejectedDate',
+        'Finalised On': 'FinalisedDate',
+        'Status': '_status'
+    };
+    const key = keyMap[adminImportSortKey] || adminImportSortKey;
+    return [...data].sort((a, b) => compareValues(a[key], b[key], adminImportSortDir === 'asc'));
 }
 
 function adminImportRenderTable(container, data, selectedStatus) {
@@ -822,7 +925,10 @@ function adminImportRenderTable(container, data, selectedStatus) {
     else if (selectedStatus === 'Finalised')   { headers.push('Status'); headers.push('Finalised On'); }
     else if (selectedStatus === 'Awaiting Submission') headers.push('Status');
 
-    const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
+    const thead = headers.map(h => h === ''
+        ? `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`
+        : renderSortableHeader(h, h, adminImportSortKey, adminImportSortDir, 'admin-import-sort-header')
+    ).join('');
 
     let rows = '';
     data.forEach(item => {
@@ -925,6 +1031,17 @@ function adminImportRenderTable(container, data, selectedStatus) {
     container.querySelectorAll('.admin-import-reject-btn').forEach(btn => {
         btn.addEventListener('click', e => { e.stopPropagation(); openActionModal('reject', 'import', btn.dataset.id, btn.dataset.name); });
     });
+
+    attachSortHeaderListeners(container, '.admin-import-sort-header', sortKey => {
+        if (adminImportSortKey === sortKey) {
+            adminImportSortDir = adminImportSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            adminImportSortKey = sortKey;
+            adminImportSortDir = 'asc';
+        }
+        adminImportCurrentPage = 1;
+        adminImportRenderUI();
+    });
 }
 
 function adminImportSetupListeners() {
@@ -970,6 +1087,8 @@ let adminExportCurrentPage   = 1;
 let adminExportTotalPages    = 1;
 let adminExportCurrentStatus = 'Awaiting Submission';
 let _adminExportFetchToken   = 0;
+let adminExportSortKey       = 'CreateDate';
+let adminExportSortDir       = 'desc';
 
 async function adminExportGetCount(status) {
     try {
@@ -1021,11 +1140,11 @@ async function adminExportRenderUI() {
             const combined = [...(p0.Results || []), ...(pW.Results || [])].map(item => ({
                 ...item, _status: ADMIN_EXPORT_STATUS_MAP[item.StatusID] ?? ADMIN_EXPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
             }));
-            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const sortedCombined = adminExportApplySort(combined);
             const total = (p0.RowCount || 0) + (pW.RowCount || 0);
             adminExportTotalPages = Math.max(1, Math.ceil(total / ADMIN_EXPORT_ROWS_PER_PAGE));
             const start = (adminExportCurrentPage - 1) * ADMIN_EXPORT_ROWS_PER_PAGE;
-            adminExportRenderTable(container, combined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
+            adminExportRenderTable(container, sortedCombined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
             renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
         } else if (adminExportCurrentStatus === 'Finalised') {
             const [r3, r_3] = await Promise.all([
@@ -1038,11 +1157,11 @@ async function adminExportRenderUI() {
             const combined = [...(p3.Results || []), ...(p_3.Results || [])].map(item => ({
                 ...item, _status: ADMIN_EXPORT_STATUS_MAP[item.StatusID] ?? ADMIN_EXPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
             }));
-            combined.sort((a, b) => new Date(b.CreateDate) - new Date(a.CreateDate));
+            const sortedCombined = adminExportApplySort(combined);
             const total = (p3.RowCount || 0) + (p_3.RowCount || 0);
             adminExportTotalPages = Math.max(1, Math.ceil(total / ADMIN_EXPORT_ROWS_PER_PAGE));
             const start = (adminExportCurrentPage - 1) * ADMIN_EXPORT_ROWS_PER_PAGE;
-            adminExportRenderTable(container, combined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
+            adminExportRenderTable(container, sortedCombined.slice(start, start + ADMIN_EXPORT_ROWS_PER_PAGE), adminExportCurrentStatus);
             renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
         } else {
             const statusId = ADMIN_EXPORT_STATUS_ID_MAP[adminExportCurrentStatus];
@@ -1053,9 +1172,10 @@ async function adminExportRenderUI() {
             const data     = (parsed?.Results || []).map(item => ({
                 ...item, _status: ADMIN_EXPORT_STATUS_MAP[item.StatusID] ?? ADMIN_EXPORT_STATUS_MAP[String(item.StatusID)] ?? 'Unknown'
             }));
+            const sortedData = adminExportApplySort(data);
             const total = parsed?.RowCount || 0;
             adminExportTotalPages = Math.max(1, Math.ceil(total / ADMIN_EXPORT_ROWS_PER_PAGE));
-            adminExportRenderTable(container, data, adminExportCurrentStatus);
+            adminExportRenderTable(container, sortedData, adminExportCurrentStatus);
             renderPaginationHtml('admin-export-pagination', total, ADMIN_EXPORT_ROWS_PER_PAGE, adminExportCurrentPage);
         }
     } catch (e) {
@@ -1064,6 +1184,23 @@ async function adminExportRenderUI() {
     } finally {
         if (token === _adminExportFetchToken) document.querySelectorAll('#admin-export-pagination [data-page]').forEach(b => { b.disabled = false; });
     }
+}
+
+function adminExportApplySort(data) {
+    const keyMap = {
+        'Export Request Name': 'ExportRequestName',
+        'Requested By': 'CreateUser',
+        'Project Name': 'ExportProjectName',
+        'Requested On': 'CreateDate',
+        'Approved By': 'ApprovedBy',
+        'Approved On': 'ApprovedDate',
+        'Rejected By': 'RejectedBy',
+        'Rejected On': 'RejectedDate',
+        'Finalised On': 'FinalisedDate',
+        'Status': '_status'
+    };
+    const key = keyMap[adminExportSortKey] || adminExportSortKey;
+    return [...data].sort((a, b) => compareValues(a[key], b[key], adminExportSortDir === 'asc'));
 }
 
 function adminExportRenderTable(container, data, selectedStatus) {
@@ -1075,7 +1212,10 @@ function adminExportRenderTable(container, data, selectedStatus) {
     else if (selectedStatus === 'Finalised')   { headers.push('Status'); headers.push('Finalised On'); }
     else if (selectedStatus === 'Awaiting Submission') headers.push('Status');
 
-    const thead = headers.map(h => `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('');
+    const thead = headers.map(h => h === ''
+        ? `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`
+        : renderSortableHeader(h, h, adminExportSortKey, adminExportSortDir, 'admin-export-sort-header')
+    ).join('');
 
     let rows = '';
     data.forEach(item => {
@@ -1176,6 +1316,17 @@ function adminExportRenderTable(container, data, selectedStatus) {
     });
     container.querySelectorAll('.admin-export-reject-btn').forEach(btn => {
         btn.addEventListener('click', e => { e.stopPropagation(); openActionModal('reject', 'export', btn.dataset.id, btn.dataset.name); });
+    });
+
+    attachSortHeaderListeners(container, '.admin-export-sort-header', sortKey => {
+        if (adminExportSortKey === sortKey) {
+            adminExportSortDir = adminExportSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            adminExportSortKey = sortKey;
+            adminExportSortDir = 'asc';
+        }
+        adminExportCurrentPage = 1;
+        adminExportRenderUI();
     });
 }
 

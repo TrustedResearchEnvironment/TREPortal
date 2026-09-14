@@ -93,6 +93,36 @@
     background-color: #f8f9fa !important;
 }
 
+/* ── Sortable Table Headers ──────────────────────────────────────────── */
+.admin-access-sort-header,
+.admin-import-sort-header,
+.admin-export-sort-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-access-sort-header:hover,
+.admin-import-sort-header:hover,
+.admin-export-sort-header:hover {
+    background-color: #f3f4f6;
+    color: #1f2937;
+}
+
+.admin-access-sort-header:focus,
+.admin-import-sort-header:focus,
+.admin-export-sort-header:focus {
+    outline: 2px solid #1AABA3;
+    outline-offset: -2px;
+}
+
+.sort-icon {
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: middle;
+    color: #6b7280;
+}
+
 /* ── Accordion / Detail Rows ─────────────────────────────────────────── */
 .hidden {
     display: none !important;
