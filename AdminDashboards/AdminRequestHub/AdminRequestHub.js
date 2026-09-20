@@ -650,7 +650,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <div class="overflow-x-auto border rounded shadow-sm">
+        <div class="admin-request-table-container">
             <table class="w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50"><tr>${thead}</tr></thead>
                 <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
@@ -671,6 +671,9 @@ function adminAccessRenderTable(container, data, selectedStatus) {
             row.setAttribute('aria-expanded', String(!isOpen));
             detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
+            if (!isOpen) {
+                requestAnimationFrame(() => detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            }
             if (!isOpen && !loaded) {
                 loaded = true;
                 const content = detailRow.querySelector('.admin-access-detail-content');
@@ -975,7 +978,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-    <div class="overflow-x-auto border rounded shadow-sm">
+    <div class="admin-request-table-container">
         <table class="w-full divide-y divide-gray-200" style="table-layout: fixed; min-width: 800px;">
             <thead class="bg-gray-50">
                 <tr>${thead}</tr>
@@ -1000,6 +1003,9 @@ function adminImportRenderTable(container, data, selectedStatus) {
             row.setAttribute('aria-expanded', String(!isOpen));
             detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
+            if (!isOpen) {
+                requestAnimationFrame(() => detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            }
             if (!isOpen && !loaded) {
                 loaded = true;
                 const content = detailRow.querySelector('.admin-import-detail-content');
@@ -1264,7 +1270,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <div class="overflow-x-auto border rounded shadow-sm">
+        <div class="admin-request-table-container">
             <table class="w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50"><tr>${thead}</tr></thead>
                 <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
@@ -1285,6 +1291,9 @@ function adminExportRenderTable(container, data, selectedStatus) {
             row.setAttribute('aria-expanded', String(!isOpen));
             detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
+            if (!isOpen) {
+                requestAnimationFrame(() => detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            }
             if (!isOpen && !loaded) {
                 loaded = true;
                 const content = detailRow.querySelector('.admin-export-detail-content');

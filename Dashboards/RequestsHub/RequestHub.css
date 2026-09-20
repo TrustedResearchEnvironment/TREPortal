@@ -115,9 +115,46 @@
     outline-offset: -2px;
 }
 
+/* ── Scrollable Request Tables ───────────────────────────────── */
+.request-table-container {
+    max-height: min(600px, 65vh);
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.request-table-container table {
+    min-width: 100%;
+}
+
+.request-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f9fafb;
+}
+
+@media (max-width: 640px) {
+    .request-table-container {
+        max-height: 60vh;
+    }
+}
+
 /* ── Accordion Detail Rows ───────────────────────────────────── */
-.detail-row td {
+.access-detail-row > td,
+.import-detail-row > td,
+.export-detail-row > td {
     padding: 0;
+}
+
+.access-detail-row .accordion-detail,
+.import-detail-row .accordion-detail,
+.export-detail-row .accordion-detail {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .accordion-detail {
     background-color: #f8f9fa;

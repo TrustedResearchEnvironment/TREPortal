@@ -429,7 +429,10 @@ function renderTable(containerId, tableConfig, data, config = {}) {
         });
     }
     table.appendChild(tbody);
-    container.appendChild(table);
+    const tableScroller = document.createElement('div');
+    tableScroller.className = 'admin-email-template-table-container';
+    tableScroller.appendChild(table);
+    container.appendChild(tableScroller);
 
     // --- SIMPLIFIED Event Listener ---
     if (config.renderAccordionContent) {
@@ -460,6 +463,9 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     contentRow.setAttribute('aria-hidden', String(!isOpen));
                     const chevron = trigger.querySelector('.chevron-icon');
                     if (chevron) chevron.classList.toggle('rotate-180');
+                    if (isOpen) {
+                        requestAnimationFrame(() => contentRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+                    }
                 }
                 return;
             }

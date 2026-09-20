@@ -1114,6 +1114,10 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
                 if (chevron) {
                     chevron.classList.toggle('rotate-180');
                 }
+
+                if (!accordionRow.classList.contains('hidden')) {
+                    requestAnimationFrame(() => accordionRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+                }
                 
                 // Only fetch data if the accordion is becoming visible
                 if (!accordionRow.classList.contains('hidden')) {
@@ -1225,7 +1229,10 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     }
     
     table.appendChild(tbody);
-    container.appendChild(table);
+    const tableScroller = document.createElement('div');
+    tableScroller.className = 'approver-table-container';
+    tableScroller.appendChild(table);
+    container.appendChild(tableScroller);
     
 }
 

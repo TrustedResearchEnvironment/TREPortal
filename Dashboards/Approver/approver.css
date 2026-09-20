@@ -803,11 +803,24 @@ video {
 }
 
 /* This is the container that will scroll */
-.table-container {
-    max-height: 600px;
+.approver-table-container {
+    max-height: min(600px, 65vh);
     overflow-y: auto;
-    border: 1px solid #e5e7eb; /* Optional: adds a nice border */
-    border-radius: 8px; /* Optional: rounded corners */
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.approver-table-container table {
+    min-width: 100%;
+}
+
+@media (max-width: 640px) {
+    .approver-table-container {
+        max-height: 60vh;
+    }
 }
 
  /*Make sure the table fills the container */

@@ -492,10 +492,12 @@ function accessRenderTable(container, data, selectedStatus) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+        <div class="request-table-container">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>${thead}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+            </table>
+        </div>`;
 
     // Accordion click
     container.querySelectorAll('.access-row').forEach(row => {
@@ -512,6 +514,9 @@ function accessRenderTable(container, data, selectedStatus) {
             row.setAttribute('aria-expanded', String(!isOpen));
             detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
+            if (!isOpen) {
+                requestAnimationFrame(() => detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            }
             if (!isOpen && !loaded) {
                 loaded = true;
                 const content = detailRow.querySelector('.access-detail-content');
@@ -831,10 +836,12 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+        <div class="request-table-container">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>${thead}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+            </table>
+        </div>`;
 
     container.querySelectorAll('.import-row').forEach(row => {
         const detailRow = row.nextElementSibling;
@@ -850,6 +857,9 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
             row.setAttribute('aria-expanded', String(!isOpen));
             detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
+            if (!isOpen) {
+                requestAnimationFrame(() => detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            }
             if (!isOpen && !loaded) {
                 loaded = true;
                 const content = detailRow.querySelector('.import-detail-content');
@@ -1228,10 +1238,12 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
     });
 
     container.innerHTML = `
-        <table class="w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr>${thead}</tr></thead>
-            <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
-        </table>`;
+        <div class="request-table-container">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr>${thead}</tr></thead>
+                <tbody class="bg-white divide-y divide-gray-200">${rows}</tbody>
+            </table>
+        </div>`;
 
     container.querySelectorAll('.export-row').forEach(row => {
         const detailRow = row.nextElementSibling;
@@ -1247,6 +1259,9 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
             row.setAttribute('aria-expanded', String(!isOpen));
             detailRow.setAttribute('aria-hidden', String(isOpen));
             chevron.classList.toggle('rotated', !isOpen);
+            if (!isOpen) {
+                requestAnimationFrame(() => detailRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            }
             if (!isOpen && !loaded) {
                 loaded = true;
                 const content = detailRow.querySelector('.export-detail-content');

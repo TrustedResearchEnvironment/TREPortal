@@ -93,6 +93,34 @@
     background-color: #f8f9fa !important;
 }
 
+/* ── Scrollable Admin Request Tables ────────────────────────────────── */
+.admin-request-table-container {
+    max-height: min(600px, 65vh);
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-request-table-container table {
+    min-width: 100%;
+}
+
+.admin-request-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f9fafb;
+}
+
+@media (max-width: 640px) {
+    .admin-request-table-container {
+        max-height: 60vh;
+    }
+}
+
 /* ── Sortable Table Headers ──────────────────────────────────────────── */
 .admin-access-sort-header,
 .admin-import-sort-header,
@@ -126,6 +154,19 @@
 /* ── Accordion / Detail Rows ─────────────────────────────────────────── */
 .hidden {
     display: none !important;
+}
+
+.admin-access-detail-row > td,
+.admin-import-detail-row > td,
+.admin-export-detail-row > td {
+    padding: 0;
+}
+
+.admin-access-detail-row .accordion-detail,
+.admin-import-detail-row .accordion-detail,
+.admin-export-detail-row .accordion-detail {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .accordion-detail {
