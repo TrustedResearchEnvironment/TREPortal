@@ -105,6 +105,7 @@ function renderPaginationHtml(containerId, totalItems, rowsPerPage, currentPage)
     const el = document.getElementById(containerId);
     if (!el) return;
     const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+    currentPage = Number.isInteger(currentPage) ? Math.min(Math.max(currentPage, 1), totalPages) : 1;
     if (totalPages <= 1) { el.innerHTML = ''; return; }
     const d = v => v ? 'disabled' : '';
     const btnCls = 'btn btn-sm btn-outline-secondary';
@@ -775,7 +776,9 @@ function adminAccessSetupListeners() {
     document.getElementById('admin-access-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
         if (!btn || btn.disabled) return;
-        adminAccessCurrentPage = parseInt(btn.dataset.page, 10);
+        const page = Number(btn.dataset.page);
+        if (!Number.isInteger(page) || page < 1 || page > adminAccessTotalPages) return;
+        adminAccessCurrentPage = page;
         adminAccessRenderUI();
     });
 
@@ -1062,7 +1065,9 @@ function adminImportSetupListeners() {
     document.getElementById('admin-import-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
         if (!btn || btn.disabled) return;
-        adminImportCurrentPage = parseInt(btn.dataset.page, 10);
+        const page = Number(btn.dataset.page);
+        if (!Number.isInteger(page) || page < 1 || page > adminImportTotalPages) return;
+        adminImportCurrentPage = page;
         adminImportRenderUI();
     });
 
@@ -1348,7 +1353,9 @@ function adminExportSetupListeners() {
     document.getElementById('admin-export-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
         if (!btn || btn.disabled) return;
-        adminExportCurrentPage = parseInt(btn.dataset.page, 10);
+        const page = Number(btn.dataset.page);
+        if (!Number.isInteger(page) || page < 1 || page > adminExportTotalPages) return;
+        adminExportCurrentPage = page;
         adminExportRenderUI();
     });
 

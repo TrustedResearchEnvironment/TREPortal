@@ -745,10 +745,10 @@ async function validateDataSetColumns(parsedCols, metaRow) {
  * A central function to handle page changes.
  */
 function handlePageChange(newPage) {
-    const totalPages = Math.ceil(allColumnsData.length / pageSize);
+    const totalPages = Math.max(1, Math.ceil(allColumnsData.length / pageSize));
 
     // Validate the page number to ensure it's within bounds
-    if (newPage >= 1 && newPage <= totalPages) {
+    if (Number.isInteger(newPage) && newPage >= 1 && newPage <= totalPages) {
         currentPage = newPage;
         renderTablePage(currentDataSourceTypeID);
     } else {
@@ -3051,7 +3051,7 @@ async function renderManageDataSetPage() {
                 const target = event.target.closest('button[data-page]');
                 if (target) {
                     event.preventDefault();
-                    const page = parseInt(target.dataset.page, 10);
+                    const page = Number(target.dataset.page);
                     handlePageChange(page);
                 }
             });
@@ -3061,7 +3061,7 @@ async function renderManageDataSetPage() {
                 const target = event.target;
                 if (target.id === 'page-input' && event.key === 'Enter') {
                     event.preventDefault();
-                    const page = parseInt(target.value, 10);
+                    const page = Number(target.value);
                     handlePageChange(page);
                 }
             });

@@ -90,6 +90,7 @@ function renderPaginationHtml(containerId, totalItems, rowsPerPage, currentPage)
     const el = document.getElementById(containerId);
     if (!el) return;
     const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+    currentPage = Number.isInteger(currentPage) ? Math.min(Math.max(currentPage, 1), totalPages) : 1;
     if (totalPages <= 1) { el.innerHTML = ''; return; }
     const disabled = (v) => v ? 'disabled' : '';
     const btnCls = 'btn btn-sm btn-outline-secondary';
@@ -627,7 +628,9 @@ function accessSetupListeners() {
     document.getElementById('access-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
         if (!btn || btn.disabled) return;
-        accessCurrentPage = parseInt(btn.dataset.page, 10);
+        const page = Number(btn.dataset.page);
+        if (!Number.isInteger(page) || page < 1 || page > accessTotalPages) return;
+        accessCurrentPage = page;
         accessRenderUI();
     });
 
@@ -953,7 +956,9 @@ function importSetupListeners() {
     document.getElementById('import-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
         if (!btn || btn.disabled) return;
-        importCurrentPage = parseInt(btn.dataset.page, 10);
+        const page = Number(btn.dataset.page);
+        if (!Number.isInteger(page) || page < 1 || page > importTotalPages) return;
+        importCurrentPage = page;
         importRenderUI();
     });
 
@@ -1346,7 +1351,9 @@ function exportSetupListeners() {
     document.getElementById('export-pagination')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-page]');
         if (!btn || btn.disabled) return;
-        exportCurrentPage = parseInt(btn.dataset.page, 10);
+        const page = Number(btn.dataset.page);
+        if (!Number.isInteger(page) || page < 1 || page > exportTotalPages) return;
+        exportCurrentPage = page;
         exportRenderUI();
     });
 

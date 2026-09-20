@@ -1485,7 +1485,9 @@ async function renderApproversPage() {
             const button = event.target.closest('button[data-page]');
             if (!button || button.disabled) return;
             
-            currentPage = parseInt(button.dataset.page, 10);
+            const page = Number(button.dataset.page);
+            if (!Number.isInteger(page) || page < 1 || page > totalPages) return;
+            currentPage = page;
             renderUI(); // Re-render everything
         });
 
@@ -1493,8 +1495,8 @@ async function renderApproversPage() {
         paginationContainer.addEventListener('keydown', (event) => {
             // Only act if the user pressed Enter and the target is our input
             if (event.key === 'Enter' && event.target.id === 'page-input') {
-                const newPage = parseInt(event.target.value, 10);
-                if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
+                const newPage = Number(event.target.value);
+                if (Number.isInteger(newPage) && newPage >= 1 && newPage <= totalPages) {
                     currentPage = newPage;
                     renderUI();
                 } else {
