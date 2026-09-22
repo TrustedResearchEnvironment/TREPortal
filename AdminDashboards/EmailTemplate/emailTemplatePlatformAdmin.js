@@ -198,7 +198,8 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
         return;
     }
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    currentPage = Number.isInteger(currentPage) ? Math.min(Math.max(currentPage, 1), totalPages) : 1;
     container.innerHTML = ''; // Clear old controls
 
     if (totalPages <= 1) {
@@ -267,6 +268,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
  * @param {string} searchTerm The search term to filter by.
  */
 async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
+    if (!Number.isInteger(page) || page < 1 || page > totalPages) return;
     try {
         // --- 1. Call the API with pagination parameters ---
         // NOTE: Your loomeApi.runApiRequest must support passing parameters.
@@ -427,7 +429,10 @@ function renderTable(containerId, tableConfig, data, config = {}) {
         });
     }
     table.appendChild(tbody);
-    container.appendChild(table);
+    const tableScroller = document.createElement('div');
+    tableScroller.className = 'admin-email-template-table-container';
+    tableScroller.appendChild(table);
+    container.appendChild(tableScroller);
 
     // --- SIMPLIFIED Event Listener ---
     if (config.renderAccordionContent) {
@@ -458,6 +463,9 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     contentRow.setAttribute('aria-hidden', String(!isOpen));
                     const chevron = trigger.querySelector('.chevron-icon');
                     if (chevron) chevron.classList.toggle('rotate-180');
+                    if (isOpen) {
+                        requestAnimationFrame(() => contentRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+                    }
                 }
                 return;
             }
@@ -658,7 +666,8 @@ async function renderPlatformAdminEmailTemplatesPage() {
                 return;
             }
 
-            const page = parseInt(button.dataset.page, 10);
+            const page = Number(button.dataset.page);
+            if (!Number.isInteger(page) || page < 1 || page > totalPages) return;
             currentPage = page; // Update the global state
 
             // Get the current search term to maintain the filter
@@ -673,10 +682,10 @@ async function renderPlatformAdminEmailTemplatesPage() {
             // Only act if the user pressed Enter and the target is our input
             if (event.key === 'Enter' && event.target.id === 'page-input') {
                 const inputElement = event.target;
-                const newPage = parseInt(inputElement.value, 10);
+                const newPage = Number(inputElement.value);
 
                 // Validate the input
-                if (newPage >= 1 && newPage <= totalPages) {
+                if (Number.isInteger(newPage) && newPage >= 1 && newPage <= totalPages) {
                     fetchAndRenderPage(tableConfig, newPage, searchInput.value);
                 } else {
                     // If invalid, show a message and reset the input to the current page

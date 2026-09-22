@@ -4,6 +4,26 @@
    ========================================================================== */
 
 /* ── Nav Tabs ─────────────────────────────────────────────────────────── */
+.orphaned-finalisation-notice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    border: 1px solid #f0ad4e;
+    border-radius: 4px;
+    background: #fff8e1;
+    color: #8a5a00;
+    vertical-align: middle;
+}
+
+.orphaned-finalisation-icon {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+}
+
 .nav-tabs {
     border-bottom: 2px solid #e9ecef;
 }
@@ -93,15 +113,206 @@
     background-color: #f8f9fa !important;
 }
 
+/* ── Scrollable Admin Request Tables ────────────────────────────────── */
+.admin-request-table-container {
+    max-height: min(600px, 65vh);
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-request-table-container table {
+    min-width: 100%;
+}
+
+.admin-request-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f9fafb;
+}
+
+@media (max-width: 640px) {
+    .admin-request-table-container {
+        max-height: 60vh;
+    }
+}
+
+/* ── Sortable Table Headers ──────────────────────────────────────────── */
+.admin-access-sort-header,
+.admin-import-sort-header,
+.admin-export-sort-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-access-sort-header:hover,
+.admin-import-sort-header:hover,
+.admin-export-sort-header:hover {
+    background-color: #f3f4f6;
+    color: #1f2937;
+}
+
+.admin-access-sort-header:focus,
+.admin-import-sort-header:focus,
+.admin-export-sort-header:focus {
+    outline: 2px solid #1AABA3;
+    outline-offset: -2px;
+}
+
+.sort-icon {
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: middle;
+    color: #6b7280;
+}
+
 /* ── Accordion / Detail Rows ─────────────────────────────────────────── */
 .hidden {
     display: none !important;
 }
 
+.admin-access-detail-row > td,
+.admin-import-detail-row > td,
+.admin-export-detail-row > td {
+    padding: 0;
+}
+
+.admin-access-detail-row .accordion-detail,
+.admin-import-detail-row .accordion-detail,
+.admin-export-detail-row .accordion-detail {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .accordion-detail {
-    background-color: #f0f4f4;
-    padding: 1rem 1.25rem;
-    border-top: 1px solid #dee2e6;
+    background-color: #f9fafb;
+    padding: 1rem;
+    margin: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.accordion-card {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.details-card {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    color: #1e293b;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.pending-approval-details .details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 640px) {
+    .pending-approval-details .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.details-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.field-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+}
+
+.field-value {
+    font-size: 15px;
+    color: #0f172a;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.alert-deleted {
+    margin-top: 6px;
+    padding: 8px 12px;
+    background-color: #fef2f2;
+    border-left: 3px solid #ef4444;
+    border-radius: 4px;
+    color: #991b1b;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.details-divider {
+    border: 0;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 24px 0;
+}
+
+.approval-message {
+    background: #f0fdf4;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #bbf7d0;
+}
+
+.approval-message .field-label {
+    color: #166534;
+}
+
+.approval-message .field-value {
+    color: #14532d;
+}
+
+.rejection-message {
+    background: #fef2f2;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #fecaca;
+}
+
+.rejection-message .field-label {
+    color: #991b1b;
+}
+
+.rejection-message .field-value {
+    color: #7f1d1d;
+}
+
+.accordion-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
 }
 
 /* ── Chevron Animation ────────────────────────────────────────────────── */
