@@ -4,6 +4,26 @@
    ================================================================= */
 
 /* ── Nav Tabs ────────────────────────────────────────────────── */
+.orphaned-finalisation-notice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    border: 1px solid #f0ad4e;
+    border-radius: 4px;
+    background: #fff8e1;
+    color: #8a5a00;
+    vertical-align: middle;
+}
+
+.orphaned-finalisation-icon {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+}
+
 .nav-tabs {
     border-bottom: 2px solid #dee2e6;
 }

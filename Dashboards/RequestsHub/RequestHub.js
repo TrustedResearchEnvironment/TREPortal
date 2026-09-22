@@ -31,6 +31,18 @@ function formatDate(inputDate) {
     return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+function hasOrphanedFinalisation(item) {
+    if (String(item?.StatusID) !== '3' || !item?.Orphaned) return false;
+    return !Number.isNaN(new Date(item.Orphaned).getTime());
+}
+
+function renderOrphanedFinalisationNotice(item) {
+    return hasOrphanedFinalisation(item) ? `
+        <span class="orphaned-finalisation-notice" title="This request was automatically finalized because the associated project was deleted before the request could be approved or rejected." aria-label="This request was automatically finalized because the associated project was deleted before the request could be approved or rejected.">
+            <span class="orphaned-finalisation-icon" aria-hidden="true">!</span>
+        </span>` : '';
+}
+
 function showToast(message, type = 'success', duration = 5000) {
     let container = document.getElementById('toast-container');
     if (!container) {
@@ -471,7 +483,7 @@ function accessRenderTable(container, data, selectedStatus) {
 
         rows += `
         <tr class="table-hover-row access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" role="button" tabindex="0" aria-expanded="false" aria-controls="access-detail-${item.RequestID}">
-            <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
+            <td class="${tdCls} px-8 text-center">${renderOrphanedFinalisationNotice(item)}${SVG_CHEVRON}</td>
             <td class="${tdCls}">${escapeHtml(item.RequestID)}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
@@ -815,7 +827,7 @@ function importRenderTable(container, data, selectedStatus, searchTerm) {
 
         rows += `
         <tr class="table-hover-row import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="import-detail-${item.ImportRequestID}">
-            <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
+            <td class="${tdCls} px-8 text-center">${renderOrphanedFinalisationNotice(item)}${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ImportRequestName || '').replace(/"/g, '&quot;')}">${escapeHtml(item.ImportRequestName) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${escapeHtml(item.ImportProjectName || item.ProjectName) || 'N/A'}</td>
@@ -1217,7 +1229,7 @@ function exportRenderTable(container, data, selectedStatus, searchTerm) {
 
         rows += `
         <tr class="table-hover-row export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="export-detail-${item.ExportRequestID}">
-            <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
+            <td class="${tdCls} px-8 text-center">${renderOrphanedFinalisationNotice(item)}${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${escapeHtml(item.ExportRequestName) || 'N/A'}</td>
             <td class="${tdCls}">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}">${escapeHtml(item.ExportProjectName || item.ProjectName) || 'N/A'}</td>

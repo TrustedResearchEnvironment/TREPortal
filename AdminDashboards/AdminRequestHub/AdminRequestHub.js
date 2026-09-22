@@ -53,6 +53,18 @@ function formatDate(inputDate) {
     return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+function hasOrphanedFinalisation(item) {
+    if (String(item?.StatusID) !== '3' || !item?.Orphaned) return false;
+    return !Number.isNaN(new Date(item.Orphaned).getTime());
+}
+
+function renderOrphanedFinalisationNotice(item) {
+    return hasOrphanedFinalisation(item) ? `
+        <span class="orphaned-finalisation-notice" title="This request was automatically finalized because the associated project was deleted before the request could be approved or rejected." aria-label="This request was automatically finalized because the associated project was deleted before the request could be approved or rejected.">
+            <span class="orphaned-finalisation-icon" aria-hidden="true">!</span>
+        </span>` : '';
+}
+
 function showToast(message, type = 'success', duration = 5000) {
     let container = document.getElementById('toast-container');
     if (!container) { container = document.createElement('div'); container.id = 'toast-container'; document.body.appendChild(container); }
@@ -606,7 +618,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
     else if (selectedStatus === 'Finalised')   { headers.push('Approved By'); headers.push('Finalised On'); }
 
     const thead = headers.map(h => h === ''
-        ? `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`
+        ? `<th class="px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>`
         : renderSortableHeader(h, h, adminAccessSortKey, adminAccessSortDir, 'admin-access-sort-header')
     ).join('');
 
@@ -624,7 +636,7 @@ function adminAccessRenderTable(container, data, selectedStatus) {
 
         rows += `
         <tr class="table-hover-row admin-access-row" data-id="${item.RequestID}" data-dataset-id="${item.DataSetID || ''}" data-name="${(item.Name || '').replace(/"/g, '&quot;')}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-access-detail-${item.RequestID}">
-            <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
+            <td class="${tdCls} px-8 text-center">${renderOrphanedFinalisationNotice(item)}${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle || ''}" title="${escapeHtml(item.Name || '')}">${escapeHtml(item.Name || 'N/A')}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${formatDate(item.CreateDate)}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.CreateUser || 'N/A'}</td>
@@ -948,7 +960,7 @@ function adminImportRenderTable(container, data, selectedStatus) {
 
         rows += `
         <tr class="table-hover-row admin-import-row" data-id="${item.ImportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-import-detail-${item.ImportRequestID}">
-            <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
+            <td class="${tdCls} px-8 text-center">${renderOrphanedFinalisationNotice(item)}${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="width:25%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.ImportRequestName)}">${item.ImportRequestName || 'N/A'}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.CreateUser || item.UserPrincipalName)}">${item.CreateUser || item.UserPrincipalName || 'N/A'}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(item.ImportProjectName || item.ProjectName)}">${item.ImportProjectName || item.ProjectName || 'N/A'}</td>
@@ -1240,7 +1252,7 @@ function adminExportRenderTable(container, data, selectedStatus) {
 
         rows += `
         <tr class="table-hover-row admin-export-row" data-id="${item.ExportRequestID}" role="button" tabindex="0" aria-expanded="false" aria-controls="admin-export-detail-${item.ExportRequestID}">
-            <td class="${tdCls} text-center">${SVG_CHEVRON}</td>
+            <td class="${tdCls} px-8 text-center">${renderOrphanedFinalisationNotice(item)}${SVG_CHEVRON}</td>
             <td class="${tdCls} font-medium" style="width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(item.ExportRequestName || '').replace(/"/g, '&quot;')}">${item.ExportRequestName || 'N/A'}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.CreateUser || 'N/A'}</td>
             <td class="${tdCls}" style="width:20%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.ExportProjectName || item.ProjectName || 'N/A'}</td>

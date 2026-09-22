@@ -970,6 +970,18 @@ function formatDate(inputDate) {
     return date.toLocaleDateString('en-US', formattingOptions);
 }
 
+function hasOrphanedFinalisation(item) {
+    if (String(item?.StatusID) !== '3' || !item?.Orphaned) return false;
+    return !Number.isNaN(new Date(item.Orphaned).getTime());
+}
+
+function renderOrphanedFinalisationNotice(item) {
+    return hasOrphanedFinalisation(item) ? `
+        <span class="orphaned-finalisation-notice" title="This request was automatically finalized because the associated project was deleted before the request could be approved or rejected." aria-label="This request was automatically finalized because the associated project was deleted before the request could be approved or rejected.">
+            <span class="orphaned-finalisation-icon" aria-hidden="true">!</span>
+        </span>` : '';
+}
+
 
 // =================================================================
 //                      API & RENDERING FUNCTIONS
@@ -990,7 +1002,7 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
     
     // Add a column for the chevron
     const chevronHeader = document.createElement('th');
-    chevronHeader.className = 'w-10 px-6 py-3';
+    chevronHeader.className = 'w-5 px-8 py-3';
     headerRow.appendChild(chevronHeader);
     
     // Define headers based on the selected status
@@ -1038,7 +1050,8 @@ function renderTable(containerId, data, config, selectedStatus, searchTerm = '')
             }
             
             row.innerHTML = `
-                <td class="${tdClasses} text-center">
+                <td class="${tdClasses} px-8 text-center">
+                    ${renderOrphanedFinalisationNotice(item)}
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 chevron-icon transition-transform inline-block" aria-hidden="true" focusable="false" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
