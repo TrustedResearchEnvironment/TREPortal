@@ -36,10 +36,14 @@
             <!-- Refresh Button -->
             <button
                 id="refreshDatasourceBtn"
-                class="w-full sm:w-auto px-4 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transform transition-transform hover:scale-105 flex items-center justify-center gap-2"
+                type="button"
+                class="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 hover:scale-105 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-400"
+                title="Refresh data"
+                aria-label="Refresh data"
             >
-                <span class="material-symbols-outlined">refresh</span>
-                Refresh
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
             </button>
             <!-- Add Button -->
             <button

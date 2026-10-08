@@ -9,6 +9,7 @@ const API_UPDATE_METADATA = 'UpdateMetaData';
 // These variables need to be accessible by multiple functions.
 let currentPage = 1;
 let rowsPerPage = 5; // Default, will be updated by API response
+let totalPages = 1;
 let tableConfig = {}; // Will hold your headers configuration
 const searchInput = document.getElementById('searchRequests');
 
@@ -183,7 +184,8 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage); 
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    currentPage = Number.isInteger(currentPage) ? Math.min(Math.max(currentPage, 1), totalPages) : 1;
     
     container.innerHTML = ''; // Clear old controls
 
@@ -229,6 +231,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
  * @param {string} searchTerm The search term to filter by.
  */
 async function fetchAndRenderPage(page, searchTerm = '') {
+    if (!Number.isInteger(page) || page < 1) return;
     const token = ++_fetchToken;
 
     const setPaginationDisabled = (disabled) => {
@@ -262,7 +265,8 @@ async function fetchAndRenderPage(page, searchTerm = '') {
         const totalItems = parsedResponse.RowCount; // The TOTAL count from the server!
         currentPage = parsedResponse.CurrentPage;
         rowsPerPage = parsedResponse.PageSize;
-        totalPages = Math.ceil(totalItems / rowsPerPage);
+        totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+        currentPage = Math.min(Math.max(Number(currentPage) || 1, 1), totalPages);
         
         // --- 3. Filter using searchTerm ---
         const lowerCaseSearchTerm = searchTerm.trim().toLowerCase();
@@ -636,7 +640,8 @@ async function renderPlatformAdminDataSourceTypesPage() {
             if (!button || button.disabled) {
                 return;
             }
-            const newPage = parseInt(button.dataset.page, 10);
+            const newPage = Number(button.dataset.page);
+            if (!Number.isInteger(newPage) || newPage < 1 || newPage > totalPages) return;
             // console.log('newPage')
             // console.log(newPage)
             // Fetch the new page, preserving the current search term
@@ -647,10 +652,10 @@ async function renderPlatformAdminDataSourceTypesPage() {
             // Only act if the user pressed Enter and the target is our input
             if (event.key === 'Enter' && event.target.id === 'page-input') {
                 const inputElement = event.target;
-                const newPage = parseInt(inputElement.value, 10);
+                const newPage = Number(inputElement.value);
 
                 // Validate the input
-                if (newPage >= 1 && newPage <= totalPages) {
+                if (Number.isInteger(newPage) && newPage >= 1 && newPage <= totalPages) {
                     fetchAndRenderPage(newPage, searchInput.value);
                 } else {
                     // If invalid, show a message and reset the input to the current page
