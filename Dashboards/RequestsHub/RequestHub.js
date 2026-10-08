@@ -749,7 +749,7 @@ async function importPopulateProjects() {
         select.innerHTML = '<option value="">Select a project…</option>';
         projects.forEach(p => {
             const o = document.createElement('option');
-            o.value            = p.AssistProjectID;
+            o.value            = String(p.AssistProjectID);
             o.textContent      = p.Name;
             o.dataset.name     = p.Name;
             o.dataset.tenantsId = p.LoomeAssistTenantsID;
@@ -1028,16 +1028,17 @@ function importSetupListeners() {
         const importSelEl  = importModal.querySelector('#import-project-select');
         const name = sanitizeInput(importNameEl?.value.trim());
         const opt  = importSelEl?.options[importSelEl?.selectedIndex];
+        const projectID = Number(opt?.value);
         if (containsInvalidChars(importNameEl?.value || '')) { showToast('Special characters are not allowed in the request name.', 'error'); return; }
-        if (!name || !opt?.value) { showToast('Please fill in all fields.', 'error'); return; }
+        if (!name || !opt?.value || !Number.isInteger(projectID)) { showToast('Please fill in all fields.', 'error'); return; }
         if (importSubmBtn) { importSubmBtn.disabled = true; importSubmBtn.textContent = 'Submitting…'; }
         const t = showToast('Creating import request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataImportByAssistProjectID', {
-                LoomeAssistProjectID: parseInt(opt.value, 10),
-                ImportRequestName:    name,
-                LoomeAssistName:      opt.dataset.name,
-                LoomeAssistTenantsID: opt.dataset.tenantsId
+                importRequestName: name,
+                loomeAssistTenantsID: opt.dataset.tenantsId,
+                loomeAssistName: opt.dataset.name,
+                projectID: projectID
             });
             dismissToast(t);
             showToast('Import request created successfully.', 'success');
@@ -1150,7 +1151,7 @@ async function exportPopulateProjects() {
         select.innerHTML = '<option value="">Select a project…</option>';
         projects.forEach(p => {
             const o = document.createElement('option');
-            o.value             = p.AssistProjectID;
+            o.value             = String(p.AssistProjectID);
             o.textContent       = p.Name;
             o.dataset.name      = p.Name;
             o.dataset.tenantsId = p.LoomeAssistTenantsID;
@@ -1432,16 +1433,17 @@ function exportSetupListeners() {
         const exportSelEl  = exportModal.querySelector('#export-project-select');
         const name = sanitizeInput(exportNameEl?.value.trim());
         const opt  = exportSelEl?.options[exportSelEl?.selectedIndex];
+        const projectID = Number(opt?.value);
         if (containsInvalidChars(exportNameEl?.value || '')) { showToast('Special characters are not allowed in the request name.', 'error'); return; }
-        if (!name || !opt?.value) { showToast('Please fill in all fields.', 'error'); return; }
+        if (!name || !opt?.value || !Number.isInteger(projectID)) { showToast('Please fill in all fields.', 'error'); return; }
         if (exportSubmBtn) { exportSubmBtn.disabled = true; exportSubmBtn.textContent = 'Submitting…'; }
         const t = showToast('Creating export request…', 'info');
         try {
             await window.loomeApi.runApiRequest('RequestDataExportByAssistProjectID', {
-                LoomeAssistProjectID: parseInt(opt.value, 10),
-                ExportRequestName:       name,
-                LoomeAssistName:      opt.dataset.name,
-                LoomeAssistTenantsID: opt.dataset.tenantsId
+                exportRequestName: name,
+                loomeAssistTenantsID: opt.dataset.tenantsId,
+                loomeAssistName: opt.dataset.name,
+                projectID: projectID
             });
             dismissToast(t);
             showToast('Export request created successfully.', 'success');
