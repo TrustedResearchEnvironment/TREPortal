@@ -188,9 +188,9 @@ function sanitizeInput(value) {
 
 function updateSupersedeWarning(selectEl, warningElId, jobsArray, projectIdKey) {
     const warningEl = document.getElementById(warningElId);
-    if (!warningEl) return;
+    if (!warningEl) return false;
     const projectId = selectEl?.value;
-    if (!projectId) { warningEl.style.display = 'none'; return; }
+    if (!projectId) { warningEl.style.display = 'none'; return false; }
 
     // Exclude terminal statuses: -3 Superseded, -2 Failed, 4 Rejected, 5 Cancelled, 3 Finalised
     const excluded = [-3, -2, 4, 5, 3];
@@ -212,6 +212,7 @@ function updateSupersedeWarning(selectEl, warningElId, jobsArray, projectIdKey) 
     });
 
     warningEl.style.display = exists ? 'block' : 'none';
+    return exists;
 }
 
 /** Returns true if the string contains any character outside the allowed whitelist. */
@@ -1009,8 +1010,8 @@ function importSetupListeners() {
         if (importSubmBtn) importSubmBtn.disabled = true;
 
         const checkImportForm = () => {
-            if (importSubmBtn) importSubmBtn.disabled = !(importNameEl?.value.trim() && importSelEl?.value);
-            updateSupersedeWarning(importSelEl, 'import-supersede-warning', importAllJobs, 'ImportProjectID');
+            const hasDuplicate = updateSupersedeWarning(importSelEl, 'import-duplicate-warning', importAllJobs, 'ImportProjectID');
+            if (importSubmBtn) importSubmBtn.disabled = hasDuplicate || !(importNameEl?.value.trim() && importSelEl?.value);
         };
         if (importNameEl) importNameEl.oninput = checkImportForm;
 
@@ -1410,8 +1411,8 @@ function exportSetupListeners() {
         if (exportSubmBtn) exportSubmBtn.disabled = true;
 
         const checkExportForm = () => {
-            if (exportSubmBtn) exportSubmBtn.disabled = !(exportNameEl?.value.trim() && exportSelEl?.value);
-            updateSupersedeWarning(exportSelEl, 'export-supersede-warning', exportAllJobs, 'ExportProjectID');
+            const hasDuplicate = updateSupersedeWarning(exportSelEl, 'export-duplicate-warning', exportAllJobs, 'ExportProjectID');
+            if (exportSubmBtn) exportSubmBtn.disabled = hasDuplicate || !(exportNameEl?.value.trim() && exportSelEl?.value);
         };
         if (exportNameEl) {
             exportNameEl.removeEventListener('input', checkExportForm);
