@@ -678,7 +678,8 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
         return;
     }
 
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    currentPage = Number.isInteger(currentPage) ? Math.min(Math.max(currentPage, 1), totalPages) : 1;
     container.innerHTML = ''; // Clear old controls
 
     if (totalPages <= 1) {
@@ -746,6 +747,7 @@ function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
  * @param {string} searchTerm The search term to filter by.
  */
 async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
+    if (!Number.isInteger(page) || page < 1 || page > totalPages) return;
     // Claim this request's token. Any response whose token no longer matches
     // the current value is stale and will be discarded.
     const token = ++_fetchToken;
@@ -781,9 +783,10 @@ async function fetchAndRenderPage(tableConfig, page, searchTerm = '') {
         // --- 2. Extract Data and Update State ---
         const dataForPage = parsedResponse.Results;
         const totalItems = parsedResponse.RowCount; // The TOTAL count from the server!
-        currentPage = parsedResponse.CurrentPage;
+        currentPage = Number(parsedResponse.CurrentPage);
         rowsPerPage = parsedResponse.PageSize;
-        totalPages = Math.ceil(totalItems / rowsPerPage);
+        totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+        currentPage = Math.min(Math.max(Number.isInteger(currentPage) ? currentPage : 1, 1), totalPages);
 
         // --- 3. Filter using searchTerm ---
         const lowerCaseSearchTerm = searchTerm.trim().toLowerCase();
@@ -1061,7 +1064,10 @@ function renderTable(containerId, tableConfig, data, config = {}) {
         });
     }
     table.appendChild(tbody);
-    container.appendChild(table);
+    const tableScroller = document.createElement('div');
+    tableScroller.className = 'admin-datasource-table-container';
+    tableScroller.appendChild(table);
+    container.appendChild(tableScroller);
 
     // --- SIMPLIFIED Event Listener ---
     if (config.renderAccordionContent) {
@@ -1092,6 +1098,9 @@ function renderTable(containerId, tableConfig, data, config = {}) {
                     contentRow.setAttribute('aria-hidden', String(!isOpen));
                     const chevron = trigger.querySelector('.chevron-icon');
                     if (chevron) chevron.classList.toggle('rotate-180');
+                    if (isOpen) {
+                        requestAnimationFrame(() => contentRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+                    }
                 }
                 return;
             }
@@ -1499,7 +1508,8 @@ async function renderPlatformAdminDataSourcePage() {
         const button = event.target.closest('button[data-page]');
         if (!button || button.disabled) return;
 
-        const newPage = parseInt(button.dataset.page, 10);
+        const newPage = Number(button.dataset.page);
+        if (!Number.isInteger(newPage) || newPage < 1 || newPage > totalPages) return;
         fetchAndRenderPage(tableConfig, newPage, searchInput.value);
     });
 
@@ -1508,10 +1518,10 @@ async function renderPlatformAdminDataSourcePage() {
         // Only act if the user pressed Enter and the target is our input
         if (event.key === 'Enter' && event.target.id === 'page-input') {
             const inputElement = event.target;
-            const newPage = parseInt(inputElement.value, 10);
+            const newPage = Number(inputElement.value);
 
             // Validate the input
-            if (newPage >= 1 && newPage <= totalPages) {
+            if (Number.isInteger(newPage) && newPage >= 1 && newPage <= totalPages) {
                 fetchAndRenderPage(tableConfig, newPage, searchInput.value);
             } else {
                 // If invalid, show a message and reset the input to the current page
@@ -1531,10 +1541,10 @@ async function renderPlatformAdminDataSourcePage() {
 
     const refreshBtn = document.getElementById('refreshDatasourceBtn');
     if (refreshBtn) {
+        const refreshIcon = refreshBtn.querySelector('svg');
         refreshBtn.addEventListener('click', async () => {
-            const originalHtml = refreshBtn.innerHTML;
             refreshBtn.disabled = true;
-            refreshBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing…`;
+            refreshIcon?.classList.add('animate-spin');
             try {
                 await fetchAndRenderPage(tableConfig, currentPage, searchInput?.value || '');
                 showToast('Data refreshed.', 'success');
@@ -1542,7 +1552,7 @@ async function renderPlatformAdminDataSourcePage() {
                 showToast('Failed to refresh data.', 'error');
             } finally {
                 refreshBtn.disabled = false;
-                refreshBtn.innerHTML = originalHtml;
+                refreshIcon?.classList.remove('animate-spin');
             }
         });
     }

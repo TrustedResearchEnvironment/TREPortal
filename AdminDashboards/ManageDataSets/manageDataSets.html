@@ -276,34 +276,47 @@
             <div class="col-md-8" style="height:100%;overflow-y:auto;">
                 <div class="d-flex flex-wrap align-items-center justify-content-between mb-2 gap-3">
                     <h6 class="mb-0 flex-shrink-0">Columns</h6>
+                    <button id="toggleFullscreenBtn" class="modern-fullscreen-btn" aria-label="Toggle Fullscreen">
+                        <!-- Expand Icon (Default State) -->
+                        <svg class="icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                        </svg>
+                        <!-- Collapse Icon (Hidden Initially) -->
+                        <svg class="icon-collapse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                            <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/>
+                        </svg>
+                    </button>
+
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                     </div>
                 </div>
-                <div class="table-responsive position-relative">
-                    <div id="dataSetColsLoader" class="d-none position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" style="background: rgba(255,255,255,0.85); z-index: 3;">
-                        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
-                        <span class="mt-2 text-muted small">Loading columns...</span>
+                <div id="tableWorkspaceWrapper" class="workspace-wrapper">
+                    <div class="table-responsive position-relative">
+                        <div id="dataSetColsLoader" class="d-none position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" style="background: rgba(255,255,255,0.85); z-index: 3;">
+                            <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                            <span class="mt-2 text-muted small">Loading columns...</span>
+                        </div>
+                        <table class="table table-bordered table-striped" id="dataSetColsTable">
+                            <thead class="thead-custom-dark" id="dataSetColsHeader">
+                                <tr>
+                                    <th>Column Name</th>
+                                    <th>Column Type</th>
+                                    <th>Logical Name</th>
+                                    <th>Business Description</th>
+                                    <th>Example Value</th>
+                                    <th>Redact</th>
+                                    <th>Deidentify</th>
+                                    <!-- <th>IsFilter</th> -->
+                                </tr>
+                            </thead>
+                            <tbody id="dataSetColsBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
                     </div>
-                    <table class="table table-bordered table-striped" id="dataSetColsTable">
-                        <thead class="thead-custom-dark" id="dataSetColsHeader">
-                            <tr>
-                                <th>Column Name</th>
-                                <th>Column Type</th>
-                                <th>Logical Name</th>
-                                <th>Business Description</th>
-                                <th>Example Value</th>
-                                <th>Redact</th>
-                                <th>Deidentify</th>
-                                <!-- <th>IsFilter</th> -->
-                            </tr>
-                        </thead>
-                        <tbody id="dataSetColsBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
-                </div>
-                <div id="pagination-controls" class="d-flex justify-content-center align-items-center mt-4"></div>
-                    <!-- The pagination buttons will be generated here -->
+                    <div id="pagination-controls" class="d-flex justify-content-center align-items-center mt-4"></div>
+                        <!-- The pagination buttons will be generated here -->
+                    </div>
                 </div>
             </div> <!-- End of right column -->
         </div> <!-- End of main content row -->

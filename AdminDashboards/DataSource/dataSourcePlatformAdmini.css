@@ -810,6 +810,33 @@ video {
     border-radius: 8px; /* Optional: rounded corners */
 }
 
+.admin-datasource-table-container {
+    max-height: min(600px, 65vh);
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-datasource-table-container table {
+    min-width: 100%;
+}
+
+.admin-datasource-table-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f9fafb;
+}
+
+@media (max-width: 640px) {
+    .admin-datasource-table-container {
+        max-height: 60vh;
+    }
+}
+
  /*Make sure the table fills the container */
 table {
     width: 100%;
