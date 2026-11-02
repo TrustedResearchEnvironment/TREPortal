@@ -178,7 +178,7 @@ let _accessFetchToken   = 0;
 async function accessGetProjectsMapping() {
     if (accessProjectsCache) return accessProjectsCache;
     try {
-        const res  = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', { page: 1, page_size: 200, search: '' });
+        const res  = await window.loomeApi.runApiRequest('GetAssistProjectsFilteredByUpn', {});
         const data = safeParseJson(res);
         const map  = {};
         (data?.Results || data || []).forEach(p => {
