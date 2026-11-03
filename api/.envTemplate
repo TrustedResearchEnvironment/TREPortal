@@ -1,0 +1,25 @@
+# SQLALCHEMY_DATABASE_URL="mssql+pyodbc://sa:Test1234!@host.docker.internal/master?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=no"
+# For local development, use localhost instead of host.docker.internal
+SQLALCHEMY_DATABASE_URL="mssql+pyodbc://sa:Test1234!@localhost/master?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=no"
+
+
+# Secret key for API Access
+API_KEY=""
+
+
+TOKEN_URL="https://test-id.loomesoftware.com/connect/token"
+API_BASE_URL="https://test-app-api.loomesoftware.com/api/v1/"
+CLIENT_ID=""
+CLIENT_SECRET=""
+
+# SSL Configuration
+# Set to "true" for production, "false" for development/testing
+SSL_VERIFY=false
+
+# Catalogue & Entity Configuration
+CUSTOM_APP_NAME="TRE Research Assets"
+EMBEDDING_URL_DB="https://sttrewebdataonlydevtre.blob.core.windows.net/$web/embeddings/TREEntityDB.js"
+EMBEDDING_URL_REDCap="https://sttrewebdataonlydevtre.blob.core.windows.net/$web/embeddings/TREEntityREDCap.js"
+
+# Optional: Client certificate path (if required by the API)
+# CLIENT_CERT_PATH=/path/to/client/cert.pem

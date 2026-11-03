@@ -1,0 +1,256 @@
+Connection:mssql+pyodbc://sa:Test1234!@localhost/master?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=no
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-8.4.1, pluggy-1.6.0
+rootdir: /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI
+configfile: pyproject.toml
+plugins: asyncio-1.1.0, inline-snapshot-0.31.1, hydra-core-1.3.2, anyio-4.12.0, cov-6.2.1
+asyncio: mode=strict, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 2 items
+
+Testing/test_datasets.py Error executing batch: (pyodbc.ProgrammingError) ('42000', '[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot change database encryption state because no database encryption key is set. (33106) (SQLExecDi
+Error executing batch: (pyodbc.ProgrammingError) ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]'svc_workflowprod' is not a valid login or you do not have permission. (15007) (SQLExecDirectW)")
+[SQ
+Error executing batch: (pyodbc.ProgrammingError) ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]'shebawebapp' is not a valid login or you do not have permission. (15007) (SQLExecDirectW)")
+[SQL: 
+/
+Error executing batch: (pyodbc.ProgrammingError) ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]User or role 'svc_workflowprod' does not exist in this database. (15410) (SQLExecDirectW)")
+[SQL: 
+sy
+Error executing batch: (pyodbc.ProgrammingError) ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]User or role 'shebawebapp' does not exist in this database. (15410) (SQLExecDirectW)")
+[SQL: 
+sys.sp_
+Error executing batch: (pyodbc.ProgrammingError) ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]User or role 'shebawebapp' does not exist in this database. (15410) (SQLExecDirectW)")
+[SQL: 
+sys.sp_
+Error executing batch: (pyodbc.ProgrammingError) ('42000', "[42000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]User or role 'shebawebapp' does not exist in this database. (15410) (SQLExecDirectW)")
+[SQL: 
+sys.sp_
+Expected API Key: UI8M...VvVl
+Application timezone configured to: UTC
+2026-01-16 10:29:21,716 INFO sqlalchemy.engine.Engine SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR)
+2026-01-16 10:29:21,716 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-01-16 10:29:21,718 INFO sqlalchemy.engine.Engine SELECT schema_name()
+2026-01-16 10:29:21,718 INFO sqlalchemy.engine.Engine [generated in 0.00021s] ()
+2026-01-16 10:29:21,722 INFO sqlalchemy.engine.Engine SELECT CAST('test max support' AS NVARCHAR(max))
+2026-01-16 10:29:21,722 INFO sqlalchemy.engine.Engine [generated in 0.00020s] ()
+2026-01-16 10:29:21,722 INFO sqlalchemy.engine.Engine SELECT 1 FROM fn_listextendedproperty(default, default, default, default, default, default, default)
+2026-01-16 10:29:21,722 INFO sqlalchemy.engine.Engine [generated in 0.00018s] ()
+2026-01-16 10:29:21,724 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-01-16 10:29:21,724 INFO sqlalchemy.engine.Engine SELECT @@version
+2026-01-16 10:29:21,725 INFO sqlalchemy.engine.Engine [generated in 0.00024s] ()
+2026-01-16 10:29:21,725 INFO sqlalchemy.engine.Engine SELECT DB_NAME() AS CurrentDatabase
+2026-01-16 10:29:21,725 INFO sqlalchemy.engine.Engine [generated in 0.00016s] ()
+2026-01-16 10:29:21,726 INFO sqlalchemy.engine.Engine SELECT TOP 1 name FROM sys.tables
+2026-01-16 10:29:21,726 INFO sqlalchemy.engine.Engine [generated in 0.00015s] ()
+2026-01-16 10:29:21,730 INFO sqlalchemy.engine.Engine ROLLBACK
+{"access_token":"test-jwt-token","token_type":"Bearer","expires_in":3600}
+Successfully obtained Loome Integrate token.
+[{"projectName":"Test Project","projectId":123}]
+Successfully accessed Loome Integrate project: Test Project
+Verify_headers called with upn: test.user@example.com and api_key: test...-key ( 12 )
+Result Length: 17
+start: 0 end: 5 total_count: 17 total_pages: 4
+F2026-01-16 10:29:21,840 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-01-16 10:29:21,840 INFO sqlalchemy.engine.Engine SELECT @@version
+2026-01-16 10:29:21,840 INFO sqlalchemy.engine.Engine [cached since 0.1156s ago] ()
+2026-01-16 10:29:21,841 INFO sqlalchemy.engine.Engine SELECT DB_NAME() AS CurrentDatabase
+2026-01-16 10:29:21,841 INFO sqlalchemy.engine.Engine [cached since 0.1156s ago] ()
+2026-01-16 10:29:21,841 INFO sqlalchemy.engine.Engine SELECT TOP 1 name FROM sys.tables
+2026-01-16 10:29:21,841 INFO sqlalchemy.engine.Engine [cached since 0.1155s ago] ()
+2026-01-16 10:29:21,843 INFO sqlalchemy.engine.Engine ROLLBACK
+{"access_token":"test-jwt-token","token_type":"Bearer","expires_in":3600}
+Successfully obtained Loome Integrate token.
+[{"projectName":"Test Project","projectId":123}]
+Successfully accessed Loome Integrate project: Test Project
+Verify_headers called with upn: test.user@example.com and api_key: test...-key ( 12 )
+Creating catalogue entry for dataset: Test Dataset
+Datasource Type: SQL Database
+_replacement_dict: {'entity_type_name': 'SQL Database', '_name': 'Test Dataset', '_sourceItemId': 40, '_group': 'TRE Data Assets', '_embeddingsDataSetID': 40, '_embeddingsDataSetIDDescription': 'Source Dataset identifier', '_actionsUrl': 'None', '_actionsDescription': 'Open', '_attributesDataSource': 'SQL Database'}
+{'Authorization': 'Bearer test-jwt-token', 'Content-Type': 'application/json'}
+all_apps: [{'name': 'Imperial College Research Assets', 'id': 'test-app-id'}]
+_entity_type_map: {'SQL Database': 59, 'REDCap Database': 60, 'Files': 61}
+Entity Name ID: SQL Database -> 59
+Entity Type Map: {'SQL Database': 59, 'REDCap Database': 60, 'Files': 61}
+Generated asset from template: [{'name': 'Test Dataset', 'sourceItemId': '40', 'group': 'TRE Data Assets', 'entityTypeId': '59', 'tags': ['Trusted Research Environment'], 'embeddingProperties': [{'key': 'DataSetID', 'value': '40', 'type': 1, 'description': 'Source Dataset identifier'}], 'actions': [{'name': 'View Publication', 'Value': 'None', 'description': 'Open'}], 'attributes': [{'name': 'Data Source', 'Values': ['SQL Database']}]}]
+Catalogue entry created successfully.
+Verify_headers called with upn: test.user@example.com and api_key: test...-key ( 12 )
+Result Length: 18
+start: 0 end: 5 total_count: 18 total_pages: 4
+F
+
+=================================== FAILURES ===================================
+___________________________ test_get_datasets_empty ____________________________
+
+client = <starlette.testclient.TestClient object at 0x7f34ead602b0>
+
+    def test_get_datasets_empty(client: TestClient):
+        """Test getting datasets when DB is empty."""
+        response = client.get("/api/DataSet")
+        assert response.status_code == 200
+    
+        # Verify structure manually
+        data = response.json()
+        assert "Results" in data
+>       assert len(data["Results"]) == 0
+E       AssertionError: assert 5 == 0
+E        +  where 5 = len([{'Approvers': 'ria.yangzon@bizdata.com.au', 'DataSetID': 1, 'DataSourceID': 1, 'Description': 'Barwon Infant Study, i...T placebo vs 1000mg/day mangosteen pericarp treatment of bipolar depression (data custodian note: in BH REDCap)', ...}])
+
+Testing/test_datasets.py:13: AssertionError
+------------------------------ Captured log setup ------------------------------
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT CAST(SERVERPROPERTY('ProductVersion') AS VARCHAR)
+INFO     sqlalchemy.engine.Engine:base.py:1904 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT schema_name()
+INFO     sqlalchemy.engine.Engine:base.py:1904 [generated in 0.00021s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT CAST('test max support' AS NVARCHAR(max))
+INFO     sqlalchemy.engine.Engine:base.py:1904 [generated in 0.00020s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT 1 FROM fn_listextendedproperty(default, default, default, default, default, default, default)
+INFO     sqlalchemy.engine.Engine:base.py:1904 [generated in 0.00018s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1094 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT @@version
+INFO     sqlalchemy.engine.Engine:base.py:1904 [generated in 0.00024s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT DB_NAME() AS CurrentDatabase
+INFO     sqlalchemy.engine.Engine:base.py:1904 [generated in 0.00016s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT TOP 1 name FROM sys.tables
+INFO     sqlalchemy.engine.Engine:base.py:1904 [generated in 0.00015s] ()
+INFO     sqlalchemy.engine.Engine:base.py:1126 ROLLBACK
+_____________________________ test_create_dataset ______________________________
+
+client = <starlette.testclient.TestClient object at 0x7f34eaa832e0>
+db_session = <sqlalchemy.orm.session.Session object at 0x7f34eaa834f0>
+
+    def test_create_dataset(client: TestClient, db_session):
+        """Test creating a new dataset."""
+    
+        # Seed dependencies
+        ds_type = DataSourceType(Name="SQL Database", IsActive=True)
+        db_session.add(ds_type)
+        db_session.flush()
+    
+        ds = DataSource(Name="Test Source", DataSourceTypeID=ds_type.DataSourceTypeID, IsActive=True)
+        db_session.add(ds)
+        db_session.commit() # Commit seed data (nested transaction handles this safely now)
+    
+        new_dataset = {
+            "Name": "Test Dataset",
+            "Description": "Created by test",
+            "DataSourceID": ds.DataSourceID,
+            "IsActive": True,
+            "Approvers": "admin@example.com",
+            "Owner": "test.user@example.com",
+            "DataSourceTypeID": ds_type.DataSourceTypeID,
+            "DataSetColumns": [
+                {
+                    "ColumnName": "id",
+                    "ColumnType": "int",
+                    "DisplayOrder": 1
+                }
+            ]
+        }
+    
+        response = client.post("/api/DataSet/Create", json=new_dataset)
+    
+        # Assert
+        assert response.status_code == 200, f"Response: {response.text}"
+        data = response.json()
+        assert data["Name"] == "Test Dataset"
+        assert data["DataSetID"] is not None
+    
+        # Verify list update
+        list_response = client.get("/api/DataSet")
+>       assert len(list_response.json()["Results"]) == 1
+E       AssertionError: assert 5 == 1
+E        +  where 5 = len([{'Approvers': 'ria.yangzon@bizdata.com.au', 'DataSetID': 1, 'DataSourceID': 1, 'Description': 'Barwon Infant Study, i...T placebo vs 1000mg/day mangosteen pericarp treatment of bipolar depression (data custodian note: in BH REDCap)', ...}])
+
+Testing/test_datasets.py:54: AssertionError
+------------------------------ Captured log setup ------------------------------
+INFO     sqlalchemy.engine.Engine:base.py:1094 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT @@version
+INFO     sqlalchemy.engine.Engine:base.py:1904 [cached since 0.1156s ago] ()
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT DB_NAME() AS CurrentDatabase
+INFO     sqlalchemy.engine.Engine:base.py:1904 [cached since 0.1156s ago] ()
+INFO     sqlalchemy.engine.Engine:base.py:1899 SELECT TOP 1 name FROM sys.tables
+INFO     sqlalchemy.engine.Engine:base.py:1904 [cached since 0.1155s ago] ()
+INFO     sqlalchemy.engine.Engine:base.py:1126 ROLLBACK
+=============================== warnings summary ===============================
+../../../.local/lib/python3.10/site-packages/testcontainers/core/waiting_utils.py:219
+  /home/ossonts/.local/lib/python3.10/site-packages/testcontainers/core/waiting_utils.py:219: DeprecationWarning: The @wait_container_is_ready decorator is deprecated and will be removed in a future version. Use structured wait strategies instead: container.waiting_for(HttpWaitStrategy(8080).for_status_code(200)) or container.waiting_for(LogMessageWaitStrategy('ready'))
+    @wait_container_is_ready()
+
+../../../.local/lib/python3.10/site-packages/testcontainers/mssql/__init__.py:53
+  /home/ossonts/.local/lib/python3.10/site-packages/testcontainers/mssql/__init__.py:53: DeprecationWarning: The @wait_container_is_ready decorator is deprecated and will be removed in a future version. Use structured wait strategies instead: container.waiting_for(HttpWaitStrategy(8080).for_status_code(200)) or container.waiting_for(LogMessageWaitStrategy('ready'))
+    @wait_container_is_ready(AssertionError)
+
+database.py:27
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/database.py:27: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/conftest.py:42: DeprecationWarning: The wait_for_logs function with string or callable predicates is deprecated and will be removed in a future version. Use structured wait strategies instead: container.waiting_for(LogMessageWaitStrategy('ready')) or container.waiting_for(LogMessageWaitStrategy(re.compile(r'pattern')))
+    wait_for_logs(wiremock, "port:", timeout=10)
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:245: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataSetColumn(DataSetColumnBase):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/.local/lib/python3.10/site-packages/pydantic/_internal/_config.py:383: UserWarning: Valid config keys have changed in V2:
+  * 'orm_mode' has been renamed to 'from_attributes'
+    warnings.warn(message, UserWarning)
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:270: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataSetFolderFile(DataSetFolderFileBase):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:276: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataSetFileWithFolder(DataSetFolderFile):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:291: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataSetFolder(DataSetFolderBase):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:320: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataSetMetaDataValue(DataSetMetaDataValueBase):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:411: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataSourceTable(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:424: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class LoomeDataSourceTables(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/models/models.py:449: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class MetaDataTokens(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/app/dataexport.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class LastExecution(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/app/dataexport.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class Schedule(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/app/dataexport.py:52: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataExportJob(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/app/dataexport.py:77: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class ProjectDetails(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/app/dataexport.py:89: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataExportJobCreated(BaseModel):
+
+Testing/test_datasets.py::test_get_datasets_empty
+  /home/ossonts/github/org-TrustedResearchEnvironment/TrustAPI/app/dataexport.py:118: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class DataExportPagedResult(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED Testing/test_datasets.py::test_get_datasets_empty - AssertionError: as...
+FAILED Testing/test_datasets.py::test_create_dataset - AssertionError: assert...
+======================= 2 failed, 19 warnings in 25.48s ========================

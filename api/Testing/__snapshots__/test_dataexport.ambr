@@ -1,0 +1,128 @@
+# serializer version: 1
+# name: test_create_data_export_snapshot
+  dict({
+    'cancelJobFlag': False,
+    'createdBy': 'test.user@example.com',
+    'dateCreated': '2026-01-20T10:00:00Z',
+    'dateModified': '2026-01-20T10:00:00Z',
+    'emailNotificationRecipients': '',
+    'emailNotificationRule': None,
+    'emailNotificationRuleId': 0,
+    'jobDependencyJob': list([
+    ]),
+    'jobDependencyPredecessorJob': list([
+    ]),
+    'jobExecutions': list([
+    ]),
+    'jobId': 2001,
+    'jobName': '[ASSIST-123] test.user@example.com 1737889500',
+    'jobSequence': list([
+    ]),
+    'lastExecution': None,
+    'logBatchSize': 5,
+    'logging': 0,
+    'loggingType': None,
+    'modifiedBy': 'test.user@example.com',
+    'project': dict({
+      'projectId': 123,
+      'projectMembershipInvites': None,
+      'projectMemberships': None,
+      'projectName': 'Test Project',
+      'requiresSync': False,
+      'tasks': None,
+    }),
+    'projectId': 123,
+    'retryCount': 0,
+    'schedules': None,
+    'taskQueues': list([
+    ]),
+  })
+# ---
+# name: test_get_all_dataexports_snapshot
+  dict({
+    'CurrentPage': 1,
+    'FirstRowOnPage': 1,
+    'LastRowOnPage': 2,
+    'PageCount': 1,
+    'PageSize': 5,
+    'Results': list([
+      dict({
+        'agentJobId': '550e8400-e29b-41d4-a716-446655440000',
+        'cancelJobFlag': False,
+        'createdBy': 'test.user@example.com',
+        'dateCreated': '2026-01-15T10:00:00Z',
+        'dateModified': '2026-01-15T10:00:00Z',
+        'emailNotificationRecipients': '',
+        'emailNotificationRuleId': 0,
+        'jobId': 1001,
+        'jobName': '[PROJ-001] test.user@example.com 1737889200',
+        'lastExecution': dict({
+          'endTime': '2026-01-15T10:10:00Z',
+          'executionGuid': '660e8400-e29b-41d4-a716-446655440001',
+          'jobExecutionId': 5001,
+          'jobId': 1001,
+          'jobName': '[PROJ-001] test.user@example.com 1737889200',
+          'partitionId': 1,
+          'projectApiMemberships': None,
+          'projectId': 123,
+          'projectMemberships': list([
+          ]),
+          'startTime': '2026-01-15T10:05:00Z',
+          'status': 'Success',
+        }),
+        'logBatchSize': 5,
+        'logging': 0,
+        'loggingType': None,
+        'modifiedBy': 'test.user@example.com',
+        'projectId': 123,
+        'retryCount': 0,
+        'schedule': dict({
+          'ObjectId': 1001,
+          'hasEnabledSchedules': False,
+          'hasSchedules': False,
+          'nextExecutionDate': None,
+        }),
+        'status': 'Completed',
+      }),
+      dict({
+        'agentJobId': '770e8400-e29b-41d4-a716-446655440002',
+        'cancelJobFlag': False,
+        'createdBy': 'test.user@example.com',
+        'dateCreated': '2026-01-18T14:30:00Z',
+        'dateModified': '2026-01-18T14:30:00Z',
+        'emailNotificationRecipients': 'admin@example.com',
+        'emailNotificationRuleId': 1,
+        'jobId': 1002,
+        'jobName': '[PROJ-002] test.user@example.com 1738166600',
+        'lastExecution': dict({
+          'endTime': None,
+          'executionGuid': '880e8400-e29b-41d4-a716-446655440003',
+          'jobExecutionId': 5002,
+          'jobId': 1002,
+          'jobName': '[PROJ-002] test.user@example.com 1738166600',
+          'partitionId': 1,
+          'projectApiMemberships': None,
+          'projectId': 123,
+          'projectMemberships': list([
+          ]),
+          'startTime': '2026-01-18T14:35:00Z',
+          'status': 'InProgress',
+        }),
+        'logBatchSize': 10,
+        'logging': 1,
+        'loggingType': 'Verbose',
+        'modifiedBy': 'test.user@example.com',
+        'projectId': 123,
+        'retryCount': 2,
+        'schedule': dict({
+          'ObjectId': 1002,
+          'hasEnabledSchedules': True,
+          'hasSchedules': True,
+          'nextExecutionDate': '2026-01-19T14:30:00Z',
+        }),
+        'status': 'Running',
+      }),
+    ]),
+    'RowCount': 2,
+  })
+# ---

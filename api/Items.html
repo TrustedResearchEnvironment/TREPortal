@@ -1,0 +1,187 @@
+<!-- using bootstrap generate an html table for the return of this json 	
+ 
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Price</th>
+            <th scope="col">Is Offer</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>string</td>
+            <td>1</td>
+            <td>true</td>
+        </tr>
+        <tr>
+            <td>t12</td>
+            <td>1</td>
+            <td>true</td>
+        </tr>
+        <tr>
+            <td>t123</td>
+            <td>1</td>
+            <td>true</td>
+        </tr>
+    </tbody>
+</table>
+-->
+
+
+
+<!-- give me teh javascript to call this https://ca-tre-prod-australiaeast.wonderfulsky-162b0f7b.australiaeast.azurecontainerapps.io/items/1
+ -->
+<script>
+    fetch('https://ca-tre-prod-australiaeast.wonderfulsky-162b0f7b.australiaeast.azurecontainerapps.io/items/1')
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+        })
+        .catch(error => {
+            console.error('Error fetching item:', error);
+        });
+</script>
+
+<!-- call the javascript to give you the table  -->
+<script>
+    fetch('https://ca-tre-prod-australiaeast.wonderfulsky-162b0f7b.australiaeast.azurecontainerapps.io/items/1')
+        .then(response => response.json())
+        .then(data => {
+            const tableBody = document.querySelector('.table tbody');
+            tableBody.innerHTML = ''; // Clear existing table rows
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.price}</td>
+                    <td>${item.is_offer}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching item:', error);
+        });
+</script>
+
+
+<!-- in javascript call the url and just display the result      -->
+<script>
+    fetch('https://ca-tre-prod-australiaeast.wonderfulsky-162b0f7b.australiaeast.azurecontainerapps.io/items/1')
+        .then(response => response.json())
+        .then(data => {
+            const tableBody = document.querySelector('.table tbody');
+            tableBody.innerHTML = ''; // Clear existing table rows
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.price}</td>
+                    <td>${item.is_offer}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching item:', error);
+        });
+</script>
+
+
+<!-- in js call this url https://ca-tre-prod-australiaeast.wonderfulsky-162b0f7b.australiaeast.azurecontainerapps.io/items/1')
+        and display the result as a string -->
+        <script>
+    fetch('https://ca-tre-prod-australiaeast.wonderfulsky-162b0f7b.australiaeast.azurecontainerapps.io/items/1')
+        .then(response => response.json())
+        .then(data => {
+            const resultContainer = document.getElementById('result');
+            resultContainer.innerHTML = JSON.stringify(data);
+        })
+        .catch(error => {
+            console.error('Error fetching item:', error);
+        });
+</script>
+
+<!-- in js call this url https://ca-tre-prod-australiaeast.wonderfulsky-162b0f7b.australiaeast.azurecontainerapps.io/items/1')
+        and add to page body 
+         -->
+
+<script>
+  
+    // This assumes the bearer token is stored in localStorage with the key 'bearerToken'.
+    // You may need to adjust the key depending on how the token is stored on your page.
+    const bearerToken1 = localStorage.getItem('oidc.user:https://test-id.loomesoftware.com/:5918db6c-9715-44c4-b627-d0f1e2a3fa1c');
+    // bearer is json take the element called access_token
+    const bearerToken = JSON.parse(bearerToken1)?.access_token;
+
+    if (bearerToken) {
+        fetch('https://test-app-api.loomesoftware.com/api/v1/apirequests/run/3', {
+            headers: {
+                'Authorization': `Bearer ${bearerToken}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            //render this as a table
+  
+            const table = document.createElement('table');
+            table.className = 'table table-striped'; // Add bootstrap classes
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            headerRow.innerHTML = `
+                <th scope="col">Name</th>
+                <th scope="col">Price</th>
+                <th scope="col">Is Offer</th>
+            `;
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.price}</td>
+                    <td>${item.is_offer}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+
+            document.body.appendChild(table);
+        })
+        .catch(error => {
+            console.error('Error fetching item:', error);
+        });
+    } else {
+        console.error('Bearer token not found in localStorage.');
+        const errorDiv = document.createElement('div');
+        errorDiv.textContent = 'Error: Bearer token not found.';
+        document.body.appendChild(errorDiv);
+    }
+</script>
+
+ 
+    // This script will fetch and execute an external JavaScript file.
+    // You need to host the highlighted script content at a public URL
+    // and replace 'URL_TO_YOUR_SCRIPT.js' with that URL.
+<script> 
+    const scriptUrl = 'https://trustedresearchenvironment.github.io/PublicPortalTemplates/test/example1.js';
+    
+    const script = document.createElement('script');
+    script.src = scriptUrl;
+    script.onload = () => {
+        console.log(`Script loaded and executed from ${scriptUrl}`);
+    };
+    script.onerror = () => {
+        console.error(`Failed to load script from ${scriptUrl}`);
+        //display full error
+        const errorDiv = document.createElement('div');
+        errorDiv.textContent = 'Error: Failed to load script.';
+        document.body.appendChild(errorDiv);
+    };
+    document.body.appendChild(script);
+ 

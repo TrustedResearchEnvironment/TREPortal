@@ -1,0 +1,116 @@
+{
+  "entityTypes": [
+    {
+      "type": "Database",
+      "category": "Dataset",
+      "subCategory": "CSV File",
+      "attributes": ["Data Source"],
+      "embeddingUrl": "https://[DYNAMIC_OVERRIDE]/embeddings/TREEntityDB.js",
+      "embeddingParams": [
+        {
+          "id": "DataSetID",
+          "name": "Dataset unique identifier",
+          "description": "The unique identifier for the dataset.",
+          "type": "text",
+          "isRequired": true
+        }
+      ],
+      "actions": [
+        {
+          "name": "View Publication",
+          "description": "Open the report in the research portal."
+        }
+      ],
+      "icon": {
+        "name": "fa-database",
+        "style": "fa-light",
+        "color": "#356769"
+      }
+    },
+    {
+      "type": "REDCap API",
+      "category": "Dataset", 
+      "subCategory": "CSV File",
+      "attributes": ["Data Source"],
+      "embeddingUrl": "https://[DYNAMIC_OVERRIDE]/embeddings/TREEntityREDCap.js",
+      "embeddingParams": [
+        {
+          "id": "DataSetID",
+          "name": "Dataset unique identifier",
+          "description": "The unique identifier for the dataset.",
+          "type": "text",
+          "isRequired": true
+        }
+      ],
+      "actions": [
+        {
+          "name": "View Publication",
+          "description": "Open the report in the research portal."
+        }
+      ],
+      "icon": {
+        "name": "fa-table-cells",
+        "style": "fa-light",
+        "color": "#356769"
+      }
+    },
+    {
+      "type": "Folder",
+      "category": "Dataset",
+      "subCategory": "CSV File", 
+      "attributes": ["Data Source"],
+      "embeddingUrl": "https://[DYNAMIC_OVERRIDE]/embeddings/TREEntityFolder.js",
+      "embeddingParams": [
+        {
+          "id": "DataSetID",
+          "name": "Dataset unique identifier",
+          "description": "The unique identifier for the dataset.",
+          "type": "text",
+          "isRequired": true
+        }
+      ],
+      "actions": [
+        {
+          "name": "View Publication",
+          "description": "Open the report in the research portal."
+        }
+      ],
+      "icon": {
+        "name": "fa-files",
+        "style": "fa-light",
+        "color": "#356769"
+      }
+    }
+  ],
+  "NewAssetTemplate": [
+    {
+      "name": "{_name}",
+      "sourceItemId": "{_sourceItemId}",
+      "group": "{_group}",
+      "entityTypeId": "{_entityTypeId}",
+      "tags": ["Trusted Research Environment"],
+      "embeddingProperties": [
+        {
+          "key": "DataSetID",
+          "value": "{_embeddingsDataSetID}",
+          "type": 1,
+          "description": "{_embeddingsDataSetIDDescription}"
+        }
+      ],
+      "actions": [
+        {
+          "name": "View Publication",
+          "Value": "{_actionsUrl}",
+          "description": "{_actionsDescription}"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "Data Source",
+          "Values": ["{_attributesDataSource}"]
+        }
+      ]      
+     
+    }
+  ]
+}
