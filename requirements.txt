@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-multipart
+python-dotenv
+pyodbc
+requests
+pydantic
+sqlalchemy
+certifi
+openpyxl
+pandas
+pytest
+pytest-asyncio
+httpx
+testcontainers
+syrupy
+PyCap
