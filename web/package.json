@@ -1,0 +1,24 @@
+{
+  "name": "tre-portal-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/roboto": "5.0.8",
+    "@fortawesome/fontawesome-free": "6.5.0",
+    "bootstrap": "5.3.2",
+    "material-symbols": "0.48.2",
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.17",
+    "vite": "5.4.11"
+  }
+}
