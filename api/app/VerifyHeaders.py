@@ -14,7 +14,6 @@ from app import VerifyHeaders
 
 
 
-# _EXPECTED_API_KEY = "UI8MVNwYj5hbjU5fD0pWjdzS1NBKjVHSTV9bTN0Q0hIJUxcZnpbRn1sPlBPYnFVdSFRY3deP0xmMGdSc2FsUDVvVl"  # e.g., get_secret_from_vault("API-KEY")
 _EXPECTED_API_KEY = os.getenv("API_KEY")
 print("Expected API Key:", _EXPECTED_API_KEY[:4] + "..." + _EXPECTED_API_KEY[-4:] if _EXPECTED_API_KEY else "Not Set")
 _api_key_header = APIKeyHeader(name="X-API-Key", scheme_name="ApiKeyAuth", auto_error=False, description="API Key needed to access the endpoints")

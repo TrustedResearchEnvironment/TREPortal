@@ -12,7 +12,9 @@ $tokenUrl = "https://localhost:58291/connect/token"
 $apiBaseUrl = "https://localhost:7191/api/v1"
 $consumerApiUrl = "$apiBaseUrl/consumer"
 $clientId = "03b713ac-78d5-4cd4-8a00-1da3d201cce7"
-$clientSecret = "MDNiNzEzYWMtNzhkNS00Y2Q0LThhMDAtMWRhM2QyMDFjY2U3"
+# Secret must be supplied via environment, never committed
+$clientSecret = $env:TRE_CLIENT_SECRET
+if (-not $clientSecret) { throw "Set TRE_CLIENT_SECRET before running this script." }
 
 # --- Script Configuration ---
 $customAppName = "External Research Source"
