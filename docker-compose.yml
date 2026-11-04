@@ -1,0 +1,13 @@
+name: treportal
+
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    environment:
+      SQLDB_CONNECTION_STRING: ${SQLDB_CONNECTION_STRING:?export SQLDB_CONNECTION_STRING in your shell}
+      API_KEY: ${API_KEY:?set API_KEY in .env}
+      API_UPN: ${API_UPN:?set API_UPN in .env}
+    ports:
+      - "8080:80"

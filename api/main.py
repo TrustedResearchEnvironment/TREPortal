@@ -55,11 +55,11 @@ def _startup_db_retry():
         return
     
     if database.SQLALCHEMY_DATABASE_URL is None:
-        _logger.warning("No SQLALCHEMY_DATABASE_URL configured - skipping DB checks")
+        _logger.warning("No SQLDB_CONNECTION_STRING configured - skipping DB checks")
         return
     
     _logger.info("Checking database connectivity on startup...")
-    _logger.info(f"Database URL: {database.SQLALCHEMY_DATABASE_URL.replace('sa:Test1234!', 'sa:***')}")
+    _logger.info(f"Database URL: {database.engine.url.render_as_string(hide_password=True)}")
     
     attempts = 0
     while attempts < _MAX_RETRIES:

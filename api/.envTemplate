@@ -1,6 +1,5 @@
-# SQLALCHEMY_DATABASE_URL="mssql+pyodbc://sa:Test1234!@host.docker.internal/master?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=no"
-# For local development, use localhost instead of host.docker.internal
-SQLALCHEMY_DATABASE_URL="mssql+pyodbc://sa:Test1234!@localhost/master?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=no"
+# Format: mssql+pyodbc://<user>:<password>@<host>/<database>?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=no
+SQLDB_CONNECTION_STRING="mssql+pyodbc://<user>:<password>@<host>/master?driver=ODBC+Driver+17+for+SQL+Server&Encrypt=no"
 
 
 # Secret key for API Access
@@ -8,7 +7,7 @@ API_KEY=""
 
 
 TOKEN_URL="https://test-id.loomesoftware.com/connect/token"
-API_BASE_URL="https://test-app-api.loomesoftware.com/api/v1/"
+API_BASE_URL="https://test-app-api.loomesoftware.com/api/v1"
 CLIENT_ID=""
 CLIENT_SECRET=""
 

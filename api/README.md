@@ -30,7 +30,7 @@ When deploying via GitHub Actions or Docker, the following environment variables
 ### Required Core Variables
 | Variable | Description |
 | -------- | ----------- |
-| `SQLALCHEMY_DATABASE_URL` | The connection string for the SQL Server database. |
+| `SQLDB_CONNECTION_STRING` | The SQLAlchemy connection string for the SQL Server database. Injected by the Azure Container App. |
 | `TOKEN_URL` | Loome ID Token URL for API authentication. |
 | `API_BASE_URL` | Loome Portal API base URL. |
 | `CLIENT_ID` | OAuth2 Client ID for Loome API access. |

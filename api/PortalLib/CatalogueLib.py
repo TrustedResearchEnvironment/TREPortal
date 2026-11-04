@@ -101,9 +101,8 @@ def test_portal_connection():
         logger.error(f"Environment Variables: TOKEN_URL={TOKEN_URL}")
         logger.error(f"Environment Variables: API_BASE_URL={API_BASE_URL}")
         logger.error(f"Environment Variables: CLIENT_ID={CLIENT_ID}")
-        # only show part of client secret
         if CLIENT_SECRET:
-            logger.error(f"Environment Variables: CLIENT_SECRET={CLIENT_SECRET[:4]}...{CLIENT_SECRET[-4:]}")        
+            logger.error("Environment Variables: CLIENT_SECRET is set")        
         else:
             logger.error("Environment Variables: CLIENT_SECRET is not set")
 
@@ -259,7 +258,7 @@ def get_api_token(url: str, client_id: str, client_secret: str, scope: str = Non
     logger.debug(f"Token response: {response}")
     if "access_token" not in response:
         raise APIError("Authentication failed: 'access_token' not found in response")
-    logger.info(f"Access token retrieved successfully. {response['access_token'][:8]}...{response['access_token'][-4:]}")
+    logger.info("Access token retrieved successfully.")
     return response["access_token"]
 
 

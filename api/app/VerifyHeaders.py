@@ -15,7 +15,6 @@ from app import VerifyHeaders
 
 
 _EXPECTED_API_KEY = os.getenv("API_KEY")
-print("Expected API Key:", _EXPECTED_API_KEY[:4] + "..." + _EXPECTED_API_KEY[-4:] if _EXPECTED_API_KEY else "Not Set")
 _api_key_header = APIKeyHeader(name="X-API-Key", scheme_name="ApiKeyAuth", auto_error=False, description="API Key needed to access the endpoints")
 _upn_header = APIKeyHeader(name="X-UPN", scheme_name="UpnHeader", auto_error=False, description="User Principal Name of the caller, e.g., user@example.com ")
 
@@ -29,8 +28,7 @@ def verify_headers(
 ) -> dict:
  
     # upn_display = f"{upn[:4]}...{upn[-4:]}" if upn and len(upn) > 8 else upn
-    api_key_display = f"{api_key[:4]}...{api_key[-4:]}" if api_key and len(api_key) > 8 else api_key
-    print("Verify_headers called with upn:", upn, "and api_key:", api_key_display , "(", len(api_key),")")
+    print("Verify_headers called with upn:", upn, "api_key length:", len(api_key) if api_key else 0)
     if not api_key or api_key != _EXPECTED_API_KEY:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing API key")
     if not upn:

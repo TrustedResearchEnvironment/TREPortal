@@ -11,11 +11,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
+SQLALCHEMY_DATABASE_URL = os.getenv("SQLDB_CONNECTION_STRING")
 
 # Only initialize database for production/local dev, not tests
 if SQLALCHEMY_DATABASE_URL:
-    print(f"Connection: {SQLALCHEMY_DATABASE_URL}")
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL, 
         pool_pre_ping=True,
@@ -25,7 +24,7 @@ if SQLALCHEMY_DATABASE_URL:
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 else:
     # Tests will inject their own engine via fixtures
-    print("No SQLALCHEMY_DATABASE_URL set - tests will use testcontainer")
+    print("No SQLDB_CONNECTION_STRING set - tests will use testcontainer")
     engine = None
     SessionLocal = None
 
@@ -34,7 +33,7 @@ Base = declarative_base()
 # Dependency to get the database session using the standard FastAPI pattern.
 def get_db():
     if SessionLocal is None:
-        raise RuntimeError("Database not configured - SQLALCHEMY_DATABASE_URL not set")
+        raise RuntimeError("Database not configured - SQLDB_CONNECTION_STRING not set")
     db = SessionLocal()
     try:
         yield db
@@ -43,6 +42,6 @@ def get_db():
 
 def create_db_and_tables():
     if engine is None:
-        raise RuntimeError("Database engine not configured - SQLALCHEMY_DATABASE_URL not set")
+        raise RuntimeError("Database engine not configured - SQLDB_CONNECTION_STRING not set")
     Base.metadata.create_all(bind=engine)
     
