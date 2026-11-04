@@ -1,0 +1,12 @@
+{
+  "request": { "method": "GET", "urlPattern": "/api/v1/Jobs/[0-9]+/JobExecutions/RunOnce" },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "jobExecutionId": 6001,
+      "jobId": 2001,
+      "status": "Queued",
+      "startTime": "2026-01-20T10:01:00Z"
+    }
+  }
+}

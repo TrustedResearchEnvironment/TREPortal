@@ -1,0 +1,7 @@
+{
+  "request": { "method": "GET", "urlPattern": "/portal/api/v1/consumer/customApps/execution/[^/]+/status" },
+  "response": {
+    "status": 200,
+    "jsonBody": { "status": "SUCCESS", "executionId": "test-exec-id" }
+  }
+}

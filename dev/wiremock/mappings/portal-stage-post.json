@@ -1,0 +1,7 @@
+{
+  "request": { "method": "POST", "urlPattern": "/portal/api/v1/consumer/customapps/[^/]+/stage" },
+  "response": {
+    "status": 200,
+    "jsonBody": { "executionId": "test-exec-id" }
+  }
+}

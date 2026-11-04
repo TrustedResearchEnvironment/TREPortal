@@ -224,6 +224,11 @@ def test_db_connection(db: Session = Depends(database.get_db)):
     except Exception as e:
         return {"status": "error", "message": f"Database connection failed: {str(e)}"}
 
+@app.get("/api/health")
+def health():
+    # Liveness probe for the container healthcheck. Does not touch the database.
+    return {"status": "ok"}
+
 @app.get("/")
 async def root(request: Request):
     # return the env vars

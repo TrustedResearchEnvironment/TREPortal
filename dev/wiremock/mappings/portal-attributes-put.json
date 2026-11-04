@@ -1,0 +1,7 @@
+{
+  "request": { "method": "PUT", "urlPath": "/portal/api/v1/consumer/customapps/attributes" },
+  "response": {
+    "status": 200,
+    "jsonBody": {}
+  }
+}

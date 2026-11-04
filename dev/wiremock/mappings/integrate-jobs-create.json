@@ -1,0 +1,38 @@
+{
+  "request": { "method": "POST", "urlPath": "/api/v1/Jobs" },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "jobId": 2001,
+      "projectId": 123,
+      "jobName": "[ASSIST-123] test.user@example.com 1737889500",
+      "logging": 0,
+      "emailNotificationRecipients": "",
+      "emailNotificationRuleId": 0,
+      "cancelJobFlag": false,
+      "logBatchSize": 5,
+      "retryCount": 0,
+      "jobDependencyPredecessorJob": [],
+      "jobDependencyJob": [],
+      "jobSequence": [],
+      "schedules": null,
+      "emailNotificationRule": null,
+      "jobExecutions": [],
+      "loggingType": null,
+      "taskQueues": [],
+      "project": {
+        "projectId": 123,
+        "projectName": "Test Project",
+        "requiresSync": false,
+        "projectMemberships": null,
+        "projectMembershipInvites": null,
+        "tasks": null
+      },
+      "lastExecution": null,
+      "createdBy": "test.user@example.com",
+      "modifiedBy": "test.user@example.com",
+      "dateCreated": "2026-01-20T10:00:00Z",
+      "dateModified": "2026-01-20T10:00:00Z"
+    }
+  }
+}

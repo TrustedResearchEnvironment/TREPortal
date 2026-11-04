@@ -1,0 +1,7 @@
+{
+  "request": { "method": "PUT", "urlPattern": "/portal/api/v1/consumer/customapps/[^/]+/entity-types" },
+  "response": {
+    "status": 200,
+    "jsonBody": {}
+  }
+}

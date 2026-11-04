@@ -11,3 +11,11 @@ services:
       API_UPN: ${API_UPN:?set API_UPN in .env}
     ports:
       - "8080:80"
+    restart: unless-stopped
+    # curl is not in the runtime image, so probe with Python. Goes through nginx to /api/health.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

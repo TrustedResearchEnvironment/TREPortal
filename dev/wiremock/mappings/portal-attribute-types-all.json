@@ -1,0 +1,7 @@
+{
+  "request": { "method": "GET", "urlPath": "/portal/api/v1/attributetype/all" },
+  "response": {
+    "status": 200,
+    "jsonBody": []
+  }
+}

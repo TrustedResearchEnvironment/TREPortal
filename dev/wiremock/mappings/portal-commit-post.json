@@ -1,0 +1,7 @@
+{
+  "request": { "method": "POST", "urlPathPattern": "/portal/api/v1/consumer/customApps/execution/[^/]+/commit" },
+  "response": {
+    "status": 200,
+    "jsonBody": "commit-success-id"
+  }
+}

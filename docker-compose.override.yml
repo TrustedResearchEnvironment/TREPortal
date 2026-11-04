@@ -1,0 +1,58 @@
+# Local development overrides. `docker compose up` loads this file automatically.
+# Production and CI use the base file only: docker compose -f docker-compose.yml up
+
+services:
+  app:
+    environment:
+      # Point Portal and Integrate calls at WireMock, using the paths in dev/wiremock/mappings.
+      TOKEN_URL: http://wiremock:8080/token
+      API_BASE_URL: http://wiremock:8080/portal/api/v1
+      LOOME_INTEGRATE_TOKEN_URL: http://wiremock:8080/token
+      LOOME_INTEGRATE_API_BASE_URL: http://wiremock:8080/api/v1
+      CLIENT_ID: test-portal-id
+      CLIENT_SECRET: test-portal-secret
+      LOOME_INTEGRATE_CLIENT_ID: test-client-id
+      LOOME_INTEGRATE_CLIENT_SECRET: test-client-secret
+      LOOME_INTEGRATE_DATA_EXPORT_PROJECT_NAME: Test Project
+      LOOME_INTEGRATE_DATA_IMPORT_PROJECT_NAME: Test Project
+      LOOME_INTEGRATE_EXPORT_TASK_NAME: Test Task
+      LOOME_INTEGRATE_IMPORT_TASK_NAME: Test Task
+      LOOME_INTEGRATE_PREP_REPOS_TASK_NAME: Test Task
+      LOOME_INTEGRATE_APPROVE_IMPORT_PROJECT_NAME: Test Project
+      LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME: Test Task
+      LOOME_INTEGRATE_APPROVE_EXPORT_PROJECT_NAME: Test Project
+      LOOME_INTEGRATE_APPROVE_EXPORT_TASK_NAME: Test Task
+      LOOME_INTEGRATE_SUBMIT_DATA_IMPORT_PROJECT_NAME: Test Project
+      LOOME_INTEGRATE_SUBMIT_DATA_IMPORT_TASK_NAME: Test Task
+      LOOME_ASSIST_TOKEN_URL: http://wiremock:8080/token
+      LOOME_ASSIST_API_BASE_URL: http://wiremock:8080/api/v1
+      LOOME_ASSIST_CLIENT_ID: test-client-id
+      LOOME_ASSIST_CLIENT_SECRET: test-client-secret
+    depends_on:
+      - wiremock
+
+  wiremock:
+    image: wiremock/wiremock:latest
+    volumes:
+      # Drop WireMock mapping JSON files in dev/wiremock/mappings. They load on start.
+      - ./dev/wiremock:/home/wiremock
+    ports:
+      - "8081:8080"
+
+  # Vite dev server with hot reload. Open http://localhost:5173.
+  web-dev:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev"
+    environment:
+      API_PROXY_TARGET: http://app:80
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - app
+
+volumes:
+  web_node_modules:

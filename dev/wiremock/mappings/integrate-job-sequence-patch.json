@@ -1,0 +1,4 @@
+{
+  "request": { "method": "PATCH", "urlPattern": "/api/v1/Jobs/[0-9]+/JobSequence/[0-9]+" },
+  "response": { "status": 204 }
+}

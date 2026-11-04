@@ -1,0 +1,11 @@
+{
+  "request": { "method": "GET", "urlPath": "/portal/api/v1/entitytype/nonactivity" },
+  "response": {
+    "status": 200,
+    "jsonBody": [
+      { "type": "SQL Database", "id": 59, "source": "Imperial College Research Assets" },
+      { "type": "REDCap Database", "id": 60, "source": "Imperial College Research Assets" },
+      { "type": "Files", "id": 61, "source": "Imperial College Research Assets" }
+    ]
+  }
+}

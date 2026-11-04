@@ -1,0 +1,15 @@
+{
+  "request": { "method": "POST", "urlPattern": "/api/v1/jobs/[0-9]+/JobSequence" },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "jobSequenceId": 4001,
+      "jobId": 2001,
+      "taskId": 3001,
+      "runSequence": 1,
+      "parallelSequence": 0,
+      "active": true,
+      "runInParallel": false
+    }
+  }
+}

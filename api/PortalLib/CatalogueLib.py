@@ -94,7 +94,7 @@ def test_portal_connection():
         #     method="GET",
         #     headers=headers
         # )
-        logger.info(f"Portal API connection test successful. headers: {headers}")
+        logger.info("Portal API connection test successful.")
     except Exception as e:
         logger.error(f"Portal API connection test failed: {str(e)}")
         # print vars

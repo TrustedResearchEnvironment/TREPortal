@@ -6,6 +6,18 @@ const page = (p) => resolve(import.meta.dirname, p);
 export default defineConfig({
   // Relative asset paths so the build works under any sub-path (nginx, GitHub Pages).
   base: './',
+  // Dev server only. Forwards /api to the app container (nginx adds the API key headers).
+  // Defaults to the published compose port for host-run `npm run dev`.
+  server: {
+    host: true,
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: process.env.API_PROXY_TARGET ?? 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       input: {

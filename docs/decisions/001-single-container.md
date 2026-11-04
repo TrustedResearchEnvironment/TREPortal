@@ -38,12 +38,9 @@ If we split later, use two images (or two containers in one app first), and move
 ## Open tasks
 
 - REDCap and Folder databases: work out how to connect them to the Portal API for the `Portal - *` catalog endpoints. Decide the connection method, credentials handling, and the endpoint list.
-- Fix connection-string logging: `api/database.py` prints the connection string, including the password. `api/main.py` logs it too.
-- Rename `SQLALCHEMY_DATABASE_URL` to `SQLDB_CONNECTION_STRING` in `api/.envTemplate`. The file contains a dev password, so do not echo it.
-- Harden `api/app/VerifyHeaders.py`: it prints part of the API key.
 - Rotate the Portal client secret (`Portal - GetToken` catalog entry).
 - Commit `DeveloperAPIRequests/AllRequests.json` after approval.
 - Decide whether to delete `api/dockerfile` (lowercase, superseded), `db/`, and `api/migrations/`. Compose no longer uses them.
 - Frontend: finish the `web/src/api/client.js` operation table, the `web/src/globals.js` Portal fallback, and verify with `npm run build`.
 - Local builds: add the user to the `docker` group so `docker compose build` can reach the socket.
-- Test the image end to end once Docker access works: the health path, `/api/` proxying, and the SQL connection through `SQLDB_CONNECTION_STRING`.
+- Test the SQL connection through `SQLDB_CONNECTION_STRING` in the container. The health path and `/api/` proxying are verified locally.

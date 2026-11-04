@@ -1,0 +1,7 @@
+{
+  "request": { "method": "POST", "urlPath": "/portal/api/v1/consumer/customApps" },
+  "response": {
+    "status": 200,
+    "jsonBody": { "id": "new-test-app-id", "name": "Test Dataset App" }
+  }
+}

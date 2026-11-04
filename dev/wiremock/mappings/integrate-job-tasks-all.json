@@ -1,0 +1,14 @@
+{
+  "request": { "method": "GET", "urlPattern": "/api/v1/Jobs/[0-9]+/Tasks/All" },
+  "response": {
+    "status": 200,
+    "jsonBody": [
+      {
+        "taskId": 3001,
+        "taskName": "Test Task",
+        "parameterNames": "LoomeAssistProjectID|LoomeAssistTenantsID|LoomeAssistProjectName|UserUPN",
+        "parameterDefaults": "default-project|default-tenant|Default Name|default@example.com"
+      }
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "request": { "method": "GET", "urlPattern": "/api/v1/Projects/123/Jobs/All" },
+  "response": {
+    "status": 200,
+    "jsonBody": [
+      {
+        "jobId": 1001,
+        "projectId": 123,
+        "dateCreated": "2026-01-15T10:00:00Z",
+        "dateModified": "2026-01-15T10:00:00Z",
+        "createdBy": "test.user@example.com",
+        "modifiedBy": "test.user@example.com",
+        "jobName": "[PROJ-001] test.user@example.com 1737889200",
+        "logging": 0,
+        "logBatchSize": 5,
+        "agentJobId": "550e8400-e29b-41d4-a716-446655440000",
+        "emailNotificationRecipients": "",
+        "emailNotificationRuleId": 0,
+        "cancelJobFlag": false,
+        "loggingType": null,
+        "status": "Completed",
+        "lastExecution": {
+          "projectId": 123,
+          "jobExecutionId": 5001,
+          "jobId": 1001,
+          "executionGuid": "660e8400-e29b-41d4-a716-446655440001",
+          "startTime": "2026-01-15T10:05:00Z",
+          "endTime": "2026-01-15T10:10:00Z",
+          "status": "Success",
+          "partitionId": 1,
+          "jobName": "[PROJ-001] test.user@example.com 1737889200",
+          "projectMemberships": [],
+          "projectApiMemberships": null
+        },
+        "schedule": {
+          "hasSchedules": false,
+          "hasEnabledSchedules": false,
+          "ObjectId": 1001,
+          "nextExecutionDate": null
+        },
+        "retryCount": 0
+      },
+      {
+        "jobId": 1002,
+        "projectId": 123,
+        "dateCreated": "2026-01-18T14:30:00Z",
+        "dateModified": "2026-01-18T14:30:00Z",
+        "createdBy": "test.user@example.com",
+        "modifiedBy": "test.user@example.com",
+        "jobName": "[PROJ-002] test.user@example.com 1738166600",
+        "logging": 1,
+        "logBatchSize": 10,
+        "agentJobId": "770e8400-e29b-41d4-a716-446655440002",
+        "emailNotificationRecipients": "admin@example.com",
+        "emailNotificationRuleId": 1,
+        "cancelJobFlag": false,
+        "loggingType": "Verbose",
+        "status": "Running",
+        "lastExecution": {
+          "projectId": 123,
+          "jobExecutionId": 5002,
+          "jobId": 1002,
+          "executionGuid": "880e8400-e29b-41d4-a716-446655440003",
+          "startTime": "2026-01-18T14:35:00Z",
+          "endTime": null,
+          "status": "InProgress",
+          "partitionId": 1,
+          "jobName": "[PROJ-002] test.user@example.com 1738166600",
+          "projectMemberships": [],
+          "projectApiMemberships": null
+        },
+        "schedule": {
+          "hasSchedules": true,
+          "hasEnabledSchedules": true,
+          "ObjectId": 1002,
+          "nextExecutionDate": "2026-01-19T14:30:00Z"
+        },
+        "retryCount": 2
+      }
+    ]
+  }
+}
