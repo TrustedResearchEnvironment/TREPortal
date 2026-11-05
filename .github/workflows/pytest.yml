@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - app-dev
   pull_request:
     branches:
       - main
+      - app-dev
   workflow_dispatch:
 
 jobs:
@@ -22,6 +24,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: api/requirements.txt
 
       - name: Install ODBC Driver 17 for SQL Server
         run: |
@@ -39,14 +42,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r api/requirements.txt
 
       - name: Run pytest
+        working-directory: api
         run: |
           python3 -m pytest -v --tb=short --junitxml=pytest-results.xml 2>&1 | tee pytest-output.txt
 
       - name: Generate test summary
         if: always()
+        working-directory: api
         run: |
           echo "## 🧪 Pytest Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -87,7 +92,7 @@ jobs:
         with:
           name: pytest-results
           path: |
-            pytest-results.xml
-            pytest-output.txt
+            api/pytest-results.xml
+            api/pytest-output.txt
           retention-days: 30
           if-no-files-found: warn
