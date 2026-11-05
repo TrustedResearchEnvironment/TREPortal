@@ -143,10 +143,16 @@ async def lifespan(app: FastAPI):
     _logger.info("Application shutdown")
     _logger.info("Application shutting down...")
 
+# Hide the interactive docs and OpenAPI schema when ENVIRONMENT=prod
+_IS_PROD = os.getenv("ENVIRONMENT", "").lower() == "prod"
+
 # Create FastAPI app with lifespan
 app = FastAPI(
     dependencies=[Depends(verify_headers)],
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None if _IS_PROD else "/docs",
+    redoc_url=None if _IS_PROD else "/redoc",
+    openapi_url=None if _IS_PROD else "/openapi.json",
 )
 
 @app.exception_handler(RequestValidationError)
