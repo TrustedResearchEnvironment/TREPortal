@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" class="h-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRE Portal</title>
+    <link rel="stylesheet" href="./src/styles/vendor.css">
+    <link rel="stylesheet" href="./src/styles/shell.css">
+</head>
+<body class="h-100">
+
+<div class="shell d-flex h-100">
+
+    <!-- Sidebar: static on lg+, offcanvas below -->
+    <nav id="sidebar" class="offcanvas-lg offcanvas-start sidebar d-flex flex-column flex-shrink-0 text-bg-dark"
+         tabindex="-1" aria-label="Portal navigation">
+        <div class="offcanvas-header d-lg-none">
+            <span class="fs-5 fw-semibold">Trusted Research Environment</span>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
+                    data-bs-target="#sidebar" aria-label="Close"></button>
+        </div>
+
+        <div class="offcanvas-body d-flex flex-column p-0">
+            <a href="#welcome" class="sidebar-brand d-none d-lg-flex align-items-center gap-2 px-3 py-3 text-white text-decoration-none">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span class="fs-6 fw-semibold">Trusted Research Environment</span>
+            </a>
+
+            <ul class="nav nav-pills flex-column px-2 pb-3 gap-1" id="sidebar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="#welcome" data-src="Dashboards/Welcome/Matrix/welcome.html">
+                        <i class="fa-solid fa-house fa-fw me-2"></i>Welcome
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#data-sources" data-src="AdminDashboards/DataSource/dataSourcePlatformAdmin.html">
+                        <i class="fa-solid fa-database fa-fw me-2"></i>Data Sources
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#manage-data-sets" data-src="AdminDashboards/ManageDataSets/manageDataSets.html">
+                        <i class="fa-solid fa-table-list fa-fw me-2"></i>Manage Data Sets
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#approver" data-src="Dashboards/Approver/approver.html">
+                        <i class="fa-solid fa-circle-check fa-fw me-2"></i>Approver
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#email-templates" data-src="AdminDashboards/EmailTemplate/emailTemplatePlatformAdmin.html">
+                        <i class="fa-solid fa-envelope fa-fw me-2"></i>Email Templates
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#meta-data" data-src="AdminDashboards/MetaData/metaDataPlatformAdmin.html">
+                        <i class="fa-solid fa-tags fa-fw me-2"></i>Meta-Data
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#requests-hub" data-src="Dashboards/RequestsHub/RequestHub.html">
+                        <i class="fa-solid fa-inbox fa-fw me-2"></i>Requests Hub
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#admin-request-hub" data-src="AdminDashboards/AdminRequestHub/AdminRequestHub.html">
+                        <i class="fa-solid fa-user-shield fa-fw me-2"></i>Admin Request Hub
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="flex-grow-1 d-flex flex-column min-w-0">
+        <header class="d-lg-none d-flex align-items-center gap-2 p-2 border-bottom bg-white">
+            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas"
+                    data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Open navigation">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <span class="fw-semibold">Trusted Research Environment</span>
+        </header>
+        <iframe id="content-frame" class="flex-grow-1 border-0 w-100" title="Page content"></iframe>
+    </main>
+</div>
+
+<script type="module" src="./src/shell.js"></script>
+</body>
+</html>

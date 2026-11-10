@@ -7,10 +7,6 @@ server {
     # Only Loome may embed the app. entrypoint.sh defaults this to * when FRAME_ANCESTORS is unset.
     add_header Content-Security-Policy "frame-ancestors ${FRAME_ANCESTORS}" always;
 
-    location = / {
-        return 302 /Dashboards/Welcome/Matrix/welcome.html;
-    }
-
     # Public Entra IDs for the browser sign-in; empty values leave sign-in off (local dev).
     location = /config.json {
         default_type application/json;

@@ -21,6 +21,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        index: page('index.html'),
         authRedirect: page('auth-redirect.html'),
         requestHub: page('Dashboards/RequestsHub/RequestHub.html'),
         approver: page('Dashboards/Approver/approver.html'),
