@@ -4,16 +4,27 @@ server {
     root /usr/share/nginx/html;
     client_max_body_size 50m;
 
+    # Only Loome may embed the app. entrypoint.sh defaults this to * when FRAME_ANCESTORS is unset.
+    add_header Content-Security-Policy "frame-ancestors ${FRAME_ANCESTORS}" always;
+
     location = / {
         return 302 /Dashboards/Welcome/Matrix/welcome.html;
+    }
+
+    # Public Entra IDs for the browser sign-in; empty values leave sign-in off (local dev).
+    location = /config.json {
+        default_type application/json;
+        add_header Cache-Control "no-store";
+        add_header Content-Security-Policy "frame-ancestors ${FRAME_ANCESTORS}" always;
+        return 200 '{"tenantId":"${ENTRA_TENANT_ID}","clientId":"${ENTRA_CLIENT_ID}"}';
     }
 
     location /api/ {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-API-Key ${API_KEY};
-        proxy_set_header X-UPN ${API_UPN};
+        proxy_set_header X-API-Key "${API_KEY}";
+        proxy_set_header X-UPN "${API_UPN}";
         proxy_read_timeout 300s;
     }
 

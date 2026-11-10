@@ -15,3 +15,4 @@ httpx
 testcontainers
 syrupy
 PyCap
+PyJWT[crypto]
