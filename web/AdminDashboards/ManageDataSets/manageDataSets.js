@@ -6,6 +6,7 @@ const API_GET_DATASOURCE_TABLE_BY_ID = 'GetLoomeDataSourceTablesByTableId';
 const API_GET_DATASET_FIELD_VALUE = 'GetDataSetFieldValuesByDataSetID';
 const API_GET_DATASET_METADATA_VALUE = 'GetDataSetMetaDataValue';
 const API_GET_DATASETS = 'GetDataSet';
+const API_GET_DATASET_COLUMNS = 'GetDatasetIDColumns';
 const API_GET_DATASOURCES = 'GetDataSource';
 const API_GET_DATASOURCE_BY_ID = 'GetDataSourceByID';
 const API_CREATE_DATASET = 'CreateDataSet';
@@ -1417,12 +1418,13 @@ async function formatSQLColumnsFromSchema(tableId) {
  */
 async function fetchREDCapDataSetColumns(dataSetId) {
     try {
-        const response = await window.loomeApi.runApiRequest(API_GET_DATASETS, { "DataSetID": dataSetId });
+        const response = await window.loomeApi.runApiRequest(API_GET_DATASET_COLUMNS, { "DataSetID": dataSetId });
         const parsed = safeParseJson(response);
 
         if (parsed && parsed.Results) {
             return parsed.Results;
         }
+        return [];
     } catch (error) {
         console.error(`Error fetching columns for Data Set ID ${dataSetId}:`, error);
         return [];
@@ -1570,10 +1572,6 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
         // --- CRITICAL: Update the master state ---
         allColumnsData = newColumnsData || [];
         refreshColumnVisibilityMap();
-
-        // Ensure the column-name dropdown initialization runs again after a fresh load
-        // so the "Select All" checkbox and per-column checkboxes are enabled on first real populate.
-        columnNameDropdownInitialized = false;
 
         // Reapply the search filter so pagination and table reflect the new data.
         applyColumnSearchFilter(dataSourceTypeId);
@@ -2476,7 +2474,6 @@ async function renderManageDataSetPage() {
                     // Update master state and refresh UI
                     allColumnsData = importedColumns;
                     refreshColumnVisibilityMap();
-                    columnNameDropdownInitialized = false;
                     
                     // Populate form fields from metadata sheet
                     try {
