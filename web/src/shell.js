@@ -1,4 +1,5 @@
 import * as bootstrap from 'bootstrap';
+import { watchCurrentUser } from './auth.js';
 
 const frame = document.getElementById('content-frame');
 const sidebarEl = document.getElementById('sidebar');
@@ -23,3 +24,11 @@ function showPage() {
 
 window.addEventListener('hashchange', showPage);
 showPage();
+
+const userBox = document.getElementById('sidebar-user');
+const userName = document.getElementById('sidebar-user-name');
+watchCurrentUser(({ name, username }) => {
+    userName.textContent = name;
+    userBox.title = username;
+    userBox.hidden = false;
+}).catch(() => {});

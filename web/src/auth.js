@@ -83,6 +83,27 @@ function promptSignIn(context, notice) {
     });
 }
 
+/** Calls onChange with the signed-in user once a sign-in exists, including one made in another frame. */
+export async function watchCurrentUser(onChange) {
+    contextPromise ??= createContext();
+    const context = await contextPromise;
+    if (!context) return;
+
+    const read = () => {
+        const { msal } = context;
+        const account = msal.getActiveAccount() ?? msal.getAllAccounts()[0];
+        if (!account) return false;
+        onChange({ name: account.name || account.username, username: account.username });
+        return true;
+    };
+
+    if (read()) return;
+    // The sign-in happens in a content frame; MSAL's cache is shared through localStorage.
+    const timer = setInterval(() => {
+        if (read()) clearInterval(timer);
+    }, 1000);
+}
+
 /** Returns an access token for the API, or null when Entra sign-in is not configured. */
 export async function getAccessToken() {
     contextPromise ??= createContext();
