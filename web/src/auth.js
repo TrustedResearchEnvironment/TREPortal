@@ -1,6 +1,6 @@
 // Microsoft Entra ID sign-in for the API. The login opens in a popup because the app runs inside
 // the Loome iframe and Microsoft's login page cannot be framed.
-import { PublicClientApplication } from '@azure/msal-browser';
+import { LogLevel, PublicClientApplication } from '@azure/msal-browser';
 
 let contextPromise = null;
 let signInPromise = null;
@@ -23,13 +23,30 @@ async function createContext() {
             redirectUri: `${window.location.origin}/auth-redirect.html`,
         },
         cache: { cacheLocation: 'localStorage' },
+        system: {
+            // Open the popup once the login URL is ready; a popup opened early can stay on about:blank.
+            asyncPopups: true,
+            // Run localStorage.setItem('msalDebug', '1') in the console to see MSAL's own log.
+            loggerOptions: {
+                logLevel: LogLevel.Verbose,
+                loggerCallback: (level, message, containsPii) => {
+                    if (!containsPii && localStorage.getItem('msalDebug')) console.log('[msal]', message);
+                },
+            },
+        },
     });
     await msal.initialize();
     return { msal, scopes: [`api://${config.clientId}/access_as_user`] };
 }
 
-// A popup needs a user click or the browser blocks it, so ask with a full-page button.
-function promptSignIn({ msal, scopes }) {
+async function signInWithPopup({ msal, scopes }) {
+    const result = await msal.loginPopup({ scopes });
+    msal.setActiveAccount(result.account);
+    return result.accessToken;
+}
+
+// Fallback for when the browser blocks the automatic popup (no user click) or it was closed.
+function promptSignIn(context, notice) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;'
@@ -45,16 +62,16 @@ function promptSignIn({ msal, scopes }) {
         button.style.cssText = 'padding:10px 20px;font-size:16px;cursor:pointer;';
 
         const message = document.createElement('div');
+        message.textContent = notice;
         message.style.cssText = 'color:#b00020;min-height:1.2em;';
 
         button.addEventListener('click', async () => {
             button.disabled = true;
             message.textContent = '';
             try {
-                const result = await msal.loginPopup({ scopes });
-                msal.setActiveAccount(result.account);
+                const token = await signInWithPopup(context);
                 overlay.remove();
-                resolve(result.accessToken);
+                resolve(token);
             } catch {
                 message.textContent = 'Sign-in did not complete. Please try again.';
                 button.disabled = false;
@@ -83,8 +100,13 @@ export async function getAccessToken() {
         }
     }
 
-    signInPromise ??= promptSignIn(context).finally(() => {
-        signInPromise = null;
-    });
+    signInPromise ??= signInWithPopup(context)
+        .catch((error) => {
+            console.warn('Automatic sign-in popup did not complete:', error?.errorCode ?? error);
+            return promptSignIn(context, 'The sign-in window was blocked or closed.');
+        })
+        .finally(() => {
+            signInPromise = null;
+        });
     return signInPromise;
 }

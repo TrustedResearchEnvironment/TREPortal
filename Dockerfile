@@ -37,7 +37,8 @@ RUN pip install --no-cache-dir \
     openpyxl \
     pandas \
     certifi \
-    nh3
+    nh3 \
+    "PyJWT[crypto]"
 
 COPY api/ ./
 COPY --from=web-build /app/dist /usr/share/nginx/html
