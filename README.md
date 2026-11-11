@@ -21,7 +21,7 @@ The frontend and API run in one container. nginx serves the site on port 80 and 
    docker compose up --build
    ```
 
-4. Open `http://localhost:8080`. The health check is `http://localhost:8080/api/health`.
+4. Open `http://localhost:8080` and sign in with Microsoft. Sign-in is always required, so set `ENTRA_TENANT_ID` and `ENTRA_CLIENT_ID` in `.env` and add `http://localhost:8080/auth-redirect.html` as a redirect URI (see Azure setup below). The health check, `http://localhost:8080/api/health`, needs no sign-in.
 
 `docker-compose.override.yml` loads automatically in local runs. It points Portal and Integrate at the WireMock stubs in `dev/wiremock/mappings`, and starts a Vite dev server at `http://localhost:5173` with hot reload. Production runs use the base file only: `docker compose -f docker-compose.yml up`.
 
@@ -38,10 +38,9 @@ All settings are in `.env.example`, with comments on each group.
 | Variable | Purpose |
 | -------- | ------- |
 | `SQLDB_CONNECTION_STRING` | SQL Server connection string. Accepts the ADO.NET form (`Server=tcp:...;Database=...;User ID=...;Password=...`) or a SQLAlchemy URL. Injected by Azure Container Apps. Export it in your shell for local runs. |
-| `ENVIRONMENT` | Set to `prod` to turn off `/docs`, `/redoc` and `/openapi.json`, and to require an Entra ID token on every API call. |
+| `ENVIRONMENT` | Set to `prod` to turn off `/docs`, `/redoc` and `/openapi.json`. |
 | `API_KEY` | Injected by nginx into every `/api/` request. Clients do not send it. |
-| `API_UPN` | Dev-only fallback user, injected by nginx. The API ignores it when `ENVIRONMENT=prod`. |
-| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | Microsoft Entra ID sign-in. Served to the browser from `/config.json`. Leave blank locally to skip sign-in. |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | Microsoft Entra ID sign-in. Required: the API will not start without them. Served to the browser from `/config.json`. |
 | `FRAME_ANCESTORS` | Origin allowed to embed the app in an iframe, for example the Loome Portal URL. Defaults to `*`, so set it in prod. |
 | `HMAC_KEY` | Secret used to sign dataset column metadata. |
 | `TOKEN_URL`, `API_BASE_URL`, `CLIENT_ID`, `CLIENT_SECRET`, `SSL_VERIFY` | Portal API settings. |
@@ -56,15 +55,16 @@ The app runs inside the Loome Portal iframe, and Loome does not yet supply the u
 
 - The page opens a Microsoft sign-in popup and sends the access token as `Authorization: Bearer` on every API call.
 - The API checks the token's signature, issuer, audience, expiry and the `access_as_user` scope. The UPN is the `preferred_username` claim.
-- With `ENVIRONMENT=prod` a valid token is required and `X-UPN` is ignored. Otherwise `API_UPN` or a test user is used, so local runs need no sign-in. `/api/health` needs no token.
+- Every endpoint requires a valid token, in every environment. There is no test user and no UPN header: `X-UPN` is ignored. The only exception is `/api/health`, which the container healthcheck calls.
+- If `ENTRA_TENANT_ID` or `ENTRA_CLIENT_ID` is missing, the API refuses to start.
 - The iframe must allow popups (`sandbox` needs `allow-popups`, plus `allow-scripts` and `allow-same-origin`).
 
 ### Azure setup
 
 1. In Microsoft Entra ID, create a single-tenant App Registration.
-2. Under **Authentication**, add a **Single-page application** redirect URI: `https://<app-host>/auth-redirect.html`.
+2. Under **Authentication**, add a **Single-page application** redirect URI: `https://<app-host>/auth-redirect.html`. For local runs also add `http://localhost:8080/auth-redirect.html`.
 3. Under **Expose an API**, set the Application ID URI (the default `api://<client-id>` is fine) and add a scope named `access_as_user`.
 4. In the manifest, set `accessTokenAcceptedVersion` to `2`.
 5. In the Enterprise Application, set **Assignment required** to Yes and assign the allowed users.
-6. On the Container App, set `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `FRAME_ANCESTORS` (the Loome origin) and `ENVIRONMENT=prod`. No client secret is needed.
+6. On the Container App, set `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` and `FRAME_ANCESTORS` (the Loome origin). Set `ENVIRONMENT=prod` to turn off the API docs. No client secret is needed.
 7. Do not turn on the Container App's built-in Authentication. Its redirect login cannot run inside an iframe.

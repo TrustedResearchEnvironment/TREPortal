@@ -8,7 +8,8 @@ services:
     environment:
       SQLDB_CONNECTION_STRING: ${SQLDB_CONNECTION_STRING:?export SQLDB_CONNECTION_STRING in your shell}
       API_KEY: ${API_KEY:?set API_KEY in .env}
-      API_UPN: ${API_UPN:-}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?set ENTRA_TENANT_ID in .env}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:?set ENTRA_CLIENT_ID in .env}
     ports:
       - "8080:80"
     restart: unless-stopped

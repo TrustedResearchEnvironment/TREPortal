@@ -9,8 +9,7 @@ from fastapi.security import APIKeyHeader, HTTPBearer
 
 _EXPECTED_API_KEY = os.getenv("API_KEY")
 _api_key_header = APIKeyHeader(name="X-API-Key", scheme_name="ApiKeyAuth", auto_error=False, description="API Key needed to access the endpoints")
-_upn_header = APIKeyHeader(name="X-UPN", scheme_name="UpnHeader", auto_error=False, description="User Principal Name of the caller, e.g., user@example.com. Ignored when ENVIRONMENT=prod.")
-_bearer = HTTPBearer(scheme_name="EntraBearer", auto_error=False, description="Microsoft Entra ID access token. Required when ENVIRONMENT=prod.")
+_bearer = HTTPBearer(scheme_name="EntraBearer", auto_error=False, description="Microsoft Entra ID access token. Required on every endpoint except /api/health.")
 
 _HEALTH_PATH = "/api/health"
 _REQUIRED_SCOPE = "access_as_user"
@@ -38,7 +37,11 @@ def _upn_from_token(token: str) -> str:
             options={"require": ["exp", "iss", "aud"]},
         )
     except jwt.PyJWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     if _REQUIRED_SCOPE not in str(claims.get("scp", "")).split():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token is missing the required scope")
@@ -51,22 +54,22 @@ def _upn_from_token(token: str) -> str:
 
 def verify_headers(
     request: Request,
-    upn: str = Security(_upn_header),
     api_key: str = Security(_api_key_header),
     bearer=Security(_bearer),
 ) -> dict:
     if not api_key or api_key != _EXPECTED_API_KEY:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing API key")
 
-    if bearer:
-        upn = _upn_from_token(bearer.credentials)
-    elif request.url.path == _HEALTH_PATH:
+    if request.url.path == _HEALTH_PATH:
         upn = "healthcheck"
-    elif os.getenv("ENVIRONMENT", "").lower() == "prod":
-        # X-UPN is never trusted in prod; the UPN must come from a validated token.
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-    elif not upn:
-        upn = "testing.upn@example.com"
+    elif bearer:
+        upn = _upn_from_token(bearer.credentials)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing bearer token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     request.state.upn = upn
     return {"upn": upn, "api_key": api_key}

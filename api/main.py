@@ -124,6 +124,9 @@ async def lifespan(app: FastAPI):
         _logger.info("Application shutdown")
         return
     
+    if not (os.getenv("ENTRA_TENANT_ID") and os.getenv("ENTRA_CLIENT_ID")):
+        raise RuntimeError("ENTRA_TENANT_ID and ENTRA_CLIENT_ID must be set: every API call requires a Microsoft sign-in")
+
     _logger.info("Testing DB connection...")
     _startup_db_retry()
     _logger.info("DB connection test completed.")

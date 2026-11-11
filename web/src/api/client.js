@@ -6,8 +6,8 @@
 //   q   - query string: array of same-named keys, or { queryKey: paramName }
 //   b   - body: 'payload' sends params.payload; { bodyKey: paramName | fn(params) } builds an object
 // Portal - * operations are not listed here; they stay on the host's window.loomeApi.
-// X-API-Key and X-UPN are injected by the nginx proxy; the browser sends the Entra ID bearer token
-// (when sign-in is configured) and the API takes the UPN from it.
+// X-API-Key is injected by the nginx proxy; the browser sends the Entra ID bearer token
+// and the API takes the UPN from it.
 
 import { getAccessToken } from '../auth.js';
 

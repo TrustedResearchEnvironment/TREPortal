@@ -436,6 +436,20 @@ def client(db_session, db_engine, mock_loome_urls):
     from app import VerifyHeaders
     test_api_key = "test-api-key"
     VerifyHeaders._EXPECTED_API_KEY = test_api_key
+
+    # Real auth needs an Entra token; endpoint tests use this stand-in that reads X-UPN instead.
+    # test_verify_headers.py removes the override to test the real check.
+    from fastapi import HTTPException, Request
+
+    def fake_verify_headers(request: Request) -> dict:
+        api_key = request.headers.get("X-API-Key")
+        if not api_key or api_key != VerifyHeaders._EXPECTED_API_KEY:
+            raise HTTPException(status_code=403, detail="Invalid or missing API key")
+        upn = request.headers.get("X-UPN") or "testing.upn@example.com"
+        request.state.upn = upn
+        return {"upn": upn, "api_key": api_key}
+
+    app.dependency_overrides[VerifyHeaders.verify_headers] = fake_verify_headers
     
     # Configure client with auth headers
     headers = {

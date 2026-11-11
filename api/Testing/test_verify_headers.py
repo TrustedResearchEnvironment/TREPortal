@@ -45,14 +45,13 @@ def make_token(private_key, **overrides):
     return jwt.encode(claims, private_key, algorithm="RS256")
 
 
-def verify(path="/api/Request/List", token=None, upn=None, api_key=API_KEY):
+def verify(path="/api/Request/List", token=None, api_key=API_KEY):
     request = Request({"type": "http", "method": "GET", "path": path, "headers": []})
     bearer = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token) if token else None
-    return VerifyHeaders.verify_headers(request=request, upn=upn, api_key=api_key, bearer=bearer)
+    return VerifyHeaders.verify_headers(request=request, api_key=api_key, bearer=bearer)
 
 
-def test_valid_token_sets_upn(private_key, monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "prod")
+def test_valid_token_sets_upn(private_key):
     assert verify(token=make_token(private_key))["upn"] == "researcher@example.com"
 
 
@@ -93,46 +92,47 @@ def test_garbage_token_is_rejected():
     assert error.value.status_code == 401
 
 
-def test_bad_token_is_rejected_outside_prod_too(monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "dev")
-    with pytest.raises(HTTPException) as error:
-        verify(token="not-a-jwt", upn="dev.user@example.com")
-    assert error.value.status_code == 401
-
-
 def test_wrong_api_key_is_forbidden(private_key):
     with pytest.raises(HTTPException) as error:
         verify(token=make_token(private_key), api_key="wrong")
     assert error.value.status_code == 403
 
 
-def test_prod_requires_a_token_and_ignores_x_upn(monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "prod")
+def test_a_token_is_always_required():
     with pytest.raises(HTTPException) as error:
-        verify(upn="spoofed@example.com")
+        verify()
     assert error.value.status_code == 401
 
 
-def test_prod_health_needs_no_token(monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "prod")
+def test_missing_entra_settings_fail_closed(private_key, monkeypatch):
+    monkeypatch.delenv("ENTRA_TENANT_ID")
+    monkeypatch.delenv("ENTRA_CLIENT_ID")
+    with pytest.raises(HTTPException) as error:
+        verify(token=make_token(private_key))
+    assert error.value.status_code == 500
+
+
+def test_health_needs_no_token():
     assert verify(path="/api/health")["upn"] == "healthcheck"
 
 
-def test_dev_uses_x_upn(monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "dev")
-    assert verify(upn="dev.user@example.com")["upn"] == "dev.user@example.com"
+@pytest.fixture
+def real_auth_client(client: TestClient):
+    from main import app
+
+    app.dependency_overrides.pop(VerifyHeaders.verify_headers)
+    return client
 
 
-def test_dev_falls_back_to_test_user(monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "dev")
-    assert verify()["upn"] == "testing.upn@example.com"
+def test_api_rejects_request_without_token(real_auth_client: TestClient):
+    response = real_auth_client.get("/api/Request/List")
+    assert response.status_code == 401
 
 
-def test_prod_api_rejects_request_without_token(client: TestClient, monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "prod")
-    assert client.get("/api/Request/List").status_code == 401
+def test_api_ignores_x_upn_header(real_auth_client: TestClient):
+    response = real_auth_client.get("/api/Request/List", headers={"X-UPN": "spoofed@example.com"})
+    assert response.status_code == 401
 
 
-def test_prod_api_health_is_public_to_the_probe(client: TestClient, monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "prod")
-    assert client.get("/api/health").status_code == 200
+def test_api_health_needs_no_token(real_auth_client: TestClient):
+    assert real_auth_client.get("/api/health").status_code == 200
