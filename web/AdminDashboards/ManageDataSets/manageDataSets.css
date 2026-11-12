@@ -8,6 +8,8 @@
 #dataSetColsTable .tabulator-header .tabulator-col .tabulator-header-filter input,
 #dataSetColsTable .tabulator-header .tabulator-col .tabulator-header-filter select {
     font-size: 0.8rem;
+    color: #212529;
+    background-color: #fff;
 }
 #dataSetColsTable .tabulator-cell.cell-editable {
     cursor: text;
