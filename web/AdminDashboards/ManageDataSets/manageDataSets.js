@@ -1,3 +1,6 @@
+import { TabulatorFull as Tabulator } from 'tabulator-tables';
+import 'tabulator-tables/dist/css/tabulator_bootstrap5.min.css';
+
 // API Constants
 const API_GET_COLUMNS_DATA = 'GetColumnsDataByDataSetID';
 const API_GET_DATASOURCE_FOLDERS = 'GetLoomeDataSourceFolders';
@@ -81,16 +84,8 @@ function extractApiError(parsed) {
 }
 
 const pageSize = 10;
-let currentPage = 1;
 let dataSourceTypeMap = new Map();
 let allColumnsData = [];
-let filteredColumnsData = [];
-let columnSearchTerm = '';
-let columnRedactFilter = 'both';
-let columnDeidentifyFilter = 'both';
-let columnNameSortDirection = 'asc';
-let columnVisibility = new Map();
-let columnNameDropdownSearchTerm = '';
 let currentDataSourceTypeID = 0;
 let currentDataSourceID = 0;
 
@@ -215,133 +210,210 @@ function getDisplayColumnType(rawType) {
     return rawType;
 }
 
-function displayColumnsTable(data, dataSetTypeId, emptyMessage = 'No columns to display. Select a Data Source or existing Data Set.') {
-    const tableBody = document.getElementById('dataSetColsBody');
+// =================================================================
+//  COLUMNS TABLE (Tabulator)
+//  `allColumnsData` is the single source of truth; the table edits those objects in place.
+// =================================================================
 
-    if (!data || data.length === 0) {
-        const headerRow = document.getElementById('dataSetColsHeader');
-        const columnCount = headerRow ? headerRow.querySelectorAll('th').length || 6 : 6;
-        const placeholderHtml = `
-            <tr>
-                <td colspan="${columnCount}" class="text-center text-muted">
-                    ${emptyMessage}
-                </td>
-            </tr>`;
-        tableBody.innerHTML = placeholderHtml;
-        return;
-    }
+const COLUMNS_EMPTY_MESSAGE = 'No columns to display. Select a Data Source or existing Data Set.';
+const EDITABLE_TEXT_LABELS = {
+    LogicalColumnName: 'Logical Name',
+    BusinessDescription: 'Business Description',
+    ExampleValue: 'Example Value',
+    FileDescription: 'File Description'
+};
 
-    // --- DATA EXISTS ---
-    // Enforce mutual exclusivity: if both Redact and Deidentify are set, Redact takes priority.
-    data.forEach(col => {
-        if (col.Redact && col.Deidentify) {
-            col.Deidentify = false;
+let columnsTable = null;
+let columnsTableReady = false;
+
+/** Pulls the table's rows back into `allColumnsData` so saves/exports always see the latest edits. */
+function syncColumnsFromTable() {
+    if (!columnsTable || !columnsTableReady) return;
+    allColumnsData = columnsTable.getData();
+}
+
+function notifyColumnsDataChanged() {
+    const el = document.getElementById('dataSetColsTable');
+    if (el) el.dispatchEvent(new CustomEvent('columnsdatachange'));
+}
+
+function textCellFormatter(cell) {
+    const value = cell.getValue() ?? '';
+    const div = document.createElement('div');
+    div.className = 'cell-text-wrap';
+    div.textContent = value;
+    cell.getElement().title = value;
+    return div;
+}
+
+function textAreaEditor(cell, onRendered, success, cancel) {
+    const field = cell.getField();
+    const textarea = document.createElement('textarea');
+    textarea.className = 'form-control form-control-sm';
+    textarea.rows = 3;
+    textarea.style.width = '100%';
+    textarea.value = cell.getValue() ?? '';
+    let finished = false;
+
+    onRendered(() => {
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    });
+
+    const commit = () => {
+        if (finished) return;
+        finished = true;
+        const newValue = textarea.value.trim();
+        const label = EDITABLE_TEXT_LABELS[field] || field;
+
+        if (containsInvalidChars(newValue)) {
+            showToast(`Special characters are not allowed in "${label}".`, 'error');
+            cancel();
+            return;
+        }
+        if (newValue.length > 500) {
+            showToast(`"${label}" exceeds 500 characters. Please shorten it.`, 'error');
+            cancel();
+            return;
+        }
+        success(newValue);
+    };
+
+    textarea.addEventListener('blur', commit);
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            commit();
+        } else if (e.key === 'Escape') {
+            // Keep Escape from also closing fullscreen / the confirm modal.
+            e.preventDefault();
+            e.stopPropagation();
+            if (!finished) {
+                finished = true;
+                cancel();
+            }
         }
     });
 
-    let rowsHtml = '';
-    if (dataSetTypeId == 1) { // Database type
+    return textarea;
+}
 
-        rowsHtml = data.map((col, index) => `
-            <tr data-id="${col.DataSetColumnID || col.ColumnName || index}" data-column-name="${col.ColumnName}">
-                <td>${col.ColumnName || ''}</td>
-                <td>${escapeHtml(getDisplayColumnType(col.ColumnType) || col.ColumnType || '')}</td>
-                <td class="editable-cell" data-field="LogicalColumnName" data-raw-value="${col.LogicalColumnName || ''}" title="${escapeHtml(col.LogicalColumnName || '')}">
-                    <div class="cell-text-wrap">${col.LogicalColumnName || ''}</div>
-                </td>
-                <td class="editable-cell" data-field="BusinessDescription" data-raw-value="${col.BusinessDescription || ''}" title="${escapeHtml(col.BusinessDescription || '')}">
-                    <div class="cell-text-wrap">${col.BusinessDescription || ''}</div>
-                </td>
-                <td class="editable-cell" data-field="ExampleValue" data-raw-value="${col.ExampleValue || ''}" title="${escapeHtml(col.ExampleValue || '')}">
-                    <div class="cell-text-wrap">${col.ExampleValue || ''}</div>
-                </td>
-                <td class="checkbox-cell">
-                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${col.Redact ? 'checked' : ''}>
-                </td>
-                <td class="checkbox-cell">
-                    <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${col.Deidentify ? 'checked' : ''}>
-                </td>
-            </tr>
-        `).join('');
+function flagCheckboxFormatter(cell) {
+    const field = cell.getField();
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'form-check-input';
+    input.checked = normalizeBooleanFlag(cell.getValue());
+    input.setAttribute('aria-label', field);
+    input.addEventListener('change', () => {
+        const row = cell.getRow();
+        const update = { [field]: input.checked ? 1 : 0 };
+        // Redact and Deidentify are mutually exclusive.
+        if (input.checked) update[field === 'Redact' ? 'Deidentify' : 'Redact'] = 0;
+        row.update(update);
+        syncColumnsFromTable();
+    });
+    return input;
+}
 
+function buildColumnDefs(dataSetTypeId) {
+    const flagColumn = (field, title) => ({
+        title,
+        field,
+        width: 120,
+        hozAlign: 'center',
+        headerHozAlign: 'center',
+        headerSort: false,
+        formatter: flagCheckboxFormatter,
+        headerFilter: 'tickCross',
+        headerFilterParams: { tristate: true },
+        headerFilterFunc: (headerValue, rowValue) => normalizeBooleanFlag(rowValue) === !!headerValue,
+        headerFilterLiveFilter: true
+    });
 
-    } else if (dataSetTypeId == 2) { // REDCap type
-        // console.log("Data for REDCap columns:", data);
-        rowsHtml = data.map((row) => {
-            // For REDCap, always use ColumnName as the unique id
-            return `
-                <tr data-id="${row.ColumnName}" data-column-name="${row.ColumnName}">
-                    <td>${row.ColumnName || ''}</td>
-                    <td>${escapeHtml(getDisplayColumnType(row.ColumnType) || row.ColumnType || '')}</td>
-                    <td class="editable-cell" data-field="LogicalColumnName" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.LogicalColumnName || '')}">${row.LogicalColumnName || ''}</td>
-                    <td class="editable-cell" data-field="BusinessDescription" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.BusinessDescription || '')}">${row.BusinessDescription || ''}</td>
-                    <td class="editable-cell" data-field="ExampleValue" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(row.ExampleValue || '')}">${row.ExampleValue || ''}</td>
-                    <td class="checkbox-cell">
-                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${row.Redact ? 'checked' : ''}>
-                    </td>
-                    <td class="checkbox-cell">
-                        <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${row.Deidentify ? 'checked' : ''}>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+    const textColumn = (field, title) => ({
+        title,
+        field,
+        minWidth: 160,
+        widthGrow: 2,
+        headerSort: false,
+        cssClass: 'cell-editable',
+        formatter: textCellFormatter,
+        editor: textAreaEditor
+    });
 
-
-    } else if (dataSetTypeId == 3) { // Folder type   
-        // 1. Group the data by FolderName
-        const groupedByFolderName = new Map();
-
-        data.forEach(item => {
-            const folderName = item.FolderName || 'Unnamed Folder';
-            if (!groupedByFolderName.has(folderName)) {
-                groupedByFolderName.set(folderName, []);
-            }
-            groupedByFolderName.get(folderName).push(item);
-        });
-
-        groupedByFolderName.forEach((items, folderName) => {
-            const rowspan = items.length;
-
-            items.forEach((col, index) => {
-                const fileExtension = col.FileType || col.FileExtensions || '';
-                const fileDescription = col.FileDescription || '';
-                const isRedacted = col.Redact ? 1 : 0;  // Convert to 1/0
-                const isDeidentified = col.Deidentify ? 1 : 0;  // Convert to 1/0
-
-                if (index === 0) {
-                    rowsHtml += `
-                        <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
-                            <td rowspan="${rowspan}">${folderName}</td>
-                            <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
-                            </td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${isDeidentified === 1 ? 'checked' : ''}>
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    rowsHtml += `
-                        <tr data-id="${col.FolderName}-${col.FileType}" data-folder-name="${folderName}">
-                            <td data-field="FileType">${fileExtension}</td>
-                            <td class="editable-cell" data-field="FileDescription">${fileDescription}</td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Redact" ${isRedacted === 1 ? 'checked' : ''}>
-                            </td>
-                            <td class="checkbox-cell">
-                                <input class="form-check-input editable-checkbox" type="checkbox" data-field="Deidentify" ${isDeidentified === 1 ? 'checked' : ''}>
-                            </td>
-                        </tr>
-                    `;
-                }
-            });
-        });
+    if (dataSetTypeId == 3) {
+        return [
+            { title: 'File Type', field: 'FileType', minWidth: 120, headerFilter: 'input', headerFilterPlaceholder: 'Search…' },
+            textColumn('FileDescription', 'File Description'),
+            flagColumn('Redact', 'Redact'),
+            flagColumn('Deidentify', 'Deidentify')
+        ];
     }
 
-    tableBody.innerHTML = rowsHtml;
-    updateColumnRowsVisibility();
+    return [
+        { title: 'Column Name', field: 'ColumnName', minWidth: 160, widthGrow: 1, headerFilter: 'input', headerFilterPlaceholder: 'Search…' },
+        {
+            title: 'Column Type',
+            field: 'ColumnType',
+            width: 120,
+            headerSort: false,
+            formatter: (cell) => {
+                const raw = cell.getValue();
+                return escapeHtml(String(getDisplayColumnType(raw) || raw || ''));
+            }
+        },
+        textColumn('LogicalColumnName', 'Logical Name'),
+        textColumn('BusinessDescription', 'Business Description'),
+        textColumn('ExampleValue', 'Example Value'),
+        flagColumn('Redact', 'Redact'),
+        flagColumn('Deidentify', 'Deidentify')
+    ];
+}
+
+/**
+ * (Re)builds the columns table for the given rows. Pass `allColumnsData` so edits land in the shared objects.
+ */
+function setColumnsTableData(data, dataSetTypeId = currentDataSourceTypeID, emptyMessage = COLUMNS_EMPTY_MESSAGE) {
+    const el = document.getElementById('dataSetColsTable');
+    if (!el) return;
+
+    const rows = Array.isArray(data) ? data : [];
+    // Redact takes priority if both flags arrive set.
+    rows.forEach(col => {
+        if (col.Redact && col.Deidentify) col.Deidentify = false;
+    });
+
+    if (columnsTable) {
+        columnsTable.destroy();
+        columnsTable = null;
+    }
+    columnsTableReady = false;
+
+    const isFolder = dataSetTypeId == 3;
+    columnsTable = new Tabulator(el, {
+        data: rows,
+        columns: buildColumnDefs(dataSetTypeId),
+        layout: 'fitColumns',
+        pagination: true,
+        paginationMode: 'local',
+        paginationSize: pageSize,
+        paginationCounter: 'rows',
+        placeholder: emptyMessage,
+        placeholderHeaderFilter: 'No columns match your search or filter.',
+        initialSort: isFolder ? [] : [{ column: 'ColumnName', dir: 'asc' }],
+        groupBy: isFolder ? (row) => row.FolderName || 'Unnamed Folder' : false,
+        groupHeader: (value, count) => `${escapeHtml(String(value))} <span class="text-muted">(${count})</span>`,
+        groupStartOpen: true
+    });
+
+    columnsTable.on('tableBuilt', () => {
+        columnsTableReady = true;
+        notifyColumnsDataChanged();
+    });
+    columnsTable.on('cellEdited', syncColumnsFromTable);
+
+    notifyColumnsDataChanged();
 }
 
 function escapeHtml(value) {
@@ -351,120 +423,6 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-}
-
-function getAllColumnNames() {
-    const names = Array.from(new Set(allColumnsData
-        .map(col => (col?.ColumnName || '').trim())
-        .filter(name => name !== '')));
-    names.sort((a, b) => a.localeCompare(b));
-    return names;
-}
-
-function buildColumnNameDropdownList(term = '') {
-    const lowerTerm = (term || '').trim().toLowerCase();
-    const names = getAllColumnNames().filter(name => {
-        return !lowerTerm || name.toLowerCase().includes(lowerTerm);
-    });
-
-    if (names.length === 0) {
-        return '<li class="text-muted small px-2">No columns match your search.</li>';
-    }
-
-    return names.map(name => {
-        const safeName = escapeHtml(name);
-        const encoded = encodeURIComponent(name);
-        const isChecked = columnVisibility.get(name) !== false;
-        return `
-            <li data-column="${encoded}">
-                <label>
-                    <input type="checkbox" ${isChecked ? 'checked' : ''}>
-                    <span>${safeName}</span>
-                </label>
-            </li>`;
-    }).join('');
-}
-
-function refreshColumnVisibilityMap() {
-    const existing = new Map(columnVisibility);
-    columnVisibility = new Map();
-    getAllColumnNames().forEach(name => {
-        columnVisibility.set(name, existing.has(name) ? existing.get(name) : true);
-    });
-}
-
-function updateColumnRowsVisibility() {
-    document.querySelectorAll('#dataSetColsBody tr[data-column-name]').forEach(row => {
-        const columnName = row.dataset.columnName || '';
-        if (!columnName) return;
-        if (columnVisibility.get(columnName) === false) {
-            row.classList.add('d-none');
-        } else {
-            row.classList.remove('d-none');
-        }
-    });
-}
-
-/**
-* Renders a compact and functional set of pagination controls.
-*/
-function renderPagination(containerId, totalItems, itemsPerPage, currentPage) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Pagination container with ID "${containerId}" not found.`);
-        return;
-    }
-
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    container.innerHTML = ''; // Clear old controls
-
-    if (totalPages <= 1) {
-        return; // No need for pagination.
-    }
-
-    // --- Determine button states ---
-    const isFirstPage = currentPage === 1;
-    const isLastPage = currentPage === totalPages;
-    const commonButtonClasses = "px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100";
-    const disabledClasses = "opacity-50 cursor-not-allowed";
-
-    let paginationHTML = `
-            <button data-page="1" 
-                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
-                    ${isFirstPage ? 'disabled' : ''}>
-                First
-            </button>
-            <button data-page="${currentPage - 1}" 
-                    class="${commonButtonClasses} ${isFirstPage ? disabledClasses : ''}" 
-                    style="margin-right: 10px;"
-                    ${isFirstPage ? 'disabled' : ''}>
-                Previous
-            </button>
-
-        <span>Page</span>
-            <input type="number" 
-                   id="page-input" 
-                   class="w-16 text-center border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" 
-                   value="${currentPage}" 
-                   min="1" 
-                   max="${totalPages}" 
-                   aria-label="Current page">
-            <span>of ${totalPages}</span>
-
-            <button data-page="${currentPage + 1}" 
-                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}"
-                    style="margin-left: 10px;" 
-                    ${isLastPage ? 'disabled' : ''}>
-                Next
-            </button>
-            <button data-page="${totalPages}" 
-                    class="${commonButtonClasses} ${isLastPage ? disabledClasses : ''}" 
-                    ${isLastPage ? 'disabled' : ''}>
-                Last
-            </button>
-    `;
-
-    container.innerHTML = paginationHTML;
 }
 
 function showColumnsLoader(message = 'Loading columns...') {
@@ -740,26 +698,6 @@ async function validateDataSetColumns(parsedCols, metaRow) {
     }
 
     return { valid: true };
-}
-
-/**
- * A central function to handle page changes.
- */
-function handlePageChange(newPage) {
-    const totalPages = Math.max(1, Math.ceil(allColumnsData.length / pageSize));
-
-    // Validate the page number to ensure it's within bounds
-    if (Number.isInteger(newPage) && newPage >= 1 && newPage <= totalPages) {
-        currentPage = newPage;
-        renderTablePage(currentDataSourceTypeID);
-    } else {
-        const pageInput = document.getElementById('page-input');
-        if (pageInput) {
-            pageInput.value = currentPage;
-        }
-        showToast(`Please enter a page number between 1 and ${totalPages}.`, "error");
-                
-    }
 }
 
 /////////////////////////
@@ -1571,90 +1509,11 @@ async function loadColumnsData(dataSourceTypeId, currentDataSourceID) {
 
         // --- CRITICAL: Update the master state ---
         allColumnsData = newColumnsData || [];
-        refreshColumnVisibilityMap();
 
-        // Reapply the search filter so pagination and table reflect the new data.
-        applyColumnSearchFilter(dataSourceTypeId);
-
-        // Rebuild the table header (and the column-name dropdown) now that columns are available.
-        try {
-            updateTableHeader(currentDataSourceTypeID);
-        } catch (e) {
-            console.warn('Failed to update table header after loading columns:', e);
-        }
+        // Rebuild the table (headers depend on the data source type).
+        setColumnsTableData(allColumnsData, dataSourceTypeId);
     } finally {
         hideColumnsLoader();
-    }
-}
-
-/**
- * Renders the UI based on the current state of `allColumnsData` and `currentPage`.
- * This function DOES NOT fetch data.
- */
-function renderTablePage(dataSetTypeId) {
-    const sourceData = filteredColumnsData || [];
-    const totalItems = sourceData.length;
-    const normalizedTotalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-
-    if (currentPage > normalizedTotalPages) {
-        currentPage = normalizedTotalPages;
-    }
-
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    // console.log(startIndex, endIndex)
-    const pageData = sourceData.slice(startIndex, endIndex);
-    // console.log("pageData: ", pageData, sourceData)
-
-    const emptyMessage = columnSearchTerm.trim() && totalItems === 0
-        ? 'No columns match your search term. Clear the search to view all columns.'
-        : 'No columns to display. Select a Data Source or existing Data Set.';
-
-    displayColumnsTable(pageData, dataSetTypeId, emptyMessage);
-
-    // console.log(totalItems, pageSize, currentPage)
-    renderPagination('pagination-controls', totalItems, pageSize, currentPage);
-}
-
-function applyColumnSearchFilter(dataSetTypeId = currentDataSourceTypeID) {
-    const normalizedTerm = (columnSearchTerm || '').trim().toLowerCase();
-    filteredColumnsData = allColumnsData.filter(column => {
-        const columnName = (column?.ColumnName || '').toLowerCase();
-        const matchesTerm = !normalizedTerm || columnName.includes(normalizedTerm);
-
-        let matchesRedact = true;
-        if (columnRedactFilter === 'yes') {
-            matchesRedact = normalizeBooleanFlag(column?.Redact);
-        } else if (columnRedactFilter === 'no') {
-            matchesRedact = !normalizeBooleanFlag(column?.Redact);
-        }
-
-        let matchesDeidentify = true;
-        if (columnDeidentifyFilter === 'yes') {
-            matchesDeidentify = normalizeBooleanFlag(column?.Deidentify);
-        } else if (columnDeidentifyFilter === 'no') {
-            matchesDeidentify = !normalizeBooleanFlag(column?.Deidentify);
-        }
-
-        return matchesTerm && matchesRedact && matchesDeidentify;
-    });
-
-    if (columnNameSortDirection) {
-        filteredColumnsData.sort((a, b) => {
-            const aName = (a?.ColumnName || '').toLowerCase();
-            const bName = (b?.ColumnName || '').toLowerCase();
-            if (aName === bName) return 0;
-            const comparison = aName < bName ? -1 : 1;
-            return columnNameSortDirection === 'asc' ? comparison : -comparison;
-        });
-    }
-
-    currentPage = 1;
-    renderTablePage(dataSetTypeId);
-    
-    // Ensure export button state is refreshed whenever the table data changes
-    if (typeof updateExportButtonState === 'function') {
-        updateExportButtonState();
     }
 }
 
@@ -1925,7 +1784,6 @@ async function updateDataSet(data_set_id, data) {
                     if (typeof populateForm === 'function') populateForm(updatedDataSet, updatedDataSource);
                     if (typeof updateDataSetFieldsTable === 'function') await updateDataSetFieldsTable(updatedDataSource, data_set_id);
                     if (typeof updateMetaDataTable === 'function') updateMetaDataTable(updatedDataSource, data_set_id);
-                    if (typeof updateTableHeader === 'function') updateTableHeader(updatedDataSource.DataSourceTypeID);
                     if (typeof loadColumnsData === 'function') await loadColumnsData(updatedDataSource.DataSourceTypeID, updatedDataSource.DataSourceID);
                 }
             }
@@ -1937,209 +1795,6 @@ async function updateDataSet(data_set_id, data) {
         console.error("Error updating dataset:", error);
         throw error;
     }
-}
-
-/**
- * Updates the header of a data table based on the specified data source type.
- * @param {number | string} dataSourceType - The ID of the data source type (e.g., 1 for Database, 3 for Folder).
- */
-function updateTableHeader(dataSourceType) {
-    const headerDefinitions = {
-        1: [
-            { label: 'Column Name', sortKey: 'column-name' },
-            { label: 'Column Type' },
-            { label: 'Logical Name' },
-            { label: 'Business Description' },
-            { label: 'Example Value' },
-            { label: 'Redact', filterType: 'redact' },
-            { label: 'Deidentify', filterType: 'deidentify' }
-        ],
-        2: [
-            { label: 'Column Name', sortKey: 'column-name' },
-            { label: 'Column Type' },
-            { label: 'Logical Name' },
-            { label: 'Business Description' },
-            { label: 'Example Value' },
-            { label: 'Redact', filterType: 'redact' },
-            { label: 'Deidentify', filterType: 'deidentify' }
-        ],
-        3: [
-            { label: 'Folder Name' },
-            { label: 'File Type' },
-            { label: 'File Description' },
-            { label: 'Redact', filterType: 'redact' },
-            { label: 'Deidentify', filterType: 'deidentify' }
-        ]
-    };
-
-    const headerRow = document.getElementById('dataSetColsHeader');
-    if (!headerRow) {
-        console.error("Error: Table header row with id 'dataSetColsHeader' not found.");
-        return;
-    }
-
-    // Default to the Database header (key 1) when no valid dataSourceType is provided
-    const definitions = headerDefinitions[dataSourceType] || headerDefinitions[1];
-
-    const filterOptions = [
-        { value: 'both', label: 'All Data' },
-        { value: 'yes', label: 'Yes' },
-        { value: 'no', label: 'No' }
-    ];
-
-    const buildHeaderCell = (def) => {
-        if (def.sortKey === 'column-name') {
-            const arrow = columnNameSortDirection === 'desc' ? '\u25B2' : '\u25BC';// '▲' : '▼';
-            const ariaLabel = columnNameSortDirection === 'desc' ? 'Sort ascending' : 'Sort descending';
-            const ariaSortValue = columnNameSortDirection === 'asc' ? 'ascending' : 'descending';
-            const listHtml = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
-            return `
-                <th aria-sort="${ariaSortValue}">
-                    <details class="header-filter column-name-filter" data-filter="column-name">
-                        <summary aria-label="Column Name, sorted ${ariaSortValue}. Click to filter.">
-                            <span>${def.label}</span>
-                            <span class="header-filter-arrow" aria-hidden="true">▾</span>
-                        </summary>
-                        <div class="column-name-dropdown">
-                            <div class="column-name-sort-row">
-                                <button type="button" data-action="sort-asc" title="Sort A-Z" aria-label="Sort column name A to Z">A-Z</button>
-                                <button type="button" data-action="sort-desc" title="Sort Z-A" aria-label="Sort column name Z to A">Z-A</button>
-                                <span style="flex:1"></span>
-                                
-                            </div>
-                          
-                            <input type="search" class="column-name-dropdown-search" placeholder="Search columns" value="${escapeHtml(columnNameDropdownSearchTerm)}">
-                            <div class="column-name-select-all">
-                                <input type="checkbox" id="column-name-select-all">
-                                <label for="column-name-select-all">Select All</label>
-                            </div>
-                            <ul class="column-name-dropdown-list">
-                                ${listHtml}
-                            </ul>
-                        </div>
-                    </details>
-                </th>`;
-        }
-
-        if (!def.filterType) {
-            return `<th>${def.label}</th>`;
-        }
-
-        const currentFilter = def.filterType === 'redact' ? columnRedactFilter : columnDeidentifyFilter;
-        const displayLabel = currentFilter === 'both'
-            ? def.label
-            : `${def.label} (${currentFilter === 'yes' ? 'Yes' : 'No'})`;
-
-        const optionsHtml = filterOptions.map(option => {
-            const isActive = option.value === currentFilter ? ' aria-current="true"' : '';
-            return `<li data-value="${escapeHtml(String(option.value))}"${isActive}>${escapeHtml(String(option.label))}</li>`;
-        }).join('');
-
-        return `
-            <th style="${def.filterType === 'deidentify' ? 'min-width:115px;' : ''}position:relative;overflow:visible;">
-                <details class="header-filter" data-filter="${def.filterType}">
-                    <summary>
-                        <span>${displayLabel}</span>
-                        <span class="header-filter-arrow">▾</span>
-                    </summary>
-                    <ul style="position:absolute;z-index:1050;background:#fff;min-width:110px;box-shadow:0 4px 12px rgba(0,0,0,.15);border-radius:4px;padding:4px 0;margin:0;list-style:none;">
-                        ${optionsHtml}
-                    </ul>
-                </details>
-            </th>`;
-    };
-
-    const headerCells = definitions.map(buildHeaderCell).join('');
-    headerRow.innerHTML = `<tr>${headerCells}</tr>`;
-    setupColumnNameDropdownHandlers();
-}
-
-function attachColumnNameCheckboxListeners(listElement) {
-    if (!listElement) return;
-    listElement.querySelectorAll('input[type="checkbox"]').forEach(input => {
-        input.addEventListener('change', () => {
-            const li = input.closest('li[data-column]');
-            if (!li) return;
-            const encoded = li.dataset.column || '';
-            if (!encoded) return;
-            const columnName = decodeURIComponent(encoded);
-            columnVisibility.set(columnName, input.checked);
-            updateColumnRowsVisibility();
-        });
-    });
-}
-
-function setupColumnNameDropdownHandlers() {
-    const container = document.querySelector('.column-name-filter');
-    if (!container) return;
-    const searchInput = container.querySelector('.column-name-dropdown-search');
-    const list = container.querySelector('.column-name-dropdown-list');
-    const selectAllCheckbox = container.querySelector('#column-name-select-all');
-    const sortAscBtn = container.querySelector('[data-action="sort-asc"]');
-    const sortDescBtn = container.querySelector('[data-action="sort-desc"]');
-
-    const refreshList = () => {
-        if (!list) return;
-        list.innerHTML = buildColumnNameDropdownList(columnNameDropdownSearchTerm);
-        attachColumnNameCheckboxListeners(list);
-        // Update Select All state
-        if (selectAllCheckbox) {
-            const all = Array.from(list.querySelectorAll('li[data-column] input[type="checkbox"]'));
-            const checked = all.filter(i => i.checked).length;
-            selectAllCheckbox.checked = all.length > 0 && checked === all.length;
-            selectAllCheckbox.indeterminate = checked > 0 && checked < all.length;
-        }
-    };
-
-    if (searchInput) {
-        searchInput.value = columnNameDropdownSearchTerm;
-        searchInput.addEventListener('input', debounce((event) => {
-            columnNameDropdownSearchTerm = event.target.value;
-            refreshList();
-        }, 300));
-    }
-
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', (e) => {
-            const checked = !!e.target.checked;
-            // apply to currently visible list items
-            if (list) {
-                list.querySelectorAll('li[data-column]').forEach(li => {
-                    const encoded = li.dataset.column;
-                    const name = decodeURIComponent(encoded || '');
-                    columnVisibility.set(name, checked);
-                    const cb = li.querySelector('input[type="checkbox"]');
-                    if (cb) cb.checked = checked;
-                });
-            }
-            updateColumnRowsVisibility();
-        });
-    }
-
-    if (sortAscBtn) {
-        sortAscBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            columnNameSortDirection = 'asc';
-            applyColumnSearchFilter();
-            // keep dropdown open and refresh the arrow
-            updateTableHeader(currentDataSourceTypeID);
-            setupColumnNameDropdownHandlers();
-        });
-    }
-
-    if (sortDescBtn) {
-        sortDescBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            columnNameSortDirection = 'desc';
-            applyColumnSearchFilter();
-            updateTableHeader(currentDataSourceTypeID);
-            setupColumnNameDropdownHandlers();
-        });
-    }
-
-    refreshList();
 }
 
 async function renderManageDataSetPage() {
@@ -2257,13 +1912,8 @@ async function renderManageDataSetPage() {
             const dsSelected = !!(selectionDropdown?.value && selectionDropdown.value !== '' && selectionDropdown.value !== 'new');
             const dataSourceSelected = !!(dataSourceDrpDwn?.value && dataSourceDrpDwn.value !== '');
             
-            // For export visibility, we check for presence of data in either the table or the global array
-            // since there might be race conditions between the state update and DOM rendering
-            const tableRowsCount = document.querySelectorAll('#dataSetColsBody tr[data-column-name]').length;
-            const stateRowsCount = (allColumnsData && allColumnsData.length) || 0;
-            const tableHasRows = tableRowsCount > 0 || stateRowsCount > 0;
-
-            // console.log("Checking export button state:", { dsSelected, dataSourceSelected, tableRowsCount, stateRowsCount });
+            // For export visibility, rely on the in-memory column state
+            const tableHasRows = ((allColumnsData && allColumnsData.length) || 0) > 0;
 
             // Export: existing dataset OR a new dataset with imported/loaded columns
             const showExport = (dsSelected || dataSourceSelected) && tableHasRows;
@@ -2278,7 +1928,7 @@ async function renderManageDataSetPage() {
         dataSourceDrpDwn?.addEventListener('change', updateExportButtonState);
         // Also update when the top-level Data Set selection changes
         selectionDropdown?.addEventListener('change', updateExportButtonState);
-        document.getElementById('dataSetColsBody').addEventListener('DOMSubtreeModified', updateExportButtonState);
+        document.getElementById('dataSetColsTable').addEventListener('columnsdatachange', updateExportButtonState);
         updateExportButtonState();
         exportBtn.addEventListener('click', createAndDownloadExcelFile);
         
@@ -2473,7 +2123,6 @@ async function renderManageDataSetPage() {
 
                     // Update master state and refresh UI
                     allColumnsData = importedColumns;
-                    refreshColumnVisibilityMap();
                     
                     // Populate form fields from metadata sheet
                     try {
@@ -2602,14 +2251,12 @@ async function renderManageDataSetPage() {
                             } finally {
                                 suppressSelectionChange = false;
                                 
-                                // Final UI Refresh: apply filter (which renders table) and update header
-                                // We do this at the very end of the import to ensure all states (DataSourceID, etc)
-                                // are fully applied so updateExportButtonState has correct context.
-                                applyColumnSearchFilter();
+                                // Final UI refresh: render the table last so all states (DataSourceID, etc.)
+                                // are applied before updateExportButtonState runs.
+                                setColumnsTableData(allColumnsData, currentDataSourceTypeID);
                                 if (typeof updateExportButtonState === 'function') {
                                     updateExportButtonState();
                                 }
-                                try { updateTableHeader(currentDataSourceTypeID); } catch (e) { /* ignore */ }
                             }
                         }
                     } catch (e) {
@@ -2845,14 +2492,10 @@ async function renderManageDataSetPage() {
             currentDataSourceTypeID = null;
             currentDataSourceID = null;
             allColumnsData = [];
-            filteredColumnsData = [];
-            refreshColumnVisibilityMap();
-            // Reset table header and pagination
-            try { updateTableHeader(currentDataSourceTypeID); } catch (e) { /* ignore */ }
             updateDataSetFieldsTable(null, null);
             updateMetaDataTable(null, null);
             // When creating a new set, there are no columns to show. Clear the table.
-            displayColumnsTable(null);
+            setColumnsTableData([], null);
         } else {
             // Don't let name and description be edited for existing sets
             // nameInput.disabled = true;
@@ -2899,9 +2542,6 @@ async function renderManageDataSetPage() {
             // 2. Update the dynamic metadata tables on the left
             updateDataSetFieldsTable(dataSource, selectedId);
             updateMetaDataTable(dataSource, selectedId);
-
-            // refresh header immediately
-            updateTableHeader(currentDataSourceTypeID);
         }
     }
 
@@ -2958,12 +2598,12 @@ async function renderManageDataSetPage() {
 
                 } else {
                     // If no source is selected, clear everything.
-                    displayColumnsTable(null);
+                    allColumnsData = [];
+                    setColumnsTableData([], null);
                     // You might also want to clear the metadata tables here.
                 }
 
                 await loadColumnsData(currentDataSourceTypeID, currentDataSourceID);
-                updateTableHeader(selectedDataSource.DataSourceTypeID)
                 try { if (typeof updateExportButtonState === 'function') updateExportButtonState(); } catch (e) { /* ignore */ }
 
 
@@ -2993,197 +2633,6 @@ async function renderManageDataSetPage() {
 
                 }
             });
-
-            const columnsSearchInput = document.getElementById('dataSetColumnsSearch');
-            if (columnsSearchInput) {
-                columnsSearchInput.addEventListener('input', debounce(() => {
-                    columnSearchTerm = (columnsSearchInput.value || '').trim();
-                    applyColumnSearchFilter();
-                }, 300));
-            }
-            const columnsHeader = document.getElementById('dataSetColsHeader');
-            if (columnsHeader) {
-                columnsHeader.addEventListener('click', (event) => {
-                    const sortButton = event.target.closest('[data-sort]');
-                    if (sortButton) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if (sortButton.dataset.sort === 'column-name') {
-                            columnNameSortDirection = columnNameSortDirection === 'asc' ? 'desc' : 'asc';
-                            updateTableHeader(currentDataSourceTypeID);
-                            applyColumnSearchFilter();
-                        }
-                        return;
-                    }
-
-                    const menuItem = event.target.closest('li[data-value]');
-                    if (!menuItem) return;
-                    const detail = menuItem.closest('details[data-filter]');
-                    if (!detail) return;
-                    const filterType = detail.dataset.filter;
-                    const chosenValue = menuItem.dataset.value;
-
-                    if (filterType === 'redact') {
-                        columnRedactFilter = chosenValue;
-                    } else if (filterType === 'deidentify') {
-                        columnDeidentifyFilter = chosenValue;
-                    } else {
-                        return;
-                    }
-
-                    detail.removeAttribute('open');
-                    updateTableHeader(currentDataSourceTypeID);
-                    applyColumnSearchFilter();
-                });
-            }
-
-            // --- "RENDER" EVENT LISTENER ---
-            // This listener ONLY updates the view, it does not fetch data.
-
-            const paginationControls = document.getElementById('pagination-controls');
-
-            // This single listener handles all pagination interactions using event delegation.
-            paginationControls.addEventListener('click', (event) => {
-                // Check if a pagination button was clicked
-                const target = event.target.closest('button[data-page]');
-                if (target) {
-                    event.preventDefault();
-                    const page = Number(target.dataset.page);
-                    handlePageChange(page);
-                }
-            });
-
-            paginationControls.addEventListener('keydown', (event) => {
-                // Check if the Enter key was pressed in the input field
-                const target = event.target;
-                if (target.id === 'page-input' && event.key === 'Enter') {
-                    event.preventDefault();
-                    const page = Number(target.value);
-                    handlePageChange(page);
-                }
-            });
-
-
-            // =================================================================
-            //  EDITABLE TABLE LOGIC
-            // =================================================================
-
-            const dataSetColsTable = document.getElementById('dataSetColsTable');
-
-
-            // Get a reference to the body of the columns table.
-            const dataSetColsBody = document.getElementById('dataSetColsBody');
-
-            // --- 1. The dblclick listener is now ONLY for creating the input ---
-            dataSetColsBody.addEventListener('dblclick', (event) => {
-                const cell = event.target.closest('td.editable-cell');
-                if (!cell || cell.querySelector('input')) return;
-
-                const originalText = cell.textContent.trim();
-                cell.innerHTML = '';
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'form-control form-control-sm';
-                input.value = originalText;
-                cell.appendChild(input);
-                input.focus();
-
-                // The 'blur' event on the input will fire a 'change' event,
-                // which is handled by the main listener below.
-                input.addEventListener('blur', () => {
-                    const newValue = input.value.trim();
-                    const field = cell.dataset.field;
-
-                    // Reject special characters
-                    if (containsInvalidChars(newValue)) {
-                        showToast('Special characters are not allowed in this field.', 'error');
-                        cell.innerHTML = originalText;
-                        cell.title = originalText;
-                        return;
-                    }
-
-                    // Reject values exceeding 500 characters
-                    if (newValue.length > 500) {
-                        showToast(`"${field === 'LogicalColumnName' ? 'Logical Name' : field === 'BusinessDescription' ? 'Business Description' : 'Example Value'}" exceeds 500 characters. Please shorten it.`, 'error');
-                        cell.innerHTML = originalText;
-                        cell.title = originalText;
-                        return;
-                    }
-
-                    updateInMemoryData(cell.closest('tr'), field, newValue);
-                    // Revert the cell to plain text
-                    cell.innerHTML = newValue;
-                    cell.title = newValue;
-                });
-
-                input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') input.blur();
-                    else if (e.key === 'Escape') cell.innerHTML = originalText;
-                });
-            });
-
-            // --- 2. The change listener ONLY handles checkboxes now ---
-            dataSetColsBody.addEventListener('change', (event) => {
-                const target = event.target;
-                if (target.classList.contains('editable-checkbox')) {
-                    const field = target.dataset.field;
-                    const row = target.closest('tr');
-
-                    // Mutual exclusivity: Redact and Deidentify cannot both be checked
-                    if (target.checked && (field === 'Redact' || field === 'Deidentify')) {
-                        const oppositeField = field === 'Redact' ? 'Deidentify' : 'Redact';
-                        const oppositeCheckbox = row.querySelector(`.editable-checkbox[data-field="${oppositeField}"]`);
-                        if (oppositeCheckbox && oppositeCheckbox.checked) {
-                            oppositeCheckbox.checked = false;
-                            updateInMemoryData(row, oppositeField, 0);
-                        }
-                    }
-
-                    const value = target.checked ? 1 : 0;
-                    updateInMemoryData(row, field, value);
-                }
-            });
-
-
-            // --- 3. A NEW helper function to keep the update logic DRY ---
-            function updateInMemoryData(rowElement, field, value) {
-                if (!rowElement || !field) {
-                    console.error("Cannot update: missing row or field information.");
-                    return;
-                }
-
-                const uniqueId = rowElement.dataset.id;
-                if (!uniqueId) {
-                    console.error("Cannot update: missing data-id on the row.");
-                    return;
-                }
-
-                // console.log(`Updating... ID: ${uniqueId}, Field: ${field}, New Value:`, value);
-
-                const columnToUpdate = allColumnsData.find(col => {
-                    // Match by DataSetColumnID (for existing datasets)
-                    if (col.DataSetColumnID && col.DataSetColumnID == uniqueId) return true;
-                    // Match by ColumnName (for new datasets)
-                    if (col.ColumnName && col.ColumnName === uniqueId) return true;
-                    // Match by FolderName-FileType (for folder type)
-                    if (col.FolderName && col.FileType) {
-                        const folderFileKey = `${col.FolderName}-${col.FileType}`;
-                        if (folderFileKey === uniqueId) return true;
-                    }
-                    return false;
-                });
-
-                if (columnToUpdate) {
-                    columnToUpdate[field] = value;
-                    // console.log("✓ Updated successfully. Object now:", columnToUpdate);
-                    // console.log("✓ Full allColumnsData:", allColumnsData);
-                } else {
-                    console.error("✗ Could not find matching object for uniqueId:", uniqueId);
-                    console.error("Available objects:", allColumnsData.map(col => `${col.FolderName}-${col.FileType}`));
-                }
-            }
-
-
 
             // =================================================================
             //  SUBMIT DATASET DETAILS LOGIC
@@ -3423,7 +2872,8 @@ async function renderManageDataSetPage() {
                             clearForm();
                             updateDataSetFieldsTable(null, null);
                             updateMetaDataTable(null, null);
-                            displayColumnsTable(null);
+                            allColumnsData = [];
+                            setColumnsTableData([], null);
                             populateExistingDataSets(optgroup, await getAllDataSets());
 
                         } catch (error) {
@@ -3489,81 +2939,6 @@ async function renderManageDataSetPage() {
         }
     });
 
-    document.getElementById('dataSetColsBody').addEventListener('click', function(e) {
-        const cell = e.target.closest('.editable-cell');
-        if (!cell) return;
-        if (document.querySelector('.floating-downward-editor')) return;
-
-        // FIX: Fallback to the inner text if data-raw-value hasn't been set yet
-        const originalText = cell.getAttribute('data-raw-value') !== null 
-            ? cell.getAttribute('data-raw-value') 
-            : cell.innerText.trim();
-        
-        const rect = cell.getBoundingClientRect();
-        const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
-
-        const editorContainer = document.createElement('div');
-        editorContainer.className = 'floating-downward-editor';
-        editorContainer.style.top = `${rect.top + scrollTop}px`;
-        editorContainer.style.left = `${rect.left + scrollLeft}px`;
-        editorContainer.style.width = `${rect.width}px`;
-
-        editorContainer.innerHTML = `<textarea rows="1"></textarea>`;
-        const textarea = editorContainer.querySelector('textarea');
-        textarea.value = originalText; // Safely populates the text container
-
-        document.body.appendChild(editorContainer);
-        textarea.focus();
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-
-        const autoGrow = () => {
-            textarea.style.height = 'auto';
-            
-            // Capture computed maximum height configured in the CSS styles block
-            const maxHeight = parseInt(window.getComputedStyle(textarea).maxHeight);
-
-            if (textarea.scrollHeight > maxHeight) {
-                // If text content climbs past max threshold, lock height and reveal scrollbar
-                textarea.style.height = maxHeight + 'px';
-                textarea.style.overflowY = 'auto'; 
-            } else {
-                // Otherwise scale naturally and hide scrollbars to look crisp
-                textarea.style.height = textarea.scrollHeight + 'px';
-                textarea.style.overflowY = 'hidden';
-            }
-        };
-        textarea.addEventListener('input', autoGrow);
-        autoGrow();
-
-        const closeAndSave = () => {
-            const newValue = textarea.value.trim();
-            
-            // Save raw text value securely to the attribute for future edits
-            cell.setAttribute('data-raw-value', newValue);
-            
-            // Update the visible layout
-            cell.innerHTML = `<div class="cell-text-wrap"></div>`;
-            cell.querySelector('.cell-text-wrap').textContent = newValue;
-            cell.setAttribute('title', newValue);
-            
-            editorContainer.remove();
-        };
-
-        textarea.addEventListener('blur', closeAndSave);
-        
-        textarea.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                textarea.blur();
-            }
-            if (event.key === 'Escape') {
-                textarea.value = originalText;
-                textarea.blur();
-            }
-        });
-    });
-
     const toggleBtn = document.getElementById('toggleFullscreenBtn');
     // Target the shared parent wrapper container instead of just the table
     const workspaceWrapper = document.getElementById('tableWorkspaceWrapper');
@@ -3582,6 +2957,9 @@ async function renderManageDataSetPage() {
             expandIcon.style.display = 'block';
             collapseIcon.style.display = 'none';
         }
+
+        // Tabulator needs a redraw once its container size changes.
+        if (columnsTable) columnsTable.redraw(true);
     }
 
     toggleBtn.addEventListener('click', toggleTableFullscreen);
