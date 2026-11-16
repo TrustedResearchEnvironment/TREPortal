@@ -46,4 +46,6 @@ jobs:
         context: .
         #   push if not a pull request 
         push: ${{ github.event_name != 'pull_request' }}        
+        build-args: |
+          GITHUB_SHA=${{ github.sha }}
         tags: ghcr.io/trustedresearchenvironment/trustapi:${{ github.ref_name }}

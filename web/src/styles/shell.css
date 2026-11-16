@@ -16,6 +16,13 @@
     background-color: var(--bs-primary);
 }
 
+#build-version {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.65rem;
+    letter-spacing: 0.02em;
+    opacity: 0.8;
+}
+
 .min-w-0 {
     min-width: 0;
 }

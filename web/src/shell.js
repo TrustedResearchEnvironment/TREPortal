@@ -4,6 +4,12 @@ import { watchCurrentUser } from './auth.js';
 const frame = document.getElementById('content-frame');
 const sidebarEl = document.getElementById('sidebar');
 const links = [...document.querySelectorAll('#sidebar-nav .nav-link')];
+const buildVersion = document.getElementById('build-version');
+
+if (buildVersion) {
+    buildVersion.textContent = `Commit ${__TRE_COMMIT_HASH__}`;
+    buildVersion.title = 'Frontend commit deployed in this container';
+}
 
 function showPage() {
     const link = links.find((l) => l.getAttribute('href') === location.hash) ?? links[0];

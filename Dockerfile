@@ -1,10 +1,11 @@
 # Stage 1: build the static frontend
 FROM node:20-alpine AS web-build
 WORKDIR /app
+ARG GITHUB_SHA=unknown
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
-RUN npm run build
+RUN GITHUB_SHA="$GITHUB_SHA" npm run build
 
 # Stage 2: API, nginx and supervisor in one runtime image
 FROM python:3.12-slim
