@@ -29,7 +29,8 @@ from app import (
     datasetfolderfiles,
     importrequest,
     exportrequest,
-    ingestionlog
+    ingestionlog,
+    catalogue
 )
 import time
 import logging
@@ -223,6 +224,7 @@ app.include_router(datasetfolderfiles.router)
 app.include_router(importrequest.router)
 app.include_router(exportrequest.router)
 app.include_router(ingestionlog.router)
+app.include_router(catalogue.router)
 
 @app.get("/test-db")
 def test_db_connection(db: Session = Depends(database.get_db)):

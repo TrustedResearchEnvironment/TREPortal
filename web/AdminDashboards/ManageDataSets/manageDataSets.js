@@ -24,9 +24,8 @@ const API_GET_METADATA = 'GetMetadata';
 const API_VERIFY_UPLOAD_SHEET = 'VerifyUploadedSheet';
 const API_GET_REQUESTS_BY_DATASET_ID = 'GetRequestByDataSetID';
 
-const API_GET_PORTAL_TOKEN = 'Portal - GetToken';
-const API_GET_ASSET_BY_NAME = 'Portal - GetAssetByName';
-const API_DELETE_ASSET_BY_ASSET_ID = 'Portal - DeleteByAssetId';
+const API_GET_CATALOGUE_ASSET = 'GetCatalogueAsset';
+const API_DELETE_CATALOGUE_ASSET = 'DeleteCatalogueAsset';
 
 /**
  * Strips characters outside the safe whitelist to guard against injection.
@@ -225,6 +224,199 @@ const EDITABLE_TEXT_LABELS = {
 
 let columnsTable = null;
 let columnsTableReady = false;
+let columnsTableTypeId = null;
+let hiddenRowLabels = new Set(); // UI-only: hidden rows are still saved
+let rowVisibilitySearch = '';
+let rowVisibilityAnchor = null;
+let rowVisibilityField = 'ColumnName';
+let columnSortDirection = 'asc';
+
+function columnRowLabel(col) {
+    if (columnsTableTypeId == 3) return `${col.FolderName || 'Unnamed Folder'} / ${col.FileType || ''}`;
+    return (col.ColumnName || '').trim();
+}
+
+function allRowLabels() {
+    const labels = new Set();
+    (allColumnsData || []).forEach(col => {
+        const label = columnRowLabel(col);
+        if (label) labels.add(label);
+    });
+    return Array.from(labels).sort((a, b) => a.localeCompare(b));
+}
+
+function matchingRowLabels() {
+    const term = rowVisibilitySearch.trim().toLowerCase();
+    return allRowLabels().filter(label => !term || label.toLowerCase().includes(term));
+}
+
+function updateRowVisibilitySummary() {
+    const selectAll = document.getElementById('columnVisibilitySelectAll');
+    const total = allRowLabels().length;
+    if (rowVisibilityAnchor) {
+        rowVisibilityAnchor.title = total === 0
+            ? 'Sort and show/hide rows'
+            : `Sort and show/hide rows (${total - hiddenRowLabels.size} of ${total} shown)`;
+        rowVisibilityAnchor.style.color = hiddenRowLabels.size > 0 ? '#ffc107' : 'inherit';
+    }
+    if (selectAll) {
+        const labels = matchingRowLabels();
+        const shown = labels.filter(label => !hiddenRowLabels.has(label)).length;
+        selectAll.checked = labels.length > 0 && shown === labels.length;
+        selectAll.indeterminate = shown > 0 && shown < labels.length;
+    }
+    [['columnSortAsc', 'asc'], ['columnSortDesc', 'desc']].forEach(([id, dir]) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const active = columnSortDirection === dir;
+        btn.classList.toggle('btn-primary', active);
+        btn.classList.toggle('btn-outline-secondary', !active);
+    });
+}
+
+function renderRowVisibilityList() {
+    const list = document.getElementById('columnVisibilityList');
+    if (!list) return;
+    list.replaceChildren();
+
+    const labels = matchingRowLabels();
+    if (labels.length === 0) {
+        const empty = document.createElement('li');
+        empty.className = 'text-muted small';
+        empty.textContent = 'No columns match your search.';
+        list.appendChild(empty);
+    }
+
+    labels.forEach((label, index) => {
+        const li = document.createElement('li');
+        li.className = 'form-check';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'form-check-input';
+        input.id = `columnVisibility-${index}`;
+        input.checked = !hiddenRowLabels.has(label);
+        input.addEventListener('change', () => {
+            if (input.checked) hiddenRowLabels.delete(label);
+            else hiddenRowLabels.add(label);
+            if (columnsTable && columnsTableReady) columnsTable.refreshFilter();
+            updateRowVisibilitySummary();
+        });
+        const text = document.createElement('label');
+        text.className = 'form-check-label';
+        text.htmlFor = input.id;
+        text.textContent = label;
+        li.append(input, text);
+        list.appendChild(li);
+    });
+
+    updateRowVisibilitySummary();
+}
+
+function closeRowVisibilityPanel() {
+    const panel = document.getElementById('columnVisibilityPanel');
+    if (panel) panel.hidden = true;
+    if (rowVisibilityAnchor) rowVisibilityAnchor.setAttribute('aria-expanded', 'false');
+}
+
+function openRowVisibilityPanel() {
+    const panel = document.getElementById('columnVisibilityPanel');
+    if (!panel || !rowVisibilityAnchor) return;
+    panel.hidden = false;
+    // Fixed positioning keeps the panel from being clipped by the table header.
+    const rect = rowVisibilityAnchor.getBoundingClientRect();
+    const width = panel.offsetWidth || 300;
+    panel.style.top = `${rect.bottom + 4}px`;
+    panel.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
+    rowVisibilityAnchor.setAttribute('aria-expanded', 'true');
+    renderRowVisibilityList();
+    document.getElementById('columnVisibilitySearch')?.focus();
+}
+
+function rowVisibilityTitleFormatter(cell) {
+    const wrap = document.createElement('div');
+    wrap.className = 'd-flex align-items-center gap-1';
+    const label = document.createElement('span');
+    label.textContent = cell.getValue();
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '\u25BE';
+    btn.style.cssText = 'background:none;border:0;padding:0 .25rem;line-height:1;color:inherit;';
+    btn.setAttribute('aria-haspopup', 'dialog');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', 'columnVisibilityPanel');
+    btn.addEventListener('click', (e) => {
+        // Keep the header click from also acting on the column.
+        e.preventDefault();
+        e.stopPropagation();
+        const panel = document.getElementById('columnVisibilityPanel');
+        if (panel && !panel.hidden && rowVisibilityAnchor === btn) {
+            closeRowVisibilityPanel();
+        } else {
+            rowVisibilityAnchor = btn;
+            openRowVisibilityPanel();
+        }
+    });
+
+    rowVisibilityAnchor = btn;
+    wrap.append(label, btn);
+    return wrap;
+}
+
+function initRowVisibilityControl() {
+    const panel = document.getElementById('columnVisibilityPanel');
+    const search = document.getElementById('columnVisibilitySearch');
+    const selectAll = document.getElementById('columnVisibilitySelectAll');
+
+    if (search) {
+        search.addEventListener('input', () => {
+            rowVisibilitySearch = search.value;
+            renderRowVisibilityList();
+        });
+        // Enter must not submit the surrounding form.
+        search.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') e.preventDefault();
+        });
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            matchingRowLabels().forEach(label => {
+                if (selectAll.checked) hiddenRowLabels.delete(label);
+                else hiddenRowLabels.add(label);
+            });
+            if (columnsTable && columnsTableReady) columnsTable.refreshFilter();
+            renderRowVisibilityList();
+        });
+    }
+
+    const applySort = (direction) => {
+        columnSortDirection = direction;
+        if (columnsTable && columnsTableReady) columnsTable.setSort(rowVisibilityField, direction);
+        updateRowVisibilitySummary();
+    };
+    document.getElementById('columnSortAsc')?.addEventListener('click', () => applySort('asc'));
+    document.getElementById('columnSortDesc')?.addEventListener('click', () => applySort('desc'));
+
+    if (panel) {
+        panel.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            // Close only the panel, not fullscreen or the confirm modal.
+            e.preventDefault();
+            e.stopPropagation();
+            closeRowVisibilityPanel();
+            rowVisibilityAnchor?.focus();
+        });
+    }
+    document.addEventListener('mousedown', (e) => {
+        if (!panel || panel.hidden) return;
+        if (panel.contains(e.target) || (rowVisibilityAnchor && rowVisibilityAnchor.contains(e.target))) return;
+        closeRowVisibilityPanel();
+    });
+    window.addEventListener('resize', closeRowVisibilityPanel);
+
+    renderRowVisibilityList();
+}
 
 /** Pulls the table's rows back into `allColumnsData` so saves/exports always see the latest edits. */
 function syncColumnsFromTable() {
@@ -344,7 +536,7 @@ function buildColumnDefs(dataSetTypeId) {
 
     if (dataSetTypeId == 3) {
         return [
-            { title: 'File Type', field: 'FileType', minWidth: 120, headerFilter: 'input', headerFilterPlaceholder: 'Search…' },
+            { title: 'File Type', field: 'FileType', minWidth: 120, headerSort: false, titleFormatter: rowVisibilityTitleFormatter },
             textColumn('FileDescription', 'File Description'),
             flagColumn('Redact', 'Redact'),
             flagColumn('Deidentify', 'Deidentify')
@@ -352,7 +544,7 @@ function buildColumnDefs(dataSetTypeId) {
     }
 
     return [
-        { title: 'Column Name', field: 'ColumnName', minWidth: 160, widthGrow: 1, headerFilter: 'input', headerFilterPlaceholder: 'Search…' },
+        { title: 'Column Name', field: 'ColumnName', minWidth: 160, widthGrow: 1, headerSort: false, titleFormatter: rowVisibilityTitleFormatter },
         {
             title: 'Column Type',
             field: 'ColumnType',
@@ -384,13 +576,21 @@ function setColumnsTableData(data, dataSetTypeId = currentDataSourceTypeID, empt
         if (col.Redact && col.Deidentify) col.Deidentify = false;
     });
 
+    // Keep hidden rows only if they still exist in the new data.
+    columnsTableTypeId = dataSetTypeId;
+    const presentLabels = new Set(rows.map(columnRowLabel));
+    hiddenRowLabels = new Set(Array.from(hiddenRowLabels).filter(label => presentLabels.has(label)));
+
     if (columnsTable) {
         columnsTable.destroy();
         columnsTable = null;
     }
     columnsTableReady = false;
+    closeRowVisibilityPanel();
 
     const isFolder = dataSetTypeId == 3;
+    rowVisibilityField = isFolder ? 'FileType' : 'ColumnName';
+    columnSortDirection = isFolder ? null : (columnSortDirection || 'asc');
     columnsTable = new Tabulator(el, {
         data: rows,
         columns: buildColumnDefs(dataSetTypeId),
@@ -401,7 +601,7 @@ function setColumnsTableData(data, dataSetTypeId = currentDataSourceTypeID, empt
         paginationCounter: 'rows',
         placeholder: emptyMessage,
         placeholderHeaderFilter: 'No columns match your search or filter.',
-        initialSort: isFolder ? [] : [{ column: 'ColumnName', dir: 'asc' }],
+        initialSort: columnSortDirection ? [{ column: rowVisibilityField, dir: columnSortDirection }] : [],
         groupBy: isFolder ? (row) => row.FolderName || 'Unnamed Folder' : false,
         groupHeader: (value, count) => `${escapeHtml(String(value))} <span class="text-muted">(${count})</span>`,
         groupStartOpen: true
@@ -409,10 +609,13 @@ function setColumnsTableData(data, dataSetTypeId = currentDataSourceTypeID, empt
 
     columnsTable.on('tableBuilt', () => {
         columnsTableReady = true;
+        columnsTable.setFilter((row) => !hiddenRowLabels.has(columnRowLabel(row)));
+        renderRowVisibilityList();
         notifyColumnsDataChanged();
     });
     columnsTable.on('cellEdited', syncColumnsFromTable);
 
+    renderRowVisibilityList();
     notifyColumnsDataChanged();
 }
 
@@ -1871,7 +2074,16 @@ async function renderManageDataSetPage() {
                 // console.log("Full Object:", response);
                 // console.log("Typeof:", typeof response);
                 // console.log("--- DEBUG END ---");
-                
+
+                // Non-2xx responses resolve with the error body, so check for fileData before decoding.
+                if (typeof response?.fileData !== 'string') {
+                    const detail = response?.detail;
+                    const message = Array.isArray(detail)
+                        ? detail.map(d => d.msg).join('; ')
+                        : (typeof detail === 'string' ? detail : 'Export failed: the server did not return a file.');
+                    throw new Error(message);
+                }
+
                 // 1. Get the base64 string from the object
                 const base64String = response.fileData;
 
@@ -2333,11 +2545,9 @@ async function renderManageDataSetPage() {
                 const datasetName = nameInput.value.trim();
                 const dataSourceTypeLabels = { 1: 'Database', 2: 'REDCap', 3: 'Folder' };
                 const dataSourceTypeLabel = dataSourceTypeLabels[currentDataSourceTypeID] || 'Dataset';
-                const token = await window.loomeApi.runApiRequest(API_GET_PORTAL_TOKEN);
-                const returnedAssets = await window.loomeApi.runApiRequest(API_GET_ASSET_BY_NAME, { 
+                const returnedAssets = await window.loomeApi.runApiRequest(API_GET_CATALOGUE_ASSET, {
                         assetName: datasetName,
-                        entityTypes: dataSourceTypeLabel,
-                        token: token.access_token
+                        entityType: dataSourceTypeLabel,
                     }
                 );
                 const asset = returnedAssets?.items?.[0];
@@ -2389,9 +2599,7 @@ async function renderManageDataSetPage() {
                     }
 
                     // Remove from Catalogue Asset List
-                    const deletedDataSet = await window.loomeApi.runApiRequest(API_DELETE_ASSET_BY_ASSET_ID, { 
-                        assetId: asset.id, token: token.access_token 
-                    });
+                    await window.loomeApi.runApiRequest(API_DELETE_CATALOGUE_ASSET, { asset_id: asset.id });
                 }
 
                 // Some APIs may return a truthy success value or empty array; consider that success
@@ -2974,4 +3182,5 @@ async function renderManageDataSetPage() {
 
 }
 
+initRowVisibilityControl();
 renderManageDataSetPage();

@@ -27,7 +27,15 @@ showPage();
 
 const userBox = document.getElementById('sidebar-user');
 const userName = document.getElementById('sidebar-user-name');
-watchCurrentUser(({ name, username }) => {
+watchCurrentUser((user) => {
+    if (!user) {
+        userName.textContent = '';
+        userBox.removeAttribute('title');
+        userBox.hidden = true;
+        return;
+    }
+
+    const { name, username } = user;
     userName.textContent = name;
     userBox.title = username;
     userBox.hidden = false;

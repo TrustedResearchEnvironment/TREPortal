@@ -1,6 +1,6 @@
 // Direct client for the TrustAPI operations listed in DeveloperAPIRequests/AllRequests.json.
 // Each entry mirrors one catalog operation:
-//   id  - catalog id
+//   id  - catalog id (omitted for backend endpoints that are not in the catalog)
 //   m   - HTTP method
 //   p   - path template; {name} is replaced by params[name]
 //   q   - query string: array of same-named keys, or { queryKey: paramName }
@@ -104,9 +104,13 @@ export const OPERATIONS = {
     GetRequestByDataSetID:                      { id: 72, m: 'GET',    p: '/api/Request/DataSet/{data_set_id}' },
     GetDataSetDateTimeFields:                   { id: 73, m: 'GET',    p: '/api/DataSetColumns/Datetime/DataSetID/{data_set_id}' },
     GetIngestionLogByRequestID:                 { id: 74, m: 'GET',    p: '/api/IngestionLog/GetIngestionLogByRequestID/{request_id}' },
+    GetCatalogueAsset:                          { m: 'GET',    p: '/api/Catalogue/Asset',                                  q: ['assetName', 'entityType'] },
+    DeleteCatalogueAsset:                       { m: 'DELETE', p: '/api/Catalogue/Asset/{asset_id}' },
 };
 
-const NAME_BY_ID = Object.fromEntries(Object.entries(OPERATIONS).map(([name, op]) => [op.id, name]));
+const NAME_BY_ID = Object.fromEntries(
+    Object.entries(OPERATIONS).filter(([, op]) => op.id !== undefined).map(([name, op]) => [op.id, name])
+);
 
 /**
  * Returns the TrustAPI operation name for a catalog name or numeric id, or null when the

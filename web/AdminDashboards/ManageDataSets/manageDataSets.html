@@ -113,6 +113,18 @@
                     </div>
                 </div>
                 <div id="tableWorkspaceWrapper" class="workspace-wrapper">
+                    <div id="columnVisibilityPanel" class="bg-white border rounded shadow p-2" role="dialog" aria-label="Sort and show or hide rows" hidden style="position:fixed;z-index:1060;width:300px;">
+                        <div class="d-flex gap-2 mb-2">
+                            <button type="button" id="columnSortAsc" class="btn btn-sm btn-outline-secondary" title="Sort A-Z" aria-label="Sort A to Z">A-Z</button>
+                            <button type="button" id="columnSortDesc" class="btn btn-sm btn-outline-secondary" title="Sort Z-A" aria-label="Sort Z to A">Z-A</button>
+                        </div>
+                        <input type="search" id="columnVisibilitySearch" class="form-control form-control-sm mb-2" placeholder="Search columns" aria-label="Search columns">
+                        <div class="form-check mb-1">
+                            <input type="checkbox" id="columnVisibilitySelectAll" class="form-check-input">
+                            <label for="columnVisibilitySelectAll" class="form-check-label fw-semibold">Select All</label>
+                        </div>
+                        <ul id="columnVisibilityList" class="list-unstyled mb-0" style="max-height:240px;overflow-y:auto;"></ul>
+                    </div>
                     <div class="table-responsive position-relative">
                         <div id="dataSetColsLoader" class="d-none position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" style="background: rgba(255,255,255,0.85); z-index: 3;">
                             <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>

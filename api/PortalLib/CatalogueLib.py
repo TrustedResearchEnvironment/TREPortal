@@ -5,6 +5,7 @@ import time
 import random
 import uuid
 from typing import Dict, List, Any, Optional
+from urllib.parse import quote
 import logging
 import urllib3
 from requests.adapters import HTTPAdapter
@@ -302,6 +303,42 @@ def ensure_custom_app(api_url: str, headers: Dict[str, str], app_name: str) -> s
         logger.info(f"Successfully created new app. ID: {custom_app_id}")
         return custom_app_id
 
+
+
+def get_portal_asset_token() -> str:
+    """Get a Portal token for catalogue asset calls made by the backend."""
+    return get_api_token(url=TOKEN_URL, client_id=CLIENT_ID, client_secret=CLIENT_SECRET, scope="webApi")
+
+
+def find_portal_asset_by_name(asset_name: str, entity_type: str) -> Dict[str, Any]:
+    """Query catalogue assets by exact name and entity type."""
+    return invoke_safe_rest_method(
+        url=f"{API_BASE_URL}/assetnode/query",
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {get_portal_asset_token()}",
+            "Content-Type": "application/json",
+        },
+        json_data={
+            "startIndex": 0,
+            "pageSize": 50,
+            "orderBy": ["entityType asc"],
+            "filterBy": [
+                f"set entityType contains {entity_type}",
+                f"text name equals {asset_name}",
+            ],
+            "isMasterDetail": True,
+        },
+    )
+
+
+def delete_portal_asset(asset_id: str) -> Any:
+    """Delete a catalogue asset by its Portal id."""
+    return invoke_safe_rest_method(
+        url=f"{API_BASE_URL}/assetnode/{quote(str(asset_id), safe='')}",
+        method="DELETE",
+        headers={"Authorization": f"Bearer {get_portal_asset_token()}"},
+    )
 
 
 def load_metadata_from_json(file_path: str = "EntityType.json") -> Dict[str, Any]:
