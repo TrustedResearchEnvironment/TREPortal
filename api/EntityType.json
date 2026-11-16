@@ -1,4 +1,12 @@
 {
+  "attributes": [
+    {
+      "name": "Data Source",
+      "$type": "Text",
+      "isRequired": false,
+      "options": {}
+    }
+  ],
   "entityTypes": [
     {
       "type": "Database",

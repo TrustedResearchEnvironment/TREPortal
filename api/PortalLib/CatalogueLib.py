@@ -466,6 +466,16 @@ def define_metadata(api_base_url: str, consumer_api_url: str, headers: Dict[str,
     
     # Build the lookup map
     _entity_type_map = {et["type"]: et["id"] for et in _my_app_entity_types}
+    _missing_entity_types = [
+        entity_type["type"]
+        for entity_type in _desired_entity_types
+        if entity_type["type"] not in _entity_type_map
+    ]
+    if _missing_entity_types:
+        raise ValueError(
+            "Portal did not return IDs for entity types: "
+            + ", ".join(_missing_entity_types)
+        )
     print ("_entity_type_map:", _entity_type_map)
     logger.info("Successfully built entity type map.")
     return {
