@@ -121,7 +121,7 @@ def create_secure_session() -> requests.Session:
     _retry_strategy = Retry(
         total=3,
         backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
+        status_forcelist=[429],
     )
     
     _adapter = HTTPAdapter(max_retries=_retry_strategy)
@@ -413,22 +413,41 @@ def define_metadata(api_base_url: str, consumer_api_url: str, headers: Dict[str,
     _desired_entity_types = _metadata_config["entityTypes"]
     
     logger.info("Comparing desired attributes with existing ones...")
-    for attribute in _desired_attributes:
-        _existing_attr = next(
-            (attr for attr in _existing_attributes if attr["name"] == attribute["name"]), 
-            None
+    _existing_attributes_by_name = {
+        attribute["name"]: attribute
+        for attribute in _existing_attributes
+        if attribute.get("name")
+    }
+    _missing_attributes = [
+        attribute
+        for attribute in _desired_attributes
+        if attribute["name"] not in _existing_attributes_by_name
+    ]
+
+    # Do not re-submit attributes already owned by Portal. In particular, Data Source
+    # may be a built-in attribute; sending it through the custom-app PUT endpoint can
+    # make Portal return a generic HTTP 500.
+    if _missing_attributes:
+        logger.info(
+            "Processing missing catalogue attributes: %s",
+            [attribute["name"] for attribute in _missing_attributes],
         )
-        if _existing_attr:
-            attribute["id"] = _existing_attr["id"]
-    
-    # print("desired_attributes:", _desired_attributes)
-    logger.info("Processing attributes...")
-    _final_attributes = invoke_safe_rest_method(
-        url=f"{consumer_api_url}/customapps/attributes",
-        method="PUT",
-        headers=headers,
-        json_data=_desired_attributes
-    )
+        _created_attributes = invoke_safe_rest_method(
+            url=f"{consumer_api_url}/customapps/attributes",
+            method="PUT",
+            headers=headers,
+            json_data=_missing_attributes,
+        )
+        if isinstance(_created_attributes, list):
+            for attribute in _created_attributes:
+                if attribute.get("name"):
+                    _existing_attributes_by_name[attribute["name"]] = attribute
+
+    _final_attributes = [
+        _existing_attributes_by_name[attribute["name"]]
+        for attribute in _desired_attributes
+        if attribute["name"] in _existing_attributes_by_name
+    ]
     # print(_final_attributes)
     logger.info("Attributes processed successfully.")
     
