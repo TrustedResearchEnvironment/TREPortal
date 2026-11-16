@@ -522,7 +522,11 @@ def stage_assets(consumer_api_url: str, headers: Dict[str, str], custom_app_id: 
             # print entity name id info 
             print(f"Entity Name ID: {_replacement_dict.get('entity_type_name')} -> {entity_type_map.get(_replacement_dict.get('entity_type_name'))}")
             print(f"Entity Type Map: {entity_type_map}")
-            _replacement_dict["_entityTypeId"] = entity_type_map.get(_replacement_dict.get("entity_type_name"))
+            _entity_type_name = _replacement_dict.get("entity_type_name")
+            _entity_type_id = entity_type_map.get(_entity_type_name)
+            if _entity_type_id is None:
+                raise ValueError(f"No Portal entity type found for {_entity_type_name!r}")
+            _replacement_dict["_entityTypeId"] = _entity_type_id
            
             _generated_asset = create_asset_from_template(_asset_template, _replacement_dict)
             

@@ -430,8 +430,13 @@ async def create_dataset(
             # print("Datasource:", datasource)
             print("Datasource Type:", datasourcetype)
 
-            # MAP :  {'SQL Database': 59, 'REDCap Database': 60, 'Files': 61}
-            #GET: Database; REDCap API; Folder
+            # Portal entity types are broader than the TrustAPI data-source types.
+            # Keep the catalogue payload aligned with EntityType.json.
+            catalogue_entity_type = {
+                "SQL Database": "Database",
+                "REDCap Database": "REDCap API",
+                "Files": "Folder",
+            }.get(datasourcetype, datasourcetype)
 
             # Add to catalogue
             # _replacement_dict = {
@@ -442,7 +447,7 @@ async def create_dataset(
             #     "_tre_url": "none"
             # }
             _replacement_dict = {
-                "entity_type_name": datasourcetype,
+                "entity_type_name": catalogue_entity_type,
                 "_name":  db_dataset.Name,
                 "_sourceItemId": db_dataset.DataSetID,
                 "_group": "TRE Data Assets",
@@ -691,12 +696,16 @@ async def update_dataset(
         datasourcetype = db.query(dbtables.DataSourceType).filter(dbtables.DataSourceType.DataSourceTypeID == str(db.query(dbtables.DataSource).filter(dbtables.DataSource.DataSourceID == str(db_dataset.DataSourceID)).first().DataSourceTypeID)).first().Name
         print("Datasource Type:", datasourcetype)
 
-        # MAP :  {'SQL Database': 59, 'REDCap Database': 60, 'Files': 61}
-        #GET: Database; REDCap API; Folder
+        # Portal entity types are broader than the TrustAPI data-source types.
+        catalogue_entity_type = {
+            "SQL Database": "Database",
+            "REDCap Database": "REDCap API",
+            "Files": "Folder",
+        }.get(datasourcetype, datasourcetype)
 
         # Build the replacement dict for the current dataset
         _replacement_dict = {
-            "entity_type_name": datasourcetype,
+            "entity_type_name": catalogue_entity_type,
             "_name":  db_dataset.Name,
             "_sourceItemId": db_dataset.DataSetID,
             "_group": "TRE Data Assets",

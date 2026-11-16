@@ -59,7 +59,7 @@
       "category": "Dataset",
       "subCategory": "CSV File", 
       "attributes": ["Data Source"],
-      "embeddingUrl": "https://[DYNAMIC_OVERRIDE]/embeddings/TREEntityFolder.js",
+      "embeddingUrl": "https://[DYNAMIC_OVERRIDE]/embeddings/TREEntityFolder.js",
       "embeddingParams": [
         {
           "id": "DataSetID",
@@ -100,7 +100,7 @@
       "actions": [
         {
           "name": "View Publication",
-          "Value": "{_actionsUrl}",
+          "value": "{_actionsUrl}",
           "description": "{_actionsDescription}"
         }
       ],
