@@ -30,6 +30,7 @@ export default defineConfig({
       input: {
         index: page('index.html'),
         authRedirect: page('auth-redirect.html'),
+        embedAuth: page('embed-auth.html'),
         requestHub: page('Dashboards/RequestsHub/RequestHub.html'),
         approver: page('Dashboards/Approver/approver.html'),
         welcome: page('Dashboards/Welcome/Matrix/welcome.html'),
