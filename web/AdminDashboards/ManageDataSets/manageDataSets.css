@@ -1,26 +1,42 @@
-/* Columns table (Tabulator) */
-#dataSetColsTable .tabulator-header,
-#dataSetColsTable .tabulator-header .tabulator-col {
-    background-color: #363A44;
-    color: white;
-    border-color: #454d55;
+/* Loome-inspired AG Grid theme */
+html, body, button, input, select, textarea {
+  font-family: Roboto, Arial, sans-serif;
 }
-#dataSetColsTable .tabulator-header .tabulator-col .tabulator-header-filter input,
-#dataSetColsTable .tabulator-header .tabulator-col .tabulator-header-filter select {
-    font-size: 0.8rem;
-    color: #212529;
-    background-color: #fff;
+
+#dataSetColsTable {
+    width: 100%;
+    height: min(600px, calc(100vh - 220px));
+    min-height: 260px;
+    --ag-font-family: Roboto, Arial, sans-serif;
+    --ag-font-size: 12px;
+    --ag-header-background-color: #f8f9fa;
+    --ag-header-foreground-color: #5f6368;
+    --ag-border-color: #d9dde2;
+    --ag-row-border-color: #e4e7ec;
+    --ag-foreground-color: #344054;
+    --ag-background-color: #fff;
+    --ag-odd-row-background-color: #fbfcfd;
+    --ag-row-hover-color: #eef9f8;
+    --ag-selected-row-background-color: #dff6f3;
+    --ag-header-height: 48px;
+    --ag-row-height: 42px;
+    --ag-cell-horizontal-padding: 12px;
+    --ag-wrapper-border-radius: 0;
 }
-#dataSetColsTable .tabulator-cell.cell-editable {
-    cursor: text;
+  #dataSetColsTable > div { height: 100%; }
+#dataSetColsTable .ag-header-cell { font-weight: 400; border-right: 1px solid #e4e7ec; }
+#dataSetColsTable .ag-header-cell.tre-grid-active-header {
+  background: #356769;
+  color: #fff;
 }
-#dataSetColsTable .tabulator-cell.cell-editable:hover {
-    background-color: #f0f8ff;
-}
-#dataSetColsTable .tabulator-row .tabulator-cell {
-    white-space: normal;
-    word-break: break-word;
-}
+#dataSetColsTable .ag-cell { border-right: 1px solid #eef0f2; display: flex; align-items: center; }
+#dataSetColsTable .ag-cell.cell-editable { cursor: text; }
+#dataSetColsTable .ag-cell.cell-editable:hover { background: #eef9f8; }
+#dataSetColsTable .ag-paging-panel { color: #344054; min-height: 42px; border-top: 1px solid #d9dde2; }
+#dataSetColsTable .ag-paging-button { color: #356769; }
+#dataSetColsTable .ag-cell-wrapper { width: 100%; }
+#dataSetColsTable .ag-cell-value,
+#dataSetColsTable .cell-text-wrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* View mode: clamp to 2 lines, keeping line breaks */
 #dataSetColsTable .cell-text-wrap {
     display: -webkit-box;

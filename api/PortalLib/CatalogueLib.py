@@ -358,6 +358,8 @@ def load_metadata_from_json(file_path: str = "EntityType.json") -> Dict[str, Any
                     et["embeddingUrl"] = EMBEDDING_URL_DB
                 elif et.get("type") == "REDCap API":
                     et["embeddingUrl"] = EMBEDDING_URL_REDCap
+                elif et.get("type") == "Folder":
+                    et["embeddingUrl"] = EMBEDDING_URL_Folder
                     
             return {
                 "attributes": config.get("attributes", []),

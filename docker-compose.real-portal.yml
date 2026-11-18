@@ -1,0 +1,23 @@
+# Real dev Portal integration.
+# Use explicitly:
+# docker compose -f docker-compose.yml -f docker-compose.real-portal.yml up --build
+#
+# This file intentionally does not include docker-compose.override.yml or WireMock.
+
+services:
+  app:
+    environment:
+      TOKEN_URL: ${TOKEN_URL:?TOKEN_URL is required}
+      API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
+      CLIENT_ID: ${CLIENT_ID:?CLIENT_ID is required}
+      CLIENT_SECRET: ${CLIENT_SECRET:?CLIENT_SECRET is required}
+
+      LOOME_INTEGRATE_TOKEN_URL: ${LOOME_INTEGRATE_TOKEN_URL:?LOOME_INTEGRATE_TOKEN_URL is required}
+      LOOME_INTEGRATE_API_BASE_URL: ${LOOME_INTEGRATE_API_BASE_URL:?LOOME_INTEGRATE_API_BASE_URL is required}
+      LOOME_INTEGRATE_CLIENT_ID: ${LOOME_INTEGRATE_CLIENT_ID:?LOOME_INTEGRATE_CLIENT_ID is required}
+      LOOME_INTEGRATE_CLIENT_SECRET: ${LOOME_INTEGRATE_CLIENT_SECRET:?LOOME_INTEGRATE_CLIENT_SECRET is required}
+
+      LOOME_ASSIST_TOKEN_URL: ${LOOME_ASSIST_TOKEN_URL:?LOOME_ASSIST_TOKEN_URL is required}
+      LOOME_ASSIST_API_BASE_URL: ${LOOME_ASSIST_API_BASE_URL:?LOOME_ASSIST_API_BASE_URL is required}
+      LOOME_ASSIST_CLIENT_ID: ${LOOME_ASSIST_CLIENT_ID:?LOOME_ASSIST_CLIENT_ID is required}
+      LOOME_ASSIST_CLIENT_SECRET: ${LOOME_ASSIST_CLIENT_SECRET:?LOOME_ASSIST_CLIENT_SECRET is required}

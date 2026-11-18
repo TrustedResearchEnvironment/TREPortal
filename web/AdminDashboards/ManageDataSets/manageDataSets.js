@@ -1,5 +1,6 @@
-import { TabulatorFull as Tabulator } from 'tabulator-tables';
-import 'tabulator-tables/dist/css/tabulator_bootstrap5.min.css';
+import { AllCommunityModule, ModuleRegistry, createGrid } from 'ag-grid-community';
+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 // API Constants
 const API_GET_COLUMNS_DATA = 'GetColumnsDataByDataSetID';
@@ -210,7 +211,7 @@ function getDisplayColumnType(rawType) {
 }
 
 // =================================================================
-//  COLUMNS TABLE (Tabulator)
+//  COLUMNS TABLE (AG Grid)
 //  `allColumnsData` is the single source of truth; the table edits those objects in place.
 // =================================================================
 
@@ -298,7 +299,7 @@ function renderRowVisibilityList() {
         input.addEventListener('change', () => {
             if (input.checked) hiddenRowLabels.delete(label);
             else hiddenRowLabels.add(label);
-            if (columnsTable && columnsTableReady) columnsTable.refreshFilter();
+            if (columnsTable && columnsTableReady) columnsTable.onFilterChanged();
             updateRowVisibilitySummary();
         });
         const text = document.createElement('label');
@@ -385,14 +386,17 @@ function initRowVisibilityControl() {
                 if (selectAll.checked) hiddenRowLabels.delete(label);
                 else hiddenRowLabels.add(label);
             });
-            if (columnsTable && columnsTableReady) columnsTable.refreshFilter();
+            if (columnsTable && columnsTableReady) columnsTable.onFilterChanged();
             renderRowVisibilityList();
         });
     }
 
     const applySort = (direction) => {
         columnSortDirection = direction;
-        if (columnsTable && columnsTableReady) columnsTable.setSort(rowVisibilityField, direction);
+        if (columnsTable && columnsTableReady) columnsTable.applyColumnState({
+            state: [{ colId: rowVisibilityField, sort: direction }],
+            defaultState: { sort: null }
+        });
         updateRowVisibilitySummary();
     };
     document.getElementById('columnSortAsc')?.addEventListener('click', () => applySort('asc'));
@@ -421,7 +425,8 @@ function initRowVisibilityControl() {
 /** Pulls the table's rows back into `allColumnsData` so saves/exports always see the latest edits. */
 function syncColumnsFromTable() {
     if (!columnsTable || !columnsTableReady) return;
-    allColumnsData = columnsTable.getData();
+    allColumnsData = [];
+    columnsTable.forEachNode((node) => allColumnsData.push(node.data));
 }
 
 function notifyColumnsDataChanged() {
@@ -429,12 +434,12 @@ function notifyColumnsDataChanged() {
     if (el) el.dispatchEvent(new CustomEvent('columnsdatachange'));
 }
 
-function textCellFormatter(cell) {
-    const value = cell.getValue() ?? '';
+function textCellFormatter(params) {
+    const value = params.value ?? '';
     const div = document.createElement('div');
     div.className = 'cell-text-wrap';
     div.textContent = value;
-    cell.getElement().title = value;
+    params.eGridCell.title = value;
     return div;
 }
 
@@ -490,19 +495,19 @@ function textAreaEditor(cell, onRendered, success, cancel) {
     return textarea;
 }
 
-function flagCheckboxFormatter(cell) {
-    const field = cell.getField();
+function flagCheckboxFormatter(params) {
+    const field = params.colDef.field;
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.className = 'form-check-input';
-    input.checked = normalizeBooleanFlag(cell.getValue());
+    input.checked = normalizeBooleanFlag(params.value);
     input.setAttribute('aria-label', field);
     input.addEventListener('change', () => {
-        const row = cell.getRow();
+        const row = params.node;
         const update = { [field]: input.checked ? 1 : 0 };
         // Redact and Deidentify are mutually exclusive.
         if (input.checked) update[field === 'Redact' ? 'Deidentify' : 'Redact'] = 0;
-        row.update(update);
+        row.setData(update);
         syncColumnsFromTable();
     });
     return input;
@@ -510,33 +515,30 @@ function flagCheckboxFormatter(cell) {
 
 function buildColumnDefs(dataSetTypeId) {
     const flagColumn = (field, title) => ({
-        title,
+        headerName: title,
         field,
         width: 120,
-        hozAlign: 'center',
-        headerHozAlign: 'center',
-        headerSort: false,
-        formatter: flagCheckboxFormatter,
-        headerFilter: 'tickCross',
-        headerFilterParams: { tristate: true },
-        headerFilterFunc: (headerValue, rowValue) => normalizeBooleanFlag(rowValue) === !!headerValue,
-        headerFilterLiveFilter: true
+        sortable: false,
+        cellRenderer: flagCheckboxFormatter,
+        cellStyle: { textAlign: 'center' }
     });
 
     const textColumn = (field, title) => ({
-        title,
+        headerName: title,
         field,
         minWidth: 160,
-        widthGrow: 2,
-        headerSort: false,
-        cssClass: 'cell-editable',
-        formatter: textCellFormatter,
-        editor: textAreaEditor
+        flex: 2,
+        sortable: false,
+        cellClass: 'cell-editable',
+        cellRenderer: textCellFormatter,
+        editable: true,
+        cellEditor: 'agLargeTextCellEditor',
+        cellEditorParams: { maxLength: 500, rows: 3, cols: 40 }
     });
 
     if (dataSetTypeId == 3) {
         return [
-            { title: 'File Type', field: 'FileType', minWidth: 120, headerSort: false, titleFormatter: rowVisibilityTitleFormatter },
+            { headerName: 'File Type', field: 'FileType', minWidth: 120, sortable: true },
             textColumn('FileDescription', 'File Description'),
             flagColumn('Redact', 'Redact'),
             flagColumn('Deidentify', 'Deidentify')
@@ -544,14 +546,14 @@ function buildColumnDefs(dataSetTypeId) {
     }
 
     return [
-        { title: 'Column Name', field: 'ColumnName', minWidth: 160, widthGrow: 1, headerSort: false, titleFormatter: rowVisibilityTitleFormatter },
+            { headerName: 'Column Name', field: 'ColumnName', minWidth: 160, flex: 1, sortable: true, headerClass: 'tre-grid-active-header' },
         {
-            title: 'Column Type',
+            headerName: 'Column Type',
             field: 'ColumnType',
             width: 120,
-            headerSort: false,
-            formatter: (cell) => {
-                const raw = cell.getValue();
+            sortable: false,
+            cellRenderer: (params) => {
+                const raw = params.value;
                 return escapeHtml(String(getDisplayColumnType(raw) || raw || ''));
             }
         },
@@ -571,6 +573,7 @@ function setColumnsTableData(data, dataSetTypeId = currentDataSourceTypeID, empt
     if (!el) return;
 
     const rows = Array.isArray(data) ? data : [];
+    el.classList.add('ag-theme-alpine');
     // Redact takes priority if both flags arrive set.
     rows.forEach(col => {
         if (col.Redact && col.Deidentify) col.Deidentify = false;
@@ -591,29 +594,40 @@ function setColumnsTableData(data, dataSetTypeId = currentDataSourceTypeID, empt
     const isFolder = dataSetTypeId == 3;
     rowVisibilityField = isFolder ? 'FileType' : 'ColumnName';
     columnSortDirection = isFolder ? null : (columnSortDirection || 'asc');
-    columnsTable = new Tabulator(el, {
-        data: rows,
-        columns: buildColumnDefs(dataSetTypeId),
-        layout: 'fitColumns',
+    columnsTable = createGrid(el, {
+        rowData: rows,
+        columnDefs: buildColumnDefs(dataSetTypeId).map((column) => ({
+            ...column,
+            filter: false,
+            resizable: true,
+            wrapText: false,
+            autoHeight: false,
+            suppressHeaderMenuButton: false
+        })),
+        autoSizeStrategy: { type: 'fitGridWidth' },
         pagination: true,
-        paginationMode: 'local',
-        paginationSize: pageSize,
-        paginationCounter: 'rows',
-        placeholder: emptyMessage,
-        placeholderHeaderFilter: 'No columns match your search or filter.',
-        initialSort: columnSortDirection ? [{ column: rowVisibilityField, dir: columnSortDirection }] : [],
-        groupBy: isFolder ? (row) => row.FolderName || 'Unnamed Folder' : false,
-        groupHeader: (value, count) => `${escapeHtml(String(value))} <span class="text-muted">(${count})</span>`,
-        groupStartOpen: true
+        paginationPageSize: pageSize,
+        paginationPageSizeSelector: false,
+        defaultColDef: {
+            sortable: true,
+            resizable: true,
+            suppressHeaderMenuButton: false,
+            minWidth: 110
+        },
+        headerHeight: 48,
+        rowHeight: 42,
+        overlayNoRowsTemplate: `<span>${escapeHtml(emptyMessage)}</span>`,
+        isExternalFilterPresent: () => hiddenRowLabels.size > 0,
+        doesExternalFilterPass: (node) => !hiddenRowLabels.has(columnRowLabel(node.data)),
+        onCellValueChanged: syncColumnsFromTable,
+        onGridReady: (params) => {
+            columnsTableReady = true;
+            if (columnSortDirection) params.api.applyColumnState({ state: [{ colId: rowVisibilityField, sort: columnSortDirection }] });
+            params.api.onFilterChanged();
+            renderRowVisibilityList();
+            notifyColumnsDataChanged();
+        }
     });
-
-    columnsTable.on('tableBuilt', () => {
-        columnsTableReady = true;
-        columnsTable.setFilter((row) => !hiddenRowLabels.has(columnRowLabel(row)));
-        renderRowVisibilityList();
-        notifyColumnsDataChanged();
-    });
-    columnsTable.on('cellEdited', syncColumnsFromTable);
 
     renderRowVisibilityList();
     notifyColumnsDataChanged();
@@ -3166,8 +3180,8 @@ async function renderManageDataSetPage() {
             collapseIcon.style.display = 'none';
         }
 
-        // Tabulator needs a redraw once its container size changes.
-        if (columnsTable) columnsTable.redraw(true);
+        // AG Grid needs its columns resized once its container size changes.
+        if (columnsTable) columnsTable.sizeColumnsToFit();
     }
 
     toggleBtn.addEventListener('click', toggleTableFullscreen);

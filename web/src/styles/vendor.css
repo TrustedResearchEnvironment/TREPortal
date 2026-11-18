@@ -1,7 +1,16 @@
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
+@import "@fontsource/roboto/700.css";
 @import "bootstrap/dist/css/bootstrap.min.css";
 @import "@fortawesome/fontawesome-free/css/all.min.css";
 @import "material-symbols/outlined.css";
+@import "ag-grid-community/styles/ag-grid.css";
+@import "ag-grid-community/styles/ag-theme-alpine.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html, body, button, input, select, textarea {
+	font-family: Roboto, Arial, sans-serif;
+}

@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="manageDataSets.css">
 </head>
 <body style="height:100vh;overflow:hidden;display:flex;flex-direction:column;margin:0;">
-<div class="container-fluid px-4" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;padding-top:1rem;">
+<div class="container-fluid" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;padding:0.75rem 0.75rem 0;">
     
     <!-- ========================================================= -->
     <!-- ===== FIX #1: The <form> tag now wraps everything ===== -->
@@ -18,7 +18,7 @@
 
         <div class="row" style="flex:1;overflow:hidden;min-height:0;margin:0;">
             <!-- ===== LEFT COLUMN (4/12) ===== -->
-            <div class="col-md-4" style="height:100%;overflow-y:auto;padding-right:1rem;">
+            <div class="col-md-4" style="height:100%;overflow-y:auto;padding-right:0.75rem;">
                 
                 <!-- Step 1: Primary Dropdown -->
                 <div class="mb-3">
@@ -95,7 +95,7 @@
             </div> <!-- End of left column -->
 
             <!-- ===== RIGHT COLUMN (8/12) ===== -->
-            <div class="col-md-8" style="height:100%;overflow-y:auto;">
+            <div class="col-md-8" style="height:100%;overflow-y:auto;padding-left:0.75rem;">
                 <div class="d-flex flex-wrap align-items-center justify-content-between mb-2 gap-3">
                     <h6 class="mb-0 flex-shrink-0">Columns</h6>
                     <button id="toggleFullscreenBtn" class="modern-fullscreen-btn" aria-label="Toggle Fullscreen">
@@ -125,14 +125,14 @@
                         </div>
                         <ul id="columnVisibilityList" class="list-unstyled mb-0" style="max-height:240px;overflow-y:auto;"></ul>
                     </div>
-                    <div class="table-responsive position-relative">
+                    <div class="table-responsive position-relative" style="height:100%;min-height:260px;overflow:visible;">
                         <div id="dataSetColsLoader" class="d-none position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" style="background: rgba(255,255,255,0.85); z-index: 3;">
                             <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
                             <span class="mt-2 text-muted small">Loading columns...</span>
                         </div>
                         <div id="dataSetColsTable" aria-busy="false"></div>
                     </div>
-                        <!-- Pagination is rendered by Tabulator inside #dataSetColsTable -->
+                        <!-- AG Grid renders pagination inside #dataSetColsTable -->
                     </div>
                 </div>
             </div> <!-- End of right column -->
