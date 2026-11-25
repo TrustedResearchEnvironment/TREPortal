@@ -488,8 +488,16 @@ def CreateDataApproveImport(auth_token: str, ImportRequestID: int, upn: str):
     print(approveImportTask)
   
     # Add task to job
-    AddTaskToJob(auth_token, newJob["jobId"], submitImportTask["taskId"], upn, runSequence=1)
+    submitSeq = AddTaskToJob(auth_token, newJob["jobId"], submitImportTask["taskId"], upn, runSequence=1)
     newSeq = AddTaskToJob(auth_token, newJob["jobId"], approveImportTask["taskId"], upn, runSequence=2)
+
+    submitParameterDictionary = GetParameterDictionary(submitImportTask['parameterNames'], submitImportTask['parameterDefaults'])
+    print(submitParameterDictionary)
+    submitParameterDictionary["UserUPN"] = upn
+    submitParameterDictionary["ImportRequestID"] = ImportRequestID
+    print("Updated parameters for submit import task:", submitParameterDictionary)
+    names, defaults = MakeParameterString(submitParameterDictionary)
+    PatchParametersForTask(auth_token, newJob["jobId"], submitImportTask["taskId"], submitSeq["jobSequenceId"], names, defaults)
 
     parameterDictionary = GetParameterDictionary(approveImportTask['parameterNames'], approveImportTask['parameterDefaults'])
     print(parameterDictionary)
