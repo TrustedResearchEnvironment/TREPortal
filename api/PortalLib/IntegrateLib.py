@@ -38,7 +38,6 @@ LOOME_INTEGRATE_EXPORT_TASK_NAME = os.getenv("LOOME_INTEGRATE_EXPORT_TASK_NAME")
 LOOME_INTEGRATE_IMPORT_TASK_NAME = os.getenv("LOOME_INTEGRATE_IMPORT_TASK_NAME")
 LOOME_INTEGRATE_PREP_REPOS_TASK_NAME = os.getenv("LOOME_INTEGRATE_PREP_REPOS_TASK_NAME")  
 LOOME_INTEGRATE_APPROVE_IMPORT_PROJECT_NAME = os.getenv("LOOME_INTEGRATE_APPROVE_IMPORT_PROJECT_NAME")
-LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME = os.getenv("LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME")
 LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME = os.getenv("LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME")
 LOOME_INTEGRATE_APPROVE_EXPORT_PROJECT_NAME = os.getenv("LOOME_INTEGRATE_APPROVE_EXPORT_PROJECT_NAME")
 LOOME_INTEGRATE_APPROVE_EXPORT_TASK_NAME = os.getenv("LOOME_INTEGRATE_APPROVE_EXPORT_TASK_NAME")
@@ -56,7 +55,6 @@ _required_env_vars = {
     "LOOME_INTEGRATE_IMPORT_TASK_NAME": LOOME_INTEGRATE_IMPORT_TASK_NAME,
     "LOOME_INTEGRATE_PREP_REPOS_TASK_NAME": LOOME_INTEGRATE_PREP_REPOS_TASK_NAME,
     "LOOME_INTEGRATE_APPROVE_IMPORT_PROJECT_NAME": LOOME_INTEGRATE_APPROVE_IMPORT_PROJECT_NAME,
-    "LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME": LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME,
     "LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME": LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME,
     "LOOME_INTEGRATE_APPROVE_EXPORT_PROJECT_NAME": LOOME_INTEGRATE_APPROVE_EXPORT_PROJECT_NAME,
     "LOOME_INTEGRATE_APPROVE_EXPORT_TASK_NAME": LOOME_INTEGRATE_APPROVE_EXPORT_TASK_NAME,
@@ -93,7 +91,6 @@ def test_integrate_connection():
         print(f"LOOME_INTEGRATE_IMPORT_TASK_NAME: {LOOME_INTEGRATE_IMPORT_TASK_NAME}")
         print(f"LOOME_INTEGRATE_PREP_REPOS_TASK_NAME: {LOOME_INTEGRATE_PREP_REPOS_TASK_NAME}")
         print(f"LOOME_INTEGRATE_APPROVE_IMPORT_PROJECT_NAME: {LOOME_INTEGRATE_APPROVE_IMPORT_PROJECT_NAME}")
-        print(f"LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME: {LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME}")
         print(f"LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME: {LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME}")
         print(f"LOOME_INTEGRATE_APPROVE_EXPORT_PROJECT_NAME: {LOOME_INTEGRATE_APPROVE_EXPORT_PROJECT_NAME}")
         print(f"LOOME_INTEGRATE_APPROVE_EXPORT_TASK_NAME: {LOOME_INTEGRATE_APPROVE_EXPORT_TASK_NAME}")
@@ -465,17 +462,7 @@ def CreateDataApproveImport(auth_token: str, ImportRequestID: int, upn: str):
     # get all tasks 
     allTasks = GetAllTasksAvailableForJobByID(auth_token, newJob["jobId"])
    
-    # get the task with name "Submit Import Request"
-    submitImportTask = next((task for task in allTasks if task.get("taskName") == LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME), None)
-    if not submitImportTask:
-        print("Submit import request task not found in the job:", LOOME_INTEGRATE_SUBMIT_IMPORT_REQUEST_TASK_NAME)
-        print(newJob)
-        # list all names
-        for task in allTasks:
-            print(f"Task: {task.get('taskName')} (ID: {task.get('taskId')})")
-        return
-
-    # get the task with name "Approve Import"
+    # get the task with name "Add Task to Job"
     approveImportTask = next((task for task in allTasks if task.get("taskName") == LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME), None)
     if not approveImportTask:
         print("Approve import task not found in the job:", LOOME_INTEGRATE_APPROVE_IMPORT_TASK_NAME)
@@ -488,16 +475,7 @@ def CreateDataApproveImport(auth_token: str, ImportRequestID: int, upn: str):
     print(approveImportTask)
   
     # Add task to job
-    submitSeq = AddTaskToJob(auth_token, newJob["jobId"], submitImportTask["taskId"], upn, runSequence=1)
-    newSeq = AddTaskToJob(auth_token, newJob["jobId"], approveImportTask["taskId"], upn, runSequence=2)
-
-    submitParameterDictionary = GetParameterDictionary(submitImportTask['parameterNames'], submitImportTask['parameterDefaults'])
-    print(submitParameterDictionary)
-    submitParameterDictionary["UserUPN"] = upn
-    submitParameterDictionary["ImportRequestID"] = ImportRequestID
-    print("Updated parameters for submit import task:", submitParameterDictionary)
-    names, defaults = MakeParameterString(submitParameterDictionary)
-    PatchParametersForTask(auth_token, newJob["jobId"], submitImportTask["taskId"], submitSeq["jobSequenceId"], names, defaults)
+    newSeq = AddTaskToJob(auth_token, newJob["jobId"], approveImportTask["taskId"], upn, runSequence=1)
 
     parameterDictionary = GetParameterDictionary(approveImportTask['parameterNames'], approveImportTask['parameterDefaults'])
     print(parameterDictionary)
